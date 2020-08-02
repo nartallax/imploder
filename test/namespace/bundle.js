@@ -1,0 +1,3 @@
+"use strict";
+define.e({"name":"/main","exports":["main"]},"define([\"require\", \"exports\", \"/namespace_loc\"], function (require, exports, namespace_loc_1) {\n    \"use strict\";\n    exports.__esModule = true;\n    function main() {\n        console.log(namespace_loc_1.LocNs.t);\n    }\n    exports.main = main;\n});\n");
+define.e({"name":"/namespace_loc","exports":["LocNs"]},"define([\"require\", \"exports\"], function (require, exports) {\n    \"use strict\";\n    exports.__esModule = true;\n    var LocNs;\n    (function (LocNs) {\n        LocNs.t = 3;\n    })(LocNs = exports.LocNs || (exports.LocNs = {}));\n});\n");

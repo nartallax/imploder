@@ -1,0 +1,18 @@
+{ 
+    "bundlerConfig": {
+        "entryModule": "ts/main.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "noLoaderCode": true
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["ts/*"],
+            "l/*": ["lib/*"],
+            "my_lib": ["lib/my_lib.ts"]
+        }
+    }
+}

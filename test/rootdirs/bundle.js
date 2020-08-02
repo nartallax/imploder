@@ -1,0 +1,4 @@
+"use strict";
+define.e({"name":"/lib/lib","exports":["getValue"]},"define([\"require\", \"exports\"], function (require, exports) {\n    \"use strict\";\n    exports.__esModule = true;\n    function getValue() {\n        return 1;\n    }\n    exports.getValue = getValue;\n});\n");
+define.e({"name":"/lib/lib2","exports":["getValue2"]},"define([\"require\", \"exports\", \"/lib/lib\"], function (require, exports, lib_1) {\n    \"use strict\";\n    exports.__esModule = true;\n    function getValue2() {\n        return lib_1.getValue() + 2;\n    }\n    exports.getValue2 = getValue2;\n});\n");
+define.e({"name":"/ts/main","exports":["main"]},"define([\"require\", \"exports\", \"/lib/lib\", \"/lib/lib2\"], function (require, exports, lib_1, lib2_1) {\n    \"use strict\";\n    exports.__esModule = true;\n    function main() {\n        console.log(lib_1.getValue() + lib2_1.getValue2());\n    }\n    exports.main = main;\n});\n");

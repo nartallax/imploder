@@ -1,0 +1,1 @@
+export const otherLibValue = 5;

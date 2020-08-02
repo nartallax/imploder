@@ -1,0 +1,12 @@
+export const testListStr = `
+cyclic_exportall
+dynamic_imports_misconfigured
+exports
+namespace
+paths
+proj_synth
+resolvable_cyclic_reference
+rootdirs
+type_only_imports
+unresolvable_cyclic_reference
+`;

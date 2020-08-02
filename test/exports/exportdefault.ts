@@ -1,0 +1,1 @@
+export default function getValue(){ return 5 };

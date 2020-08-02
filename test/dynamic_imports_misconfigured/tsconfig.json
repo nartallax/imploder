@@ -1,0 +1,18 @@
+{ 
+    "bundlerConfig": {
+        "entryModule": "main.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "noLoaderCode": true
+    },
+    
+    "compilerOptions": {
+        "module": "AMD",
+        "target": "ES2017",
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["./*"]
+        }
+    }
+}

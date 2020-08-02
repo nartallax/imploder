@@ -1,0 +1,17 @@
+{
+  "name": "tsbundler_3",
+  "version": "1.0.0",
+  "description": "A tool to assemble Typescript projects into Javascript bundle files.",
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "./compile.sh",
+    "test": "node main.js --test"
+  },
+  "author": "Nartallax",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^13.7.6",
+    "tslib": "^2.0.0",
+    "typescript": "^3.9.7"
+  }
+}

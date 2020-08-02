@@ -1,0 +1,2 @@
+"use strict";
+define.e({"name":"/main","exports":["main"]},"define([\"require\", \"exports\"], function (require, exports) {\n    \"use strict\";\n    Object.defineProperty(exports, \"__esModule\", { value: true });\n    async function main() {\n        console.log(\"importing...\");\n        let ref = await new Promise((resolve_1, reject_1) => { require([\"/fs\"], resolve_1, reject_1); });\n        console.log(ref.x + \"!\");\n    }\n    exports.main = main;\n});\n");
