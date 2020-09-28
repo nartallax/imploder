@@ -1,0 +1,1 @@
+export const INT_FIVE = 7;

@@ -1,6 +1,5 @@
-define(["require", "exports"], function (require, exports) {
-    "use strict";
+function (exports, require) {
     return function () {
         return 10;
     };
-});
+}

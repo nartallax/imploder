@@ -1,9 +1,4 @@
-define(["require", "exports", "/b"], function (require, exports, b_1) {
-    "use strict";
-    function __export(m) {
-        for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
-    }
-    exports.__esModule = true;
+function (exports, require, tslib_1, b_1) {
     exports.x = 5;
-    __export(b_1);
-});
+    tslib_1.__exportStar(b_1, exports);
+}

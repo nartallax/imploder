@@ -1,2 +1,1 @@
-"use strict";
-define.e({"name":"/main","exports":["main"]},"define([\"require\", \"exports\"], function (require, exports) {\n    \"use strict\";\n    exports.__esModule = true;\n    exports.main = void 0;\n    function main() {\n        var obj = { x: 5, y: 10 };\n        var t = new Map();\n        console.log(obj.x + \" \" + obj.y + \" \" + t.size);\n    }\n    exports.main = main;\n});\n");
+[["/main",[],{"exports":["main"]},"function (exports, require) {\n    function main() {\n        var obj = { x: 5, y: 10 };\n        var t = new Map();\n        console.log(obj.x + \" \" + obj.y + \" \" + t.size);\n    }\n    exports.main = main;\n}\n"]]

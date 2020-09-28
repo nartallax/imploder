@@ -118,8 +118,8 @@ class TestProject {
 				let allCode = [
 					this.compiler.bundler.getPrefixCode(), 
 					this.producedBundleText, 
-					this.compiler.bundler.getPostfixCode("mainThen")].join("\n")
-
+					this.compiler.bundler.getPostfixCode("mainThen")
+				].join("\n");
 				try {
 					eval(allCode);
 				} catch(e){
@@ -155,25 +155,30 @@ class TestProject {
 		} catch(e){
 			err = e;
 		}
-		if(!this.checkError(err, "compile-time", this.compileErrorText))
+
+		if(!this.checkError(err, "compile-time", this.compileErrorText)){
 			return false;
-		if(err)
+		}
+		if(err){
 			return true;
+		}
 
 		try {
-			if(!(await this.checkStdout()))
+			if(!(await this.checkStdout())){
 				return false;
+			}
 		} catch(e){
 			err = e;
 		}
 		
-		if(!this.checkError(err, "runtime", this.runtimeErrorText))
+		if(!this.checkError(err, "runtime", this.runtimeErrorText)){
 			return false;
-		if(err)
+		}
+		if(err){
 			return true;
+		}
 		
 		return this.checkBundle();
-
 	}
 
 }

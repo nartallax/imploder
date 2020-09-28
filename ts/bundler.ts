@@ -1,10 +1,10 @@
 import {Compiler} from "compiler";
 import {ModuleOrderer} from "module_orderer";
-import {ModuleMeta} from "module_meta_storage";
 import {loaderCode} from "generated/loader_code";
 import {logDebug} from "log";
 import * as path from "path";
 import {readTextFile} from "afs";
+import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
 
 /** сборщик бандл-файла из кучи исходников */
 export class Bundler {
@@ -16,7 +16,7 @@ export class Bundler {
 	}
 
 	async produceBundle(): Promise<string>{
-		let result = ["\"use strict\";"];
+		let result = [] as string[];
 		if(!this.compiler.noLoaderCode){
 			result.push(this.getPrefixCode());
 		}
@@ -26,14 +26,8 @@ export class Bundler {
 		let moduleOrder = new ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.compiler.entryModule);
 		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
 
-		moduleOrder.modules.forEach(name => {
-			let meta = this.compiler.metaStorage.get(name);
-			let code = meta.jsCode;
-			if(!code){
-				throw new Error("Code for module " + name + " is not loaded at bundling time.");
-			}
-			result.push(this.getModuleEvalCode(name, meta, code));
-		});
+		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
+		result.push(JSON.stringify(defArrArr));
 		
 		if(!this.compiler.noLoaderCode){
 			result.push(this.getPostfixCode());
@@ -42,39 +36,69 @@ export class Bundler {
 		return result.join("\n");
 	}
 
-	private getModuleEvalCode(name: string, meta: ModuleMeta, code: string): string{
-		let data: ModuleMetaShort = { name: name };
+	private buildModuleDefinitionArrayArray(modules: string[], circularDependentModules: Set<string>): ModuleDefinitonArray[] {
+		return modules.map(name => {
+			let meta = this.compiler.metaStorage.get(name);
+			let code = meta.jsCode;
+			if(!code){
+				throw new Error("Code for module " + name + " is not loaded at bundling time.");
+			}
 
-		if(meta.exports.length > 0){
-			data.exports = meta.exports;
-		}
+			let haveModuleRefs = meta.exportModuleReferences.length > 0;
+			let needExports = meta.exports.length > 0 && circularDependentModules.has(name)
+			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
 
-		if(meta.exportModuleReferences.length > 0){
-			data.exportRefs = meta.exportModuleReferences;
-		}
-		if(meta.hasOmniousExport){
-			data.arbitraryType = true;
-		}
-		return `define.e(${JSON.stringify(data)},${JSON.stringify(code)});`
+				let short: ModuleMetaShort = {}
+				if(haveModuleRefs){
+					short.exportRefs = meta.exportModuleReferences;
+				}
+				if(needExports){
+					short.exports = meta.exports;
+				}
+				if(meta.hasOmniousExport){
+					short.arbitraryType = true;
+				}
+				if(meta.altName){
+					short.altName = meta.altName;
+				}
+
+				return [name, meta.dependencies, short, code]
+			} else {
+				return meta.dependencies.length > 0? [name, meta.dependencies, code]: [name, code]
+			}
+		});
 	}
 
-	private getLoaderPostfixCode(): string {
-		return [
-			!this.compiler.errorHandlerName? null: `define.errorHandler=${this.compiler.errorHandlerName};`,
-			`define.amdRequire=${this.compiler.amdRequireName};`,
-			`define.commonjsRequire=${this.compiler.commonjsRequireName};`,
-			`define.preferCommonjs=${this.compiler.preferCommonjs? "true": "false"};`
-		].filter(_ => !!_).join("\n")
-	} 
-
 	getPrefixCode(): string {
-		return loaderCode + "\n" + this.getLoaderPostfixCode();
+		return loaderCode.replace(/;?[\n\s]*$/, "") + "(\n";
 	}
 
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
 	getPostfixCode(thenCode?: string): string {
-		return `define.launch(${JSON.stringify(this.compiler.entryModule)},${JSON.stringify(this.compiler.entryFunction)}${thenCode? "," + thenCode: ""});`
+		let params: any = {
+			entryPoint: {
+				module: this.compiler.entryModule,
+				function: this.compiler.entryFunction
+			}
+		};
+		if(this.compiler.errorHandlerName){
+			params.errorHandler = this.compiler.errorHandlerName;
+		}
+		if(this.compiler.amdRequireName !== "require"){
+			params.amdRequire = this.compiler.amdRequireName
+		}
+		if(this.compiler.commonjsRequireName !== "require"){
+			params.commonjsRequire = this.compiler.commonjsRequireName;
+		}
+		if(this.compiler.preferCommonjs){
+			params.preferCommonjs = true;
+		}
+		let paramStr = JSON.stringify(params);
+		if(thenCode){
+			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("afterEntryPointExecuted")}:${thenCode}}`;
+		}
+		return ",\n" + paramStr + ");"
 	}
 
 	private async loadAbsentModuleCode(): Promise<void> {
@@ -88,11 +112,6 @@ export class Bundler {
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
 					mod.jsCode = code;
-					// почему я получаю список зависимостей именно так?
-					// потому что тогда в него не попадают зависимости, из которых нужны только типы, но не значения
-					// альтернатива этому - анализировать код на этапе трансформации
-					// но это долго, сложно и будут ошибки, так что проще так
-					discoverModuleDependencies(mod, moduleName);
 				})());
 			}
 		});
@@ -101,35 +120,4 @@ export class Bundler {
 		}
 	}
 
-}
-
-function discoverModuleDependencies(meta: ModuleMeta, moduleName: string): void {
-	if(!meta.hasImportOrExport){
-		// у не-модульных файлов с кодом нечего особо дисковерить, скипаем
-		return;
-	}
-
-	let result: string[] | null = null;
-	function define(deps: string[]){
-		if(result){
-			throw new Error("Uncorrect module code for " + moduleName + ": expected no more than one invocation of define().");
-		}
-		result = deps.filter(_ => _ !== "exports" && _ !== "require");
-	}
-	void define;
-	if(!meta.jsCode){
-		throw new Error("Could not discover dependencies of module " + moduleName + ": no code loaded.");
-	}
-	eval(meta.jsCode);
-	if(!result){
-		throw new Error("Uncorrect module code for " + moduleName + ": expected at least one invocation of define().");
-	}
-	meta.dependencies = result;
-}
-
-export interface ModuleMetaShort {
-	name: string;
-	exports?: string[];
-	exportRefs?: string[];
-	arbitraryType?: true;
 }

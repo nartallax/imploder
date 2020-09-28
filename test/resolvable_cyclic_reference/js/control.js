@@ -1,6 +1,4 @@
-define(["require", "exports", "/button"], function (require, exports, button_1) {
-    "use strict";
-    exports.__esModule = true;
+function (exports, require, button_1) {
     var idCounter = 0;
     var Control = /** @class */ (function () {
         function Control() {
@@ -10,4 +8,4 @@ define(["require", "exports", "/button"], function (require, exports, button_1) 
         return Control;
     }());
     exports.Control = Control;
-});
+}

@@ -23,7 +23,7 @@ export function getModulePathMatcher(compilerOptions: tsc.CompilerOptions, tscon
 	
 	let mappings = parsePathsFromTsconfig(absBaseUrl, compilerOptions.paths || {});
 
-	return modulePath => tryApplyMappings(mappings, modulePath);
+	return modulePath => tryApplyMappings(mappings, modulePath, absBaseUrl);
 }
 
 type PathMappings = {fixed: OMap<string>, wildcard: OMap<string[]>}
@@ -87,18 +87,20 @@ function isPathAbsolute(p: string): boolean {
 }
 
 /** попытаться, используя маппинги путей, получить абсолютный путь к файлу модуля */
-function tryApplyMappings(mappings: PathMappings, modulePath: string): string | null {
+function tryApplyMappings(mappings: PathMappings, modulePath: string, absBaseUrl: string): string | null {
 	let fixedPath = mappings.fixed[modulePath];
-	if(fixedPath)
+	if(fixedPath){
 		return fixedPath;
+	}
 
 	let matchedPrefixes: string[] = [];
 	let matchedFiles: string[] = [];
-	for(let modulePrefix in mappings.wildcard){
+
+	function tryUsePrefix(modulePrefix: string, substitutes: string[]): void {
 		if(modulePath.startsWith(modulePrefix)){
 			matchedPrefixes.push(modulePrefix);
 			let pathPostfix = modulePath.substr(modulePrefix.length);
-			for(let pathPrefix of mappings.wildcard[modulePrefix]){
+			for(let pathPrefix of substitutes){
 				let fullModulePath = joinModulePath(pathPrefix, pathPostfix);
 				if(typescriptFileExists(fullModulePath)){
 					matchedFiles.push(fullModulePath);
@@ -107,10 +109,28 @@ function tryApplyMappings(mappings: PathMappings, modulePath: string): string | 
 		}
 	}
 
+	// смысл этого кода следующий:
+	// если на путь к модулю сматчился хотя бы один префикс - то модуль мы будем искать в нем
+	// если не сматчился ни один - то пробуем матчить так, как если бы был задан path "*": ["./*"]
+	// судя по докам, если путь матчится хотя бы на один вилдкард-путь из конфига
+	// - то нужно использовать только те значения, которые этому вилдкарду соответствуют
+	// если не сматчился ни один - то резолвить как обычно
+	// см. тест paths - если убрать "*": ... из конфига, то некоторые имена модулей, 
+	// которые до этого не резолвились, начнут резолвиться (например, "more_ts/consts")
+	// доки: https://www.typescriptlang.org/docs/handbook/module-resolution.html#path-mapping
+	for(let modulePrefix in mappings.wildcard){
+		tryUsePrefix(modulePrefix, mappings.wildcard[modulePrefix])
+	}
+	if(matchedPrefixes.length === 0){
+		tryUsePrefix("", [path.join(absBaseUrl, "./")]);
+	}
+
 	if(matchedFiles.length === 1){
 		return matchedFiles[0];
 	}
 
+	// что именно должен делать компилятор в случаях коллизий - доки умалчивают
+	// ну, видимо, буду выдавать ошибку
 	if(matchedPrefixes.length > 0){
 		if(matchedFiles.length < 1){
 			logWarn("For module dependency path \"" 

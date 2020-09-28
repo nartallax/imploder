@@ -2,13 +2,13 @@ import * as tsc from "typescript";
 import * as path from "path";
 import {BundlerConfig} from "config";
 import {logErrorAndExit, logError, logWarn, logInfo} from "log";
-import {BundlerTransformer} from "transformer/bundler_transformer";
+import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
 import {isPathNested, stripTsExt} from "path_utils";
 import {ModuleMetadataStorage} from "module_meta_storage";
 import {Bundler} from "bundler";
 import {writeTextFile} from "afs";
-import {ModulePathResolver} from "transformer/module_path_resolver";
-import {visitNodeRecursive} from "transformer/transformer_utils";
+import {ModulePathResolver} from "module_path_resolver";
+import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
 
 type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
 
@@ -86,7 +86,7 @@ export class Compiler {
 		this.config = config;
 		this.modulePathResolver = new ModulePathResolver(this.tsconfigPath, this.mergedConfig.options);
 		this.transformers = [
-			context => new BundlerTransformer(context, this.metaStorage, this.modulePathResolver),
+			context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
 			...transformers
 		];
 		this.bundler = new Bundler(this);
@@ -125,6 +125,10 @@ export class Compiler {
 		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, {
 			before: this.transformers,
 			after: [
+				context => new AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
+			]
+			/*
+			after: [
 				context => ({
 					transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
 						let prefix = fileNode.fileName;
@@ -132,8 +136,7 @@ export class Compiler {
 							prefix = "..." + prefix.substr(prefix.length - 30);
 						}
 						return visitNodeRecursive(fileNode, context, (node, depth) => {
-							//console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-							if(node)
+							console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
 							return node;
 						}) as tsc.SourceFile;
 					},
@@ -142,6 +145,7 @@ export class Compiler {
 					}
 				})
 			]
+			*/
 		});
 		processTypescriptDiagnostics(emitResult.diagnostics);
 

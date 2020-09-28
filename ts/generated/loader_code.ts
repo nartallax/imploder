@@ -1,32 +1,31 @@
 export const loaderCode = `
-var define = (function () {
-    var defMap = {};
-    var renames = {};
+(function (defs, params) {
     function handleError(e, action) {
-        if (define.errorHandler) {
-            define.errorHandler(e, action);
+        if (params.errorHandler) {
+            params.errorHandler(e, action);
         }
         else {
             console.error("Error" + (action ? " " + action : "") + ": " + (e.stack || e.message || e));
         }
         throw e;
     }
-    function hasEs5() {
-        if (!Object.defineProperty)
-            return false;
-        var x = {}, y = 5;
-        Object.defineProperty(x, "a", {
-            get: function () { return y; },
-            set: function (v) { return y = v; }
-        });
-        if (x.a !== 5)
-            return false;
-        x.a = 10;
-        return x.a === 10;
+    // разбираем полученный массив определений
+    var renames = {};
+    var defMap = {};
+    for (var i = 0; i < defs.length; i++) {
+        var v = defs[i];
+        var m = typeof (v[2]) !== "string" ? v[2] : undefined;
+        var def = m ? m : {};
+        def.name = v[0];
+        def.code = v[v.length - 1];
+        if (m && m.altName) {
+            renames[m.altName] = def.name;
+        }
+        def.dependencies = Array.isArray(v[1]) ? v[1] : [];
+        defMap[def.name] = def;
     }
-    if (!hasEs5()) {
-        handleError(new Error("No ES5 support detected."));
-    }
+    var amdRequire = params.amdRequire || require;
+    var commondjsRequire = params.commonjsRequire || require;
     /** функция, которую будут дергать в качестве require изнутри модулей */
     function requireAny(names, onOk, onError) {
         if (Array.isArray(names) && !onOk) {
@@ -38,7 +37,7 @@ var define = (function () {
                 return getProduct(name_1);
             }
             else {
-                return define.commonjsRequire(name_1);
+                return commondjsRequire(name_1);
             }
         }
         else {
@@ -63,7 +62,7 @@ var define = (function () {
                     return callOk_1();
                 }
                 else {
-                    return define.amdRequire(externalNameArr_1, function (externalResults) {
+                    return amdRequire(externalNameArr_1, function (externalResults) {
                         for (var i = 0; i < externalNameArr_1.length; i++) {
                             results_1[externalNameArr_1[i]] = externalResults[i];
                         }
@@ -81,101 +80,32 @@ var define = (function () {
             }
         }
     }
-    function requireExternal(names, onOk, onError) {
-        if (define.preferCommonjs) {
-            try {
-                onOk(names.map(function (name) { return define.commonjsRequire(name); }));
-            }
-            catch (e) {
-                onError(e);
-            }
-        }
-        else {
-            define.amdRequire(names, function () { onOk(arguments); }, onError);
-        }
-    }
-    function discoverExternalModules(moduleName, result, visited) {
-        if (result === void 0) { result = []; }
-        if (visited === void 0) { visited = {}; }
-        if (moduleName in renames) {
-            moduleName = renames[moduleName];
-        }
-        if (moduleName in visited || moduleName === "require" || moduleName === "exports")
-            return;
-        visited[moduleName] = true;
-        if (moduleName in defMap) {
-            defMap[moduleName].dependencies.forEach(function (depName) { return discoverExternalModules(depName, result, visited); });
-        }
-        else {
-            result.push(moduleName);
-        }
-        return result;
-    }
-    function preloadExternalModules(entryPoint, onDone) {
-        var externalNames = discoverExternalModules(entryPoint);
-        requireExternal(externalNames, function (externalValues) {
-            externalNames.forEach(function (name, i) {
-                defMap[externalNames[i]] = {
-                    definitor: function () { throw new Error("Impossible to invoke definition of external module \\"" + name + "\\"."); },
-                    product: externalValues[i],
-                    dependencies: [],
-                    exports: [],
-                    name: name,
-                    external: true,
-                    arbitraryType: true // мы ничего не знаем про экспортируемое значение, поэтому так
-                };
-            });
-            onDone();
-        }, handleError);
-    }
-    var nextMeta = null;
-    var define = function (name, deps, definitor) {
-        if (Array.isArray(name)) {
-            definitor = deps;
-            deps = name;
-            name = null;
-        }
-        var meta = nextMeta;
-        if (!meta) {
-            handleError(new Error("No module metadata is passed before calling define()."));
-            return;
-        }
-        if (name) {
-            renames[name] = meta.name;
-        }
-        meta.dependencies = deps;
-        meta.definitor = definitor;
-        defMap[meta.name] = meta;
-    };
     var currentlyDefiningProductMap = {};
     var currentlyDefiningProductSeq = [];
-    function getProduct(name) {
-        if (name in renames) {
-            name = renames[name];
+    var products = {};
+    function throwCircularDependencyError(name) {
+        var str = name;
+        for (var i = currentlyDefiningProductSeq.length - 1; i >= 0; i--) {
+            var n = currentlyDefiningProductSeq[i];
+            str += " <- " + currentlyDefiningProductSeq[i];
+            if (n === name)
+                break;
         }
+        throw new Error("Unresolvable circular dependency detected: " + str);
+    }
+    function getProduct(name) {
+        name = renames[name] || name;
         var meta = defMap[name];
-        if (!meta.product) {
+        if (!(name in products)) {
             if (name in currentlyDefiningProductMap) {
-                var str = name;
-                for (var i = currentlyDefiningProductSeq.length - 1; i >= 0; i--) {
-                    var n = currentlyDefiningProductSeq[i];
-                    str += " <- " + currentlyDefiningProductSeq[i];
-                    if (n === name)
-                        break;
-                }
-                throw new Error("Unresolvable circular dependency detected: " + str);
+                throwCircularDependencyError(name);
             }
             currentlyDefiningProductMap[name] = true;
             currentlyDefiningProductSeq.push(name);
             try {
-                var product_1;
-                var deps = meta.dependencies.map(function (name) {
-                    if (name === "exports") {
-                        return product_1 = {};
-                    }
-                    else if (name === "require") {
-                        return requireAny;
-                    }
+                var product = {};
+                var deps_1 = [product, requireAny];
+                meta.dependencies.forEach(function (name) {
                     if (name in renames) {
                         name = renames[name];
                     }
@@ -183,32 +113,34 @@ var define = (function () {
                     if (!depMeta) {
                         throw new Error("Failed to get module \\"" + name + "\\": no definition is known and no preloaded external module is present.");
                     }
-                    return depMeta.arbitraryType ? getProduct(name) : getProxy(depMeta);
+                    deps_1.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
                 });
-                var returnProduct = meta.definitor.apply(null, deps);
+                var defFunc = eval("(" + meta.code + ")\\n//# sourceURL=" + meta.name);
+                var returnProduct = defFunc.apply(null, deps_1);
                 if (meta.arbitraryType) {
-                    product_1 = returnProduct;
+                    product = returnProduct;
                 }
-                meta.product = product_1;
+                products[name] = product;
             }
             finally {
                 delete currentlyDefiningProductMap[name];
                 currentlyDefiningProductSeq.pop();
             }
         }
-        return meta.product;
+        return products[name];
     }
-    function defineProxyProp(meta, name) {
-        var proxy = meta.proxy;
-        if (proxy.hasOwnProperty(name)) {
-            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
-            return;
+    var proxies = {};
+    function getProxy(def) {
+        if (!(def.name in proxies)) {
+            var proxy_1 = {};
+            getAllExportNames(def).forEach(function (arr) {
+                arr.forEach(function (name) {
+                    defineProxyProp(def, proxy_1, name);
+                });
+            });
+            proxies[def.name] = proxy_1;
         }
-        Object.defineProperty(proxy, name, {
-            get: function () { return getProduct(meta.name)[name]; },
-            set: function (v) { return getProduct(meta.name)[name] = v; },
-            enumerable: true
-        });
+        return proxies[def.name];
     }
     function getAllExportNames(meta, result, noDefault) {
         if (result === void 0) { result = []; }
@@ -228,57 +160,78 @@ var define = (function () {
         }
         return result;
     }
-    function getProxy(meta) {
-        if (!meta.proxy) {
-            meta.proxy = {};
-            var allExportNames = getAllExportNames(meta);
-            allExportNames.forEach(function (arr) {
-                arr.forEach(function (name) {
-                    defineProxyProp(meta, name);
-                });
-            });
+    function defineProxyProp(meta, proxy, name) {
+        if (proxy.hasOwnProperty(name)) {
+            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
+            return;
         }
-        return meta.proxy;
+        Object.defineProperty(proxy, name, {
+            get: function () { return getProduct(meta.name)[name]; },
+            set: function (v) { return getProduct(meta.name)[name] = v; },
+            enumerable: true
+        });
     }
-    define.e = function (meta, str) {
-        nextMeta = meta;
-        eval(str + '\\n//# sourceURL=' + meta.name);
-        nextMeta = null;
-    };
-    /*
-    // функция для прокидывания внутрь скоупа define.e каких-либо глобальных значений
-    define.insertScopeValue = (name, value) => {
-        var glob = define.e("this")
-        glob.__tsbundlerInsertionValue = value;
-        define.e("var define=__tsbundlerInsertionValue")
-        delete glob.__tsbundlerInsertionValue;
+    function discoverExternalModules(moduleName, result, visited) {
+        if (result === void 0) { result = []; }
+        if (visited === void 0) { visited = {}; }
+        if (moduleName in renames) {
+            moduleName = renames[moduleName];
+        }
+        if (!(moduleName in visited)) {
+            visited[moduleName] = true;
+            if (moduleName in defMap) {
+                defMap[moduleName].dependencies.forEach(function (depName) { return discoverExternalModules(depName, result, visited); });
+            }
+            else {
+                result.push(moduleName);
+            }
+        }
+        return result;
     }
-
-    define.insertScopeValue("define", define);
-    */
-    define.launch = function (mod, fn, then) {
-        preloadExternalModules(mod, function () {
-            var mainProduct = getProduct(mod);
+    function requireExternal(names, onOk, onError) {
+        if (params.preferCommonjs) {
+            try {
+                onOk(names.map(function (name) { return commondjsRequire(name); }));
+            }
+            catch (e) {
+                onError(e);
+            }
+        }
+        else {
+            amdRequire(names, function () { onOk(arguments); }, onError);
+        }
+    }
+    function preloadExternalModules(entryPoint, onDone) {
+        var externalNames = discoverExternalModules(entryPoint);
+        requireExternal(externalNames, function (externalValues) {
+            externalNames.forEach(function (name, i) {
+                products[name] = externalValues[i];
+            });
+            onDone();
+        }, handleError);
+    }
+    function start() {
+        preloadExternalModules(params.entryPoint.module, function () {
+            var mainProduct = getProduct(params.entryPoint.module);
             // инициализируем все модули в бандле, ради сайд-эффектов
             Object.keys(defMap).forEach(function (name) {
-                var meta = defMap[name];
-                if (!meta.product) {
+                if (!(name in products)) {
                     getProduct(name);
                 }
             });
             var res = null;
             var err = null;
             try {
-                res = mainProduct[fn].call(null);
+                res = mainProduct[params.entryPoint.function].call(null);
             }
             catch (e) {
                 err = e;
             }
-            if (then) {
-                then(err, res);
+            if (params.afterEntryPointExecuted) {
+                params.afterEntryPointExecuted(err, res);
             }
         });
-    };
-    return define;
-})();
+    }
+    start();
+});
 `;

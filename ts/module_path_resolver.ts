@@ -1,8 +1,8 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import {getModulePathMatcher, PathMatcher} from "./tsconfig_paths_parser";
+import {getModulePathMatcher, PathMatcher} from "./transformer/tsconfig_paths_parser";
 import {getRelativeModulePath, isModulePathRelative, isPathNested, typescriptFileExists, joinModulePath} from "path_utils";
-import {logError} from "log";
+import {logError, logDebug} from "log";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
 export class ModulePathResolver {
@@ -20,7 +20,7 @@ export class ModulePathResolver {
 	/** имея ссылку из одного файла модуля на другой,
 	 * получить путь к этому другому файлу относительно директории rootDir
 	 * isKnownPath = известно, что этот moduleDesignator - точно путь, а не имя модуля */
-	getRootdirRelativePath(moduleDesignator: string, sourceFile: string, isKnownPath: boolean = false): string | null {
+	protected getRootdirRelativePath(moduleDesignator: string, sourceFile: string, isKnownPath: boolean = false): string | null {
 		// здесь нам нужно получать абсолютный путь к файлу, на который ссылается импорт
 		// в данный момент мы вручную учитываем все (?) возможные случаи (paths, rootDirs)
 		// но это отстой. но альтернатив на момент написания этого кода нет
@@ -39,6 +39,14 @@ export class ModulePathResolver {
 			let abs = this.pathMatcher(moduleDesignator);
 			return abs? this.getAbsoluteModulePath(abs): moduleDesignator;
 		}
+	}
+	
+	/** если moduleDesignator указывает на модуль-файл - получить полный путь к moduleDesignator; иначе оставить его как есть */ 
+	resolveModuleDesignator(moduleDesignator: string, sourceFile: string, isKnownPath: boolean = false): string {
+		let resultModulePath = this.getRootdirRelativePath(moduleDesignator, sourceFile, isKnownPath);
+		logDebug("Resolved module path " + moduleDesignator + " to " + resultModulePath + " (is known path = " + isKnownPath + ")");
+		
+		return resultModulePath || moduleDesignator;
 	}
 
 	getAbsoluteModulePath(absPath: string): string {

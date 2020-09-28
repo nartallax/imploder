@@ -10,7 +10,7 @@
         "baseUrl": ".",
         "outDir": "js",
         "paths": {
-            "*": ["ts/*"],
+            "*": ["ts/*", "more_ts/*"],
             "l/*": ["lib/*"],
             "my_lib": ["lib/my_lib.ts"]
         }

@@ -50,6 +50,7 @@ let define = (() => {
 		defMap[name] = {deps, def};
 	}
 })();
+"use strict";
 define("afs", ["require", "exports", "fs", "path"], function (require, exports, fs, path) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -443,7 +444,7 @@ define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript",
             absBaseUrl = path.join(path.dirname(tsconfigPath), absBaseUrl);
         }
         let mappings = parsePathsFromTsconfig(absBaseUrl, compilerOptions.paths || {});
-        return modulePath => tryApplyMappings(mappings, modulePath);
+        return modulePath => tryApplyMappings(mappings, modulePath, absBaseUrl);
     }
     exports.getModulePathMatcher = getModulePathMatcher;
     function parsePathsFromTsconfig(absBaseUrl, paths) {
@@ -494,23 +495,30 @@ define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript",
         let isWindowsAbsolutePath = /^[A-Z]:\//.test(p);
         return isUnixAbsolutePath || isWindowsAbsolutePath;
     }
-    function tryApplyMappings(mappings, modulePath) {
+    function tryApplyMappings(mappings, modulePath, absBaseUrl) {
         let fixedPath = mappings.fixed[modulePath];
-        if (fixedPath)
+        if (fixedPath) {
             return fixedPath;
+        }
         let matchedPrefixes = [];
         let matchedFiles = [];
-        for (let modulePrefix in mappings.wildcard) {
+        function tryUsePrefix(modulePrefix, substitutes) {
             if (modulePath.startsWith(modulePrefix)) {
                 matchedPrefixes.push(modulePrefix);
                 let pathPostfix = modulePath.substr(modulePrefix.length);
-                for (let pathPrefix of mappings.wildcard[modulePrefix]) {
+                for (let pathPrefix of substitutes) {
                     let fullModulePath = path_utils_1.joinModulePath(pathPrefix, pathPostfix);
                     if (path_utils_1.typescriptFileExists(fullModulePath)) {
                         matchedFiles.push(fullModulePath);
                     }
                 }
             }
+        }
+        for (let modulePrefix in mappings.wildcard) {
+            tryUsePrefix(modulePrefix, mappings.wildcard[modulePrefix]);
+        }
+        if (matchedPrefixes.length === 0) {
+            tryUsePrefix("", [path.join(absBaseUrl, "./")]);
         }
         if (matchedFiles.length === 1) {
             return matchedFiles[0];
@@ -531,7 +539,7 @@ define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript",
         return null;
     }
 });
-define("transformer/module_path_resolver", ["require", "exports", "path", "transformer/tsconfig_paths_parser", "path_utils", "log"], function (require, exports, path, tsconfig_paths_parser_1, path_utils_2, log_3) {
+define("module_path_resolver", ["require", "exports", "path", "transformer/tsconfig_paths_parser", "path_utils", "log"], function (require, exports, path, tsconfig_paths_parser_1, path_utils_2, log_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ModulePathResolver = void 0;
@@ -550,6 +558,11 @@ define("transformer/module_path_resolver", ["require", "exports", "path", "trans
                 let abs = this.pathMatcher(moduleDesignator);
                 return abs ? this.getAbsoluteModulePath(abs) : moduleDesignator;
             }
+        }
+        resolveModuleDesignator(moduleDesignator, sourceFile, isKnownPath = false) {
+            let resultModulePath = this.getRootdirRelativePath(moduleDesignator, sourceFile, isKnownPath);
+            log_3.logDebug("Resolved module path " + moduleDesignator + " to " + resultModulePath + " (is known path = " + isKnownPath + ")");
+            return resultModulePath || moduleDesignator;
         }
         getAbsoluteModulePath(absPath) {
             return "/" + path_utils_2.getRelativeModulePath(this.moduleRoot, absPath);
@@ -627,117 +640,82 @@ define("module_meta_storage", ["require", "exports", "log"], function (require, 
     }
     exports.ModuleMetadataStorage = ModuleMetadataStorage;
 });
-define("transformer/transformer_utils", ["require", "exports", "typescript"], function (require, exports, tsc) {
+define("transformer/abstract_transformer", ["require", "exports", "typescript", "path_utils"], function (require, exports, tsc, path_utils_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.visitNodeRecursive = void 0;
-    function visitNodeRecursive(node, context, mapper, currentDepth = 0) {
-        return tsc.visitEachChild(mapper(node, currentDepth), child => visitNodeRecursive(child, context, mapper, currentDepth + 1), context);
-    }
-    exports.visitNodeRecursive = visitNodeRecursive;
-});
-define("transformer/export_explorer", ["require", "exports", "typescript", "log"], function (require, exports, tsc, log_5) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.hasExportModifier = exports.processFileExports = void 0;
-    function processFileExports(fileNode, moduleMeta) {
-        let children = fileNode.getChildren();
-        if (children.length === 2 && children[0].kind === tsc.SyntaxKind.SyntaxList && children[1].kind === tsc.SyntaxKind.EndOfFileToken) {
-            children = children[0].getChildren();
-        }
-        for (let node of children) {
-            if (tsc.isFunctionDeclaration(node) || tsc.isClassDeclaration(node)) {
-                if (hasExportModifier(node)) {
-                    if (!node.name) {
-                        log_5.logErrorAndExit("Unexpected: exported node of type " + tsc.SyntaxKind[node.kind] + " have no name.");
-                    }
-                    if (hassDefaultModifier(node)) {
-                        moduleMeta.exports.push("default");
-                    }
-                    else {
-                        moduleMeta.exports.push(node.name.text);
-                    }
-                }
-            }
-            else if (node.kind === tsc.SyntaxKind.FirstStatement) {
-                if (hasExportModifier(node)) {
-                    for (let child of node.getChildren()) {
-                        if (tsc.isVariableDeclarationList(child)) {
-                            for (let decl of child.declarations) {
-                                let name = decl.name;
-                                if (name.kind !== tsc.SyntaxKind.Identifier) {
-                                    log_5.logErrorAndExit("Unexpected: exported variable declaration name is not identifier.");
-                                }
-                                moduleMeta.exports.push(name.text);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (tsc.isModuleDeclaration(node)) {
-                if (hasExportModifier(node)) {
-                    for (let child of node.getChildren()) {
-                        if (tsc.isIdentifier(child)) {
-                            moduleMeta.exports.push(child.text);
-                            break;
-                        }
-                    }
-                }
-            }
-            else if (tsc.isExportDeclaration(node)) {
-                if (!node.exportClause) {
-                    if (!node.moduleSpecifier || !tsc.isStringLiteral(node.moduleSpecifier)) {
-                        log_5.logErrorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
-                    }
-                    moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text);
-                }
-                else {
-                    let exportClause = node.exportClause;
-                    if (tsc.isNamedExports(exportClause)) {
-                        for (let exportElement of exportClause.elements) {
-                            moduleMeta.exports.push(exportElement.name.text);
-                        }
-                    }
-                    else {
-                        throw new Error("Export declaration is not consists of named elements.");
-                    }
-                }
-            }
-            else if (tsc.isExportAssignment(node)) {
-                if (!node.isExportEquals) {
-                    moduleMeta.exports.push("default");
-                }
-                else {
-                    moduleMeta.hasOmniousExport = true;
-                }
-            }
-        }
-    }
-    exports.processFileExports = processFileExports;
-    function hasExportModifier(node) {
-        return !!node.modifiers && !!node.modifiers.find(_ => _.kind === tsc.SyntaxKind.ExportKeyword);
-    }
-    exports.hasExportModifier = hasExportModifier;
-    function hassDefaultModifier(node) {
-        return !!node.modifiers && !!node.modifiers.find(_ => _.kind === tsc.SyntaxKind.DefaultKeyword);
-    }
-});
-define("transformer/bundler_transformer", ["require", "exports", "typescript", "log", "path_utils", "transformer/transformer_utils", "transformer/export_explorer"], function (require, exports, tsc, log_6, path_utils_3, transformer_utils_1, export_explorer_1) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.BundlerTransformer = void 0;
-    class BundlerTransformer {
-        constructor(context, metaStorage, resolver) {
+    exports.AbstractTransformer = void 0;
+    class AbstractTransformer {
+        constructor(context, resolver) {
             this.context = context;
-            this.metaStorage = metaStorage;
             this.resolver = resolver;
         }
         transformBundle(node) {
             return node;
         }
         transformSourceFile(fileNode) {
-            let moduleName = path_utils_3.stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
-            log_6.logDebug("Visiting " + this.resolver.getAbsoluteModulePath(fileNode.fileName) + " as module " + moduleName);
+            return fileNode;
+        }
+        transformVisitRecursive(node, mapper, currentDepth = 0) {
+            let mapped = mapper(node, currentDepth);
+            if (!mapped.recurse) {
+                return mapped.result;
+            }
+            else {
+                if (Array.isArray(mapped.result)) {
+                    let arr = mapped.result;
+                    for (let i = 0; i < arr.length; i++) {
+                        arr[i] = tsc.visitEachChild(arr[i], child => this.transformVisitRecursive(child, mapper, currentDepth + 1), this.context);
+                    }
+                    return arr;
+                }
+                else {
+                    return tsc.visitEachChild(mapped.result, child => this.transformVisitRecursive(child, mapper, currentDepth + 1), this.context);
+                }
+            }
+        }
+        visitRecursive(node, visitor, shouldFallThrough = null, currentDepth = 0) {
+            let stopped = false;
+            node.forEachChild(child => {
+                if (stopped || visitor(child, currentDepth) === false) {
+                    stopped = true;
+                    return;
+                }
+                if (shouldFallThrough && shouldFallThrough(child)) {
+                    if (this.visitRecursive(child, visitor, shouldFallThrough, currentDepth + 1) === false) {
+                        stopped = true;
+                        return;
+                    }
+                }
+            });
+            return !stopped;
+        }
+        traverseDumpFileAst(fileNode) {
+            let prefix = fileNode.fileName;
+            if (prefix.length > 30) {
+                prefix = "..." + prefix.substr(prefix.length - 30);
+            }
+            this.visitRecursive(fileNode, (node, depth) => {
+                console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
+            });
+        }
+        moduleNameByNode(fileNode) {
+            return path_utils_3.stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
+        }
+    }
+    exports.AbstractTransformer = AbstractTransformer;
+});
+define("transformer/before_js_transformer", ["require", "exports", "typescript", "log", "transformer/abstract_transformer"], function (require, exports, tsc, log_5, abstract_transformer_1) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.BeforeJsBundlerTransformer = void 0;
+    class BeforeJsBundlerTransformer extends abstract_transformer_1.AbstractTransformer {
+        constructor(context, metaStorage, resolver) {
+            super(context, resolver);
+            this.metaStorage = metaStorage;
+        }
+        transformSourceFile(fileNode) {
+            let moduleName = this.moduleNameByNode(fileNode);
+            log_5.logDebug("Visiting " + this.resolver.getAbsoluteModulePath(fileNode.fileName) + " as module " + moduleName);
             let meta = {
                 dependencies: [],
                 exportModuleReferences: [],
@@ -748,126 +726,192 @@ define("transformer/bundler_transformer", ["require", "exports", "typescript", "
                 hasImportOrExport: false
             };
             if (fileNode.referencedFiles.length > 0) {
-                log_6.logWarn("File " + moduleName + " references some other files. They will not be included in bundle.");
+                log_5.logWarn("File " + moduleName + " references some other files. They will not be included in bundle.");
             }
             if (fileNode.moduleName) {
                 meta.altName = fileNode.moduleName;
             }
-            let result = transformer_utils_1.visitNodeRecursive(fileNode, this.context, node => {
-                let result;
-                if (tsc.isImportEqualsDeclaration(node)) {
-                    result = this.fixImportEqualsNode(fileNode, node);
+            this.exploreSpecialExports(meta, fileNode);
+            this.metaStorage.set(moduleName, meta);
+            return fileNode;
+        }
+        exploreSpecialExports(moduleMeta, fileNode) {
+            let children = fileNode.getChildren();
+            if (children.length === 2 && children[0].kind === tsc.SyntaxKind.SyntaxList && children[1].kind === tsc.SyntaxKind.EndOfFileToken) {
+                children = children[0].getChildren();
+            }
+            for (let node of children) {
+                if (tsc.isExportDeclaration(node)) {
+                    if (!node.exportClause) {
+                        if (!node.moduleSpecifier || !tsc.isStringLiteral(node.moduleSpecifier)) {
+                            log_5.logErrorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
+                        }
+                        moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text);
+                    }
+                    else {
+                        let exportClause = node.exportClause;
+                        if (tsc.isNamedExports(exportClause)) {
+                            for (let exportElement of exportClause.elements) {
+                                moduleMeta.exports.push(exportElement.name.text);
+                            }
+                        }
+                        else {
+                            throw new Error("Export declaration is not consists of named elements.");
+                        }
+                    }
                 }
-                else if (tsc.isImportDeclaration(node) || tsc.isExportDeclaration(node)) {
-                    result = this.fixImportExportNode(fileNode, node);
+                else if (tsc.isExportAssignment(node)) {
+                    if (!node.isExportEquals) {
+                        moduleMeta.exports.push("default");
+                    }
+                    else {
+                        moduleMeta.hasOmniousExport = true;
+                    }
                 }
-                else if (tsc.isCallExpression(node) && node.expression.kind === tsc.SyntaxKind.ImportKeyword) {
-                    result = this.fixDynamicImportNode(fileNode, node);
+            }
+            moduleMeta.exportModuleReferences = [...new Set(moduleMeta.exportModuleReferences.map(x => this.resolver.resolveModuleDesignator(x, fileNode.fileName)))];
+        }
+    }
+    exports.BeforeJsBundlerTransformer = BeforeJsBundlerTransformer;
+});
+define("transformer/after_js_transformer", ["require", "exports", "transformer/abstract_transformer", "typescript", "path_utils", "log"], function (require, exports, abstract_transformer_2, tsc, path_utils_4, log_6) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.AfterJsBundlerTransformer = void 0;
+    class AfterJsBundlerTransformer extends abstract_transformer_2.AbstractTransformer {
+        constructor(context, metaStorage, resolver) {
+            super(context, resolver);
+            this.metaStorage = metaStorage;
+        }
+        transformSourceFile(fileNode) {
+            let moduleName = this.moduleNameByNode(fileNode);
+            let moduleMeta = this.metaStorage.get(moduleName);
+            let definingFunction = null;
+            this.visitRecursive(fileNode, node => {
+                if (!tsc.isCallExpression(node) || !tsc.isIdentifier(node.expression) || node.expression.text !== "define" && !!definingFunction) {
+                    return;
+                }
+                definingFunction = this.processDefineCall(moduleMeta, node, fileNode);
+                return false;
+            }, node => {
+                return !tsc.isFunctionExpression(node);
+            });
+            if (!definingFunction) {
+                if (moduleMeta.hasImportOrExport) {
+                    throw new Error("Transformed code of module " + moduleName + " does not contain any define() invocations");
                 }
                 else {
-                    return node;
+                    return fileNode;
                 }
-                meta.hasImportOrExport = true;
-                return result;
-            });
-            this.exploreExports(meta, fileNode);
-            this.metaStorage.set(moduleName, meta);
-            if (meta.hasImportOrExport) {
+            }
+            this.setImportExportFlag(moduleMeta, fileNode, moduleName);
+            let result = tsc.getMutableClone(fileNode);
+            result.statements = tsc.createNodeArray([definingFunction]);
+            return result;
+        }
+        setImportExportFlag(moduleMeta, fileNode, moduleName) {
+            moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
+                || moduleMeta.exports.length > 0
+                || moduleMeta.hasOmniousExport
+                || moduleMeta.dependencies.length > 0
+                || moduleMeta.exportModuleReferences.length > 0;
+            if (moduleMeta.hasImportOrExport) {
                 fileNode.amdDependencies.forEach(dep => {
-                    let path = this.fixModulePath(path_utils_3.stripTsExt(dep.path), fileNode, true);
-                    meta.dependencies.push(path);
+                    let path = this.resolver.resolveModuleDesignator(path_utils_4.stripTsExt(dep.path), fileNode.fileName, true);
+                    moduleMeta.dependencies.push(path);
                 });
             }
             else {
                 if (fileNode.amdDependencies.length > 0) {
                     log_6.logWarn("Source file " + moduleName + " has <amd-dependency>, but is not a module (does not exports or imports anything). Dependency information will be lost.");
                 }
-                if (meta.altName) {
+                if (moduleMeta.altName) {
                     log_6.logWarn("Source file " + moduleName + " has <amd-module>, but is not a module (does not exports or imports anything). Value of module name will be lost.");
                 }
             }
+        }
+        processDefineCall(moduleMeta, defineCallNode, fileNode) {
+            let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2];
+            if (!tsc.isArrayLiteralExpression(depArrNode)) {
+                throw new Error("Second-from-end argument of define() is not array literal.");
+            }
+            let rawDependencies = depArrNode.elements.map(el => {
+                if (!tsc.isStringLiteral(el)) {
+                    throw new Error("Second-from-end argument of define() is not string literal array.");
+                }
+                return el.text;
+            }).filter(x => x !== "exports" && x !== "require");
+            moduleMeta.dependencies = rawDependencies.map(x => this.resolver.resolveModuleDesignator(x, fileNode.fileName));
+            let defFuncArg = defineCallNode.arguments[defineCallNode.arguments.length - 1];
+            if (!tsc.isFunctionExpression(defFuncArg)) {
+                throw new Error("First-from-end argument of define() is not function expression.");
+            }
+            let moduleBodyStatements = defFuncArg.body.statements;
+            let startWith = 0;
+            let firstMeaninfulStatementReached = false;
+            for (let i = 0; i < moduleBodyStatements.length; i++) {
+                let statement = moduleBodyStatements[i];
+                if (!tsc.isExpressionStatement(statement)) {
+                    firstMeaninfulStatementReached = true;
+                    continue;
+                }
+                let expr = statement.expression;
+                if (!firstMeaninfulStatementReached) {
+                    if (tsc.isStringLiteral(expr) && expr.text === "use strict") {
+                        startWith = i + 1;
+                        continue;
+                    }
+                    if (this.isExportAssignment(expr)) {
+                        let exportName = this.getExportAssignmentName(expr);
+                        if (exportName === "__esModule") {
+                            startWith = i + 1;
+                            continue;
+                        }
+                        else {
+                            moduleMeta.exports.push(exportName);
+                            if (tsc.isVoidExpression(expr.right)) {
+                                startWith = i + 1;
+                                continue;
+                            }
+                        }
+                    }
+                    firstMeaninfulStatementReached = true;
+                }
+                if (this.isExportAssignment(expr)) {
+                    moduleMeta.exports.push(this.getExportAssignmentName(expr));
+                }
+            }
+            moduleMeta.exports = [...new Set(moduleMeta.exports)];
+            let resultBodyStatements = moduleBodyStatements.slice(startWith);
+            let result = tsc.getMutableClone(defFuncArg);
+            let resultBody = result.body = tsc.getMutableClone(result.body);
+            resultBody.statements = tsc.createNodeArray(resultBodyStatements);
+            let params = [...result.parameters];
+            params = params.filter(x => !tsc.isIdentifier(x.name) || (x.name.text !== "exports" && x.name.text !== "require"));
+            params = [
+                tsc.createParameter(undefined, undefined, undefined, "exports"),
+                tsc.createParameter(undefined, undefined, undefined, "require"),
+                ...params
+            ];
+            result.parameters = tsc.createNodeArray(params);
             return result;
         }
-        fixModulePath(sourceModulePath, fileNode, isKnownPath = false) {
-            let resultModulePath = this.resolver.getRootdirRelativePath(sourceModulePath, fileNode.fileName, isKnownPath);
-            log_6.logDebug("Resolved module path " + sourceModulePath + " to " + resultModulePath + " (is known path = " + isKnownPath + ")");
-            return resultModulePath || sourceModulePath;
+        isExportAssignment(node) {
+            if (tsc.isBinaryExpression(node)
+                && tsc.isPropertyAccessExpression(node.left)
+                && tsc.isIdentifierOrPrivateIdentifier(node.left.expression)
+                && node.left.expression.text === "exports") {
+                return true;
+            }
+            return false;
         }
-        fixDynamicImportNode(fileNode, node) {
-            if (node.arguments.length !== 1) {
-                log_6.logWarn("Dynamic import expession has " + node.arguments.length + " argument(s), expected exactly one.");
-                return node;
-            }
-            let arg = node.arguments[0];
-            if (!tsc.isStringLiteral(arg)) {
-                log_6.logWarn("Dynamic import expession has argument that is not string literal as first argument.");
-                return node;
-            }
-            let modulePath = arg.text;
-            let isPath = path_utils_3.isTsExt(modulePath);
-            if (isPath) {
-                modulePath = path_utils_3.stripTsExt(modulePath);
-            }
-            return this.fixRewriteNode(fileNode, node, modulePath, (node, path) => {
-                node.arguments = tsc.createNodeArray([tsc.createStringLiteral(path)]);
-            }, isPath);
-        }
-        fixImportExportNode(fileNode, node) {
-            let modulePath = getNodeModulePath(node);
-            if (!modulePath)
-                return node;
-            return this.fixRewriteNode(fileNode, node, modulePath, (mutNode, resultModulePath) => {
-                mutNode.moduleSpecifier = tsc.createStringLiteral(resultModulePath);
-            });
-        }
-        fixImportEqualsNode(fileNode, node) {
-            if (!tsc.isExternalModuleReference(node.moduleReference)) {
-                log_6.logErrorAndExit("Unexpected: \"import = \" target is not module reference.");
-            }
-            if (!tsc.isStringLiteral(node.moduleReference.expression)) {
-                log_6.logWarn("In file " + fileNode.fileName + ", \"import = \" is using non-constant reference name. This could lead to errors.");
-                return node;
-            }
-            let modulePath = node.moduleReference.expression.text;
-            return this.fixRewriteNode(fileNode, node, modulePath, (mutNode, resultModulePath) => {
-                mutNode.moduleReference = tsc.createExternalModuleReference(tsc.createStringLiteral(resultModulePath));
-            });
-        }
-        fixRewriteNode(fileNode, node, modulePath, mutate, isKnownPath = false) {
-            let resultModulePath = this.fixModulePath(modulePath, fileNode, isKnownPath);
-            if (resultModulePath === modulePath) {
-                return node;
-            }
-            let mutNode = tsc.getMutableClone(node);
-            mutate(mutNode, resultModulePath);
-            return mutNode;
-        }
-        exploreExports(meta, fileNode) {
-            export_explorer_1.processFileExports(fileNode, meta);
-            meta.exportModuleReferences = [...new Set(meta.exportModuleReferences.map(x => this.fixModulePath(x, fileNode)))];
-        }
-        traverseDumpFileAst(fileNode) {
-            let prefix = fileNode.fileName;
-            if (prefix.length > 30) {
-                prefix = "..." + prefix.substr(prefix.length - 30);
-            }
-            transformer_utils_1.visitNodeRecursive(fileNode, this.context, (node, depth) => {
-                console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-                return node;
-            });
+        getExportAssignmentName(node) {
+            return node.left.name.text;
         }
     }
-    exports.BundlerTransformer = BundlerTransformer;
-    function getNodeModulePath(node) {
-        return node.moduleSpecifier ? getModuleSpecifierValue(node.moduleSpecifier) : null;
-    }
-    function getModuleSpecifierValue(specifier) {
-        let leadingWidth = specifier.getLeadingTriviaWidth();
-        const value = specifier.getText().substr(leadingWidth, specifier.getWidth() - (leadingWidth * 2));
-        return value;
-    }
+    exports.AfterJsBundlerTransformer = AfterJsBundlerTransformer;
 });
-define("compiler", ["require", "exports", "typescript", "path", "log", "transformer/bundler_transformer", "path_utils", "module_meta_storage", "bundler", "afs", "transformer/module_path_resolver", "transformer/transformer_utils"], function (require, exports, tsc, path, log_7, bundler_transformer_1, path_utils_4, module_meta_storage_1, bundler_1, afs_1, module_path_resolver_1, transformer_utils_2) {
+define("compiler", ["require", "exports", "typescript", "path", "log", "transformer/before_js_transformer", "path_utils", "module_meta_storage", "bundler", "afs", "module_path_resolver", "transformer/after_js_transformer"], function (require, exports, tsc, path, log_7, before_js_transformer_1, path_utils_5, module_meta_storage_1, bundler_1, afs_1, module_path_resolver_1, after_js_transformer_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.processTypescriptDiagnostics = exports.processTypescriptDiagnosticEntry = exports.Compiler = void 0;
@@ -880,7 +924,7 @@ define("compiler", ["require", "exports", "typescript", "path", "log", "transfor
             this.config = config;
             this.modulePathResolver = new module_path_resolver_1.ModulePathResolver(this.tsconfigPath, this.mergedConfig.options);
             this.transformers = [
-                context => new bundler_transformer_1.BundlerTransformer(context, this.metaStorage, this.modulePathResolver),
+                context => new before_js_transformer_1.BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
                 ...transformers
             ];
             this.bundler = new bundler_1.Bundler(this);
@@ -906,22 +950,7 @@ define("compiler", ["require", "exports", "typescript", "path", "log", "transfor
             let emitResult = this.program.emit(undefined, undefined, undefined, undefined, {
                 before: this.transformers,
                 after: [
-                    context => ({
-                        transformSourceFile(fileNode) {
-                            let prefix = fileNode.fileName;
-                            if (prefix.length > 30) {
-                                prefix = "..." + prefix.substr(prefix.length - 30);
-                            }
-                            transformer_utils_2.visitNodeRecursive(fileNode, context, (node, depth) => {
-                                console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-                                return node;
-                            });
-                            return fileNode;
-                        },
-                        transformBundle(node) {
-                            return node;
-                        }
-                    })
+                    context => new after_js_transformer_1.AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
                 ]
             });
             processTypescriptDiagnostics(emitResult.diagnostics);
@@ -977,7 +1006,7 @@ define("compiler", ["require", "exports", "typescript", "path", "log", "transfor
                 let haveNestedDirs = false;
                 for (let i = 0; i < dirs.length; i++) {
                     for (let j = i + 1; j < dirs.length; j++) {
-                        if (path_utils_4.isPathNested(dirs[i], dirs[j])) {
+                        if (path_utils_5.isPathNested(dirs[i], dirs[j])) {
                             log_7.logError("Values of rootDirs must not be nested within one another, but there are \"" + dirs[i] + "\" and \"" + dirs[j] + "\" which are nested.");
                             haveNestedDirs = true;
                         }
@@ -1017,7 +1046,7 @@ define("compiler", ["require", "exports", "typescript", "path", "log", "transfor
         get outDir() { return this.mergedConfig.options.outDir; }
         get entryModule() {
             let absPath = path.resolve(path.dirname(this.tsconfigPath), this.inclusionConfig.entryModule);
-            let name = path_utils_4.stripTsExt(this.modulePathResolver.getAbsoluteModulePath(absPath));
+            let name = path_utils_5.stripTsExt(this.modulePathResolver.getAbsoluteModulePath(absPath));
             return name;
         }
         get entryFunction() { return this.inclusionConfig.entryFunction; }
@@ -1106,9 +1135,10 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
             this.storage = storage;
         }
         getModuleOrder(entryPointModule) {
-            let [modules, absentModules] = this.getSortedModules(entryPointModule);
+            let circularDependentModules = new Set();
+            let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentModules);
             modules.forEach(name => this.detectRecursiveRefExport(name));
-            return { modules, absentModules };
+            return { modules, absentModules, circularDependentModules };
         }
         unwindNameStack(nameStack, name) {
             let referenceCircle = [name];
@@ -1136,23 +1166,28 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
             };
             visit(entryPoint);
         }
-        getSortedModules(entryPoint) {
+        getSortedModules(entryPoint, circularDependencyModules) {
             let nameStack = new seq_set_1.SeqSet();
             let absentModules = new Set();
+            let result = [];
             let visit = (name) => {
-                if (nameStack.has(name))
+                if (nameStack.has(name)) {
+                    this.unwindNameStack(nameStack, name).forEach(x => circularDependencyModules.add(x));
                     return;
+                }
                 if (!this.storage.has(name)) {
                     absentModules.add(name);
                 }
                 else {
                     nameStack.push(name);
+                    result.push(name);
                     this.storage.get(name).dependencies.forEach(dep => visit(dep));
+                    nameStack.pop();
                 }
             };
             visit(entryPoint);
             return [
-                nameStack.seq.sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
+                result.sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
                 [...absentModules]
             ];
         }
@@ -1164,34 +1199,33 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.loaderCode = void 0;
     exports.loaderCode = `
-var define = (function () {
-    var defMap = {};
-    var renames = {};
+(function (defs, params) {
     function handleError(e, action) {
-        if (define.errorHandler) {
-            define.errorHandler(e, action);
+        if (params.errorHandler) {
+            params.errorHandler(e, action);
         }
         else {
             console.error("Error" + (action ? " " + action : "") + ": " + (e.stack || e.message || e));
         }
         throw e;
     }
-    function hasEs5() {
-        if (!Object.defineProperty)
-            return false;
-        var x = {}, y = 5;
-        Object.defineProperty(x, "a", {
-            get: function () { return y; },
-            set: function (v) { return y = v; }
-        });
-        if (x.a !== 5)
-            return false;
-        x.a = 10;
-        return x.a === 10;
+    // разбираем полученный массив определений
+    var renames = {};
+    var defMap = {};
+    for (var i = 0; i < defs.length; i++) {
+        var v = defs[i];
+        var m = typeof (v[2]) !== "string" ? v[2] : undefined;
+        var def = m ? m : {};
+        def.name = v[0];
+        def.code = v[v.length - 1];
+        if (m && m.altName) {
+            renames[m.altName] = def.name;
+        }
+        def.dependencies = Array.isArray(v[1]) ? v[1] : [];
+        defMap[def.name] = def;
     }
-    if (!hasEs5()) {
-        handleError(new Error("No ES5 support detected."));
-    }
+    var amdRequire = params.amdRequire || require;
+    var commondjsRequire = params.commonjsRequire || require;
     /** функция, которую будут дергать в качестве require изнутри модулей */
     function requireAny(names, onOk, onError) {
         if (Array.isArray(names) && !onOk) {
@@ -1203,7 +1237,7 @@ var define = (function () {
                 return getProduct(name_1);
             }
             else {
-                return define.commonjsRequire(name_1);
+                return commondjsRequire(name_1);
             }
         }
         else {
@@ -1228,7 +1262,7 @@ var define = (function () {
                     return callOk_1();
                 }
                 else {
-                    return define.amdRequire(externalNameArr_1, function (externalResults) {
+                    return amdRequire(externalNameArr_1, function (externalResults) {
                         for (var i = 0; i < externalNameArr_1.length; i++) {
                             results_1[externalNameArr_1[i]] = externalResults[i];
                         }
@@ -1246,101 +1280,32 @@ var define = (function () {
             }
         }
     }
-    function requireExternal(names, onOk, onError) {
-        if (define.preferCommonjs) {
-            try {
-                onOk(names.map(function (name) { return define.commonjsRequire(name); }));
-            }
-            catch (e) {
-                onError(e);
-            }
-        }
-        else {
-            define.amdRequire(names, function () { onOk(arguments); }, onError);
-        }
-    }
-    function discoverExternalModules(moduleName, result, visited) {
-        if (result === void 0) { result = []; }
-        if (visited === void 0) { visited = {}; }
-        if (moduleName in renames) {
-            moduleName = renames[moduleName];
-        }
-        if (moduleName in visited || moduleName === "require" || moduleName === "exports")
-            return;
-        visited[moduleName] = true;
-        if (moduleName in defMap) {
-            defMap[moduleName].dependencies.forEach(function (depName) { return discoverExternalModules(depName, result, visited); });
-        }
-        else {
-            result.push(moduleName);
-        }
-        return result;
-    }
-    function preloadExternalModules(entryPoint, onDone) {
-        var externalNames = discoverExternalModules(entryPoint);
-        requireExternal(externalNames, function (externalValues) {
-            externalNames.forEach(function (name, i) {
-                defMap[externalNames[i]] = {
-                    definitor: function () { throw new Error("Impossible to invoke definition of external module \\"" + name + "\\"."); },
-                    product: externalValues[i],
-                    dependencies: [],
-                    exports: [],
-                    name: name,
-                    external: true,
-                    arbitraryType: true // мы ничего не знаем про экспортируемое значение, поэтому так
-                };
-            });
-            onDone();
-        }, handleError);
-    }
-    var nextMeta = null;
-    var define = function (name, deps, definitor) {
-        if (Array.isArray(name)) {
-            definitor = deps;
-            deps = name;
-            name = null;
-        }
-        var meta = nextMeta;
-        if (!meta) {
-            handleError(new Error("No module metadata is passed before calling define()."));
-            return;
-        }
-        if (name) {
-            renames[name] = meta.name;
-        }
-        meta.dependencies = deps;
-        meta.definitor = definitor;
-        defMap[meta.name] = meta;
-    };
     var currentlyDefiningProductMap = {};
     var currentlyDefiningProductSeq = [];
-    function getProduct(name) {
-        if (name in renames) {
-            name = renames[name];
+    var products = {};
+    function throwCircularDependencyError(name) {
+        var str = name;
+        for (var i = currentlyDefiningProductSeq.length - 1; i >= 0; i--) {
+            var n = currentlyDefiningProductSeq[i];
+            str += " <- " + currentlyDefiningProductSeq[i];
+            if (n === name)
+                break;
         }
+        throw new Error("Unresolvable circular dependency detected: " + str);
+    }
+    function getProduct(name) {
+        name = renames[name] || name;
         var meta = defMap[name];
-        if (!meta.product) {
+        if (!(name in products)) {
             if (name in currentlyDefiningProductMap) {
-                var str = name;
-                for (var i = currentlyDefiningProductSeq.length - 1; i >= 0; i--) {
-                    var n = currentlyDefiningProductSeq[i];
-                    str += " <- " + currentlyDefiningProductSeq[i];
-                    if (n === name)
-                        break;
-                }
-                throw new Error("Unresolvable circular dependency detected: " + str);
+                throwCircularDependencyError(name);
             }
             currentlyDefiningProductMap[name] = true;
             currentlyDefiningProductSeq.push(name);
             try {
-                var product_1;
-                var deps = meta.dependencies.map(function (name) {
-                    if (name === "exports") {
-                        return product_1 = {};
-                    }
-                    else if (name === "require") {
-                        return requireAny;
-                    }
+                var product = {};
+                var deps_1 = [product, requireAny];
+                meta.dependencies.forEach(function (name) {
                     if (name in renames) {
                         name = renames[name];
                     }
@@ -1348,32 +1313,34 @@ var define = (function () {
                     if (!depMeta) {
                         throw new Error("Failed to get module \\"" + name + "\\": no definition is known and no preloaded external module is present.");
                     }
-                    return depMeta.arbitraryType ? getProduct(name) : getProxy(depMeta);
+                    deps_1.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
                 });
-                var returnProduct = meta.definitor.apply(null, deps);
+                var defFunc = eval("(" + meta.code + ")\\n//# sourceURL=" + meta.name);
+                var returnProduct = defFunc.apply(null, deps_1);
                 if (meta.arbitraryType) {
-                    product_1 = returnProduct;
+                    product = returnProduct;
                 }
-                meta.product = product_1;
+                products[name] = product;
             }
             finally {
                 delete currentlyDefiningProductMap[name];
                 currentlyDefiningProductSeq.pop();
             }
         }
-        return meta.product;
+        return products[name];
     }
-    function defineProxyProp(meta, name) {
-        var proxy = meta.proxy;
-        if (proxy.hasOwnProperty(name)) {
-            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
-            return;
+    var proxies = {};
+    function getProxy(def) {
+        if (!(def.name in proxies)) {
+            var proxy_1 = {};
+            getAllExportNames(def).forEach(function (arr) {
+                arr.forEach(function (name) {
+                    defineProxyProp(def, proxy_1, name);
+                });
+            });
+            proxies[def.name] = proxy_1;
         }
-        Object.defineProperty(proxy, name, {
-            get: function () { return getProduct(meta.name)[name]; },
-            set: function (v) { return getProduct(meta.name)[name] = v; },
-            enumerable: true
-        });
+        return proxies[def.name];
     }
     function getAllExportNames(meta, result, noDefault) {
         if (result === void 0) { result = []; }
@@ -1393,60 +1360,85 @@ var define = (function () {
         }
         return result;
     }
-    function getProxy(meta) {
-        if (!meta.proxy) {
-            meta.proxy = {};
-            var allExportNames = getAllExportNames(meta);
-            allExportNames.forEach(function (arr) {
-                arr.forEach(function (name) {
-                    defineProxyProp(meta, name);
-                });
-            });
+    function defineProxyProp(meta, proxy, name) {
+        if (proxy.hasOwnProperty(name)) {
+            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
+            return;
         }
-        return meta.proxy;
+        Object.defineProperty(proxy, name, {
+            get: function () { return getProduct(meta.name)[name]; },
+            set: function (v) { return getProduct(meta.name)[name] = v; },
+            enumerable: true
+        });
     }
-    define.e = function (meta, str) {
-        nextMeta = meta;
-        eval(str + '\\n//# sourceURL=' + meta.name);
-        nextMeta = null;
-    };
-    /*
-    // функция для прокидывания внутрь скоупа define.e каких-либо глобальных значений
-    define.insertScopeValue = (name, value) => {
-        var glob = define.e("this")
-        glob.__tsbundlerInsertionValue = value;
-        define.e("var define=__tsbundlerInsertionValue")
-        delete glob.__tsbundlerInsertionValue;
+    function discoverExternalModules(moduleName, result, visited) {
+        if (result === void 0) { result = []; }
+        if (visited === void 0) { visited = {}; }
+        if (moduleName in renames) {
+            moduleName = renames[moduleName];
+        }
+        if (!(moduleName in visited)) {
+            visited[moduleName] = true;
+            if (moduleName in defMap) {
+                defMap[moduleName].dependencies.forEach(function (depName) { return discoverExternalModules(depName, result, visited); });
+            }
+            else {
+                result.push(moduleName);
+            }
+        }
+        return result;
     }
-
-    define.insertScopeValue("define", define);
-    */
-    define.launch = function (mod, fn, then) {
-        preloadExternalModules(mod, function () {
-            var mainProduct = getProduct(mod);
+    function requireExternal(names, onOk, onError) {
+        if (params.preferCommonjs) {
+            try {
+                onOk(names.map(function (name) { return commondjsRequire(name); }));
+            }
+            catch (e) {
+                onError(e);
+            }
+        }
+        else {
+            amdRequire(names, function () { onOk(arguments); }, onError);
+        }
+    }
+    function preloadExternalModules(entryPoint, onDone) {
+        var externalNames = discoverExternalModules(entryPoint);
+        requireExternal(externalNames, function (externalValues) {
+            externalNames.forEach(function (name, i) {
+                products[name] = externalValues[i];
+            });
+            onDone();
+        }, handleError);
+    }
+    function start() {
+        preloadExternalModules(params.entryPoint.module, function () {
+            var mainProduct = getProduct(params.entryPoint.module);
             // инициализируем все модули в бандле, ради сайд-эффектов
             Object.keys(defMap).forEach(function (name) {
-                var meta = defMap[name];
-                if (!meta.product) {
+                if (!(name in products)) {
                     getProduct(name);
                 }
             });
             var res = null;
             var err = null;
             try {
-                res = mainProduct[fn].call(null);
+                res = mainProduct[params.entryPoint.function].call(null);
             }
             catch (e) {
                 err = e;
             }
-            if (then) {
-                then(err, res);
+            if (params.afterEntryPointExecuted) {
+                params.afterEntryPointExecuted(err, res);
             }
         });
-    };
-    return define;
-})();
+    }
+    start();
+});
 `;
+});
+define("loader/loader_types", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
 });
 define("bundler", ["require", "exports", "module_orderer", "generated/loader_code", "log", "path", "afs"], function (require, exports, module_orderer_1, loader_code_1, log_8, path, afs_2) {
     "use strict";
@@ -1457,52 +1449,77 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
             this.compiler = compiler;
         }
         async produceBundle() {
-            let result = ["\"use strict\";"];
+            let result = [];
             if (!this.compiler.noLoaderCode) {
                 result.push(this.getPrefixCode());
             }
             await this.loadAbsentModuleCode();
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.compiler.entryModule);
             log_8.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
-            moduleOrder.modules.forEach(name => {
-                let meta = this.compiler.metaStorage.get(name);
-                let code = meta.jsCode;
-                if (!code) {
-                    throw new Error("Code for module " + name + " is not loaded at bundling time.");
-                }
-                result.push(this.getModuleEvalCode(name, meta, code));
-            });
+            let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
+            result.push(JSON.stringify(defArrArr));
             if (!this.compiler.noLoaderCode) {
                 result.push(this.getPostfixCode());
             }
             return result.join("\n");
         }
-        getModuleEvalCode(name, meta, code) {
-            let data = { name: name };
-            if (meta.exports.length > 0) {
-                data.exports = meta.exports;
-            }
-            if (meta.exportModuleReferences.length > 0) {
-                data.exportRefs = meta.exportModuleReferences;
-            }
-            if (meta.hasOmniousExport) {
-                data.arbitraryType = true;
-            }
-            return `define.e(${JSON.stringify(data)},${JSON.stringify(code)});`;
-        }
-        getLoaderPostfixCode() {
-            return [
-                !this.compiler.errorHandlerName ? null : `define.errorHandler=${this.compiler.errorHandlerName};`,
-                `define.amdRequire=${this.compiler.amdRequireName};`,
-                `define.commonjsRequire=${this.compiler.commonjsRequireName};`,
-                `define.preferCommonjs=${this.compiler.preferCommonjs ? "true" : "false"};`
-            ].filter(_ => !!_).join("\n");
+        buildModuleDefinitionArrayArray(modules, circularDependentModules) {
+            return modules.map(name => {
+                let meta = this.compiler.metaStorage.get(name);
+                let code = meta.jsCode;
+                if (!code) {
+                    throw new Error("Code for module " + name + " is not loaded at bundling time.");
+                }
+                let haveModuleRefs = meta.exportModuleReferences.length > 0;
+                let needExports = meta.exports.length > 0 && circularDependentModules.has(name);
+                if (needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs) {
+                    let short = {};
+                    if (haveModuleRefs) {
+                        short.exportRefs = meta.exportModuleReferences;
+                    }
+                    if (needExports) {
+                        short.exports = meta.exports;
+                    }
+                    if (meta.hasOmniousExport) {
+                        short.arbitraryType = true;
+                    }
+                    if (meta.altName) {
+                        short.altName = meta.altName;
+                    }
+                    return [name, meta.dependencies, short, code];
+                }
+                else {
+                    return meta.dependencies.length > 0 ? [name, meta.dependencies, code] : [name, code];
+                }
+            });
         }
         getPrefixCode() {
-            return loader_code_1.loaderCode + "\n" + this.getLoaderPostfixCode();
+            return loader_code_1.loaderCode.replace(/;?[\n\s]*$/, "") + "(\n";
         }
         getPostfixCode(thenCode) {
-            return `define.launch(${JSON.stringify(this.compiler.entryModule)},${JSON.stringify(this.compiler.entryFunction)}${thenCode ? "," + thenCode : ""});`;
+            let params = {
+                entryPoint: {
+                    module: this.compiler.entryModule,
+                    function: this.compiler.entryFunction
+                }
+            };
+            if (this.compiler.errorHandlerName) {
+                params.errorHandler = this.compiler.errorHandlerName;
+            }
+            if (this.compiler.amdRequireName !== "require") {
+                params.amdRequire = this.compiler.amdRequireName;
+            }
+            if (this.compiler.commonjsRequireName !== "require") {
+                params.commonjsRequire = this.compiler.commonjsRequireName;
+            }
+            if (this.compiler.preferCommonjs) {
+                params.preferCommonjs = true;
+            }
+            let paramStr = JSON.stringify(params);
+            if (thenCode) {
+                paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("afterEntryPointExecuted")}:${thenCode}}`;
+            }
+            return ",\n" + paramStr + ");";
         }
         async loadAbsentModuleCode() {
             let storage = this.compiler.metaStorage;
@@ -1515,7 +1532,6 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
                     proms.push((async () => {
                         let code = await afs_2.readTextFile(modulePath);
                         mod.jsCode = code;
-                        discoverModuleDependencies(mod, moduleName);
                     })());
                 }
             });
@@ -1525,27 +1541,6 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
         }
     }
     exports.Bundler = Bundler;
-    function discoverModuleDependencies(meta, moduleName) {
-        if (!meta.hasImportOrExport) {
-            return;
-        }
-        let result = null;
-        function define(deps) {
-            if (result) {
-                throw new Error("Uncorrect module code for " + moduleName + ": expected no more than one invocation of define().");
-            }
-            result = deps.filter(_ => _ !== "exports" && _ !== "require");
-        }
-        void define;
-        if (!meta.jsCode) {
-            throw new Error("Could not discover dependencies of module " + moduleName + ": no code loaded.");
-        }
-        eval(meta.jsCode);
-        if (!result) {
-            throw new Error("Uncorrect module code for " + moduleName + ": expected at least one invocation of define().");
-        }
-        meta.dependencies = result;
-    }
 });
 define("generated/test_list_str", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -1698,21 +1693,26 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             catch (e) {
                 err = e;
             }
-            if (!this.checkError(err, "compile-time", this.compileErrorText))
+            if (!this.checkError(err, "compile-time", this.compileErrorText)) {
                 return false;
-            if (err)
+            }
+            if (err) {
                 return true;
+            }
             try {
-                if (!(await this.checkStdout()))
+                if (!(await this.checkStdout())) {
                     return false;
+                }
             }
             catch (e) {
                 err = e;
             }
-            if (!this.checkError(err, "runtime", this.runtimeErrorText))
+            if (!this.checkError(err, "runtime", this.runtimeErrorText)) {
                 return false;
-            if (err)
+            }
+            if (err) {
                 return true;
+            }
             return this.checkBundle();
         }
     }
@@ -1783,4 +1783,232 @@ define("bundler_main", ["require", "exports", "config", "test", "log", "compiler
         compiler.runSingle();
     }
     exports.tsBundlerMain = tsBundlerMain;
+});
+(function (defs, params) {
+    function handleError(e, action) {
+        if (params.errorHandler) {
+            params.errorHandler(e, action);
+        }
+        else {
+            console.error("Error" + (action ? " " + action : "") + ": " + (e.stack || e.message || e));
+        }
+        throw e;
+    }
+    let renames = {};
+    let defMap = {};
+    for (let i = 0; i < defs.length; i++) {
+        let v = defs[i];
+        let m = typeof (v[2]) !== "string" ? v[2] : undefined;
+        let def = m ? m : {};
+        def.name = v[0];
+        def.code = v[v.length - 1];
+        if (m && m.altName) {
+            renames[m.altName] = def.name;
+        }
+        def.dependencies = Array.isArray(v[1]) ? v[1] : [];
+        defMap[def.name] = def;
+    }
+    let amdRequire = params.amdRequire || require;
+    let commondjsRequire = params.commonjsRequire || require;
+    function requireAny(names, onOk, onError) {
+        if (Array.isArray(names) && !onOk) {
+            throw new Error("Passed array of module names to require (" + names.join(", ") + "), but provided no callback! This is inconsistent.");
+        }
+        if (!onOk) {
+            let name = names;
+            if (name in defMap) {
+                return getProduct(name);
+            }
+            else {
+                return commondjsRequire(name);
+            }
+        }
+        else {
+            try {
+                let nameArr = Array.isArray(names) ? names : [names];
+                let results = {};
+                let externalNameArr = nameArr.filter(name => {
+                    if (name in defMap) {
+                        results[name] = getProduct(name);
+                        return false;
+                    }
+                    return true;
+                });
+                let callOk = () => {
+                    let resultsArr = [];
+                    for (let i = 0; i < nameArr.length; i++) {
+                        resultsArr.push(results[nameArr[i]]);
+                    }
+                    return onOk.apply(null, resultsArr);
+                };
+                if (externalNameArr.length === 0) {
+                    return callOk();
+                }
+                else {
+                    return amdRequire(externalNameArr, function (externalResults) {
+                        for (let i = 0; i < externalNameArr.length; i++) {
+                            results[externalNameArr[i]] = externalResults[i];
+                        }
+                        callOk();
+                    }, onError);
+                }
+            }
+            catch (e) {
+                if (onError) {
+                    onError(e);
+                }
+                else {
+                    throw e;
+                }
+            }
+        }
+    }
+    let currentlyDefiningProductMap = {};
+    let currentlyDefiningProductSeq = [];
+    let products = {};
+    function throwCircularDependencyError(name) {
+        let str = name;
+        for (let i = currentlyDefiningProductSeq.length - 1; i >= 0; i--) {
+            let n = currentlyDefiningProductSeq[i];
+            str += " <- " + currentlyDefiningProductSeq[i];
+            if (n === name)
+                break;
+        }
+        throw new Error("Unresolvable circular dependency detected: " + str);
+    }
+    function getProduct(name) {
+        name = renames[name] || name;
+        let meta = defMap[name];
+        if (!(name in products)) {
+            if (name in currentlyDefiningProductMap) {
+                throwCircularDependencyError(name);
+            }
+            currentlyDefiningProductMap[name] = true;
+            currentlyDefiningProductSeq.push(name);
+            try {
+                let product = {};
+                let deps = [product, requireAny];
+                meta.dependencies.forEach(name => {
+                    if (name in renames) {
+                        name = renames[name];
+                    }
+                    let depMeta = defMap[name];
+                    if (!depMeta) {
+                        throw new Error("Failed to get module \"" + name + "\": no definition is known and no preloaded external module is present.");
+                    }
+                    deps.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
+                });
+                let defFunc = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
+                let returnProduct = defFunc.apply(null, deps);
+                if (meta.arbitraryType) {
+                    product = returnProduct;
+                }
+                products[name] = product;
+            }
+            finally {
+                delete currentlyDefiningProductMap[name];
+                currentlyDefiningProductSeq.pop();
+            }
+        }
+        return products[name];
+    }
+    let proxies = {};
+    function getProxy(def) {
+        if (!(def.name in proxies)) {
+            let proxy = {};
+            getAllExportNames(def).forEach(arr => {
+                arr.forEach(name => {
+                    defineProxyProp(def, proxy, name);
+                });
+            });
+            proxies[def.name] = proxy;
+        }
+        return proxies[def.name];
+    }
+    function getAllExportNames(meta, result = [], noDefault = false) {
+        if (meta.exports) {
+            if (noDefault) {
+                result.push(meta.exports.filter(_ => _ !== "default"));
+            }
+            else {
+                result.push(meta.exports);
+            }
+        }
+        if (meta.exportRefs) {
+            meta.exportRefs.forEach(ref => {
+                getAllExportNames(defMap[ref], result, true);
+            });
+        }
+        return result;
+    }
+    function defineProxyProp(meta, proxy, name) {
+        if (proxy.hasOwnProperty(name)) {
+            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
+            return;
+        }
+        Object.defineProperty(proxy, name, {
+            get: () => getProduct(meta.name)[name],
+            set: v => getProduct(meta.name)[name] = v,
+            enumerable: true
+        });
+    }
+    function discoverExternalModules(moduleName, result = [], visited = {}) {
+        if (moduleName in renames) {
+            moduleName = renames[moduleName];
+        }
+        if (!(moduleName in visited)) {
+            visited[moduleName] = true;
+            if (moduleName in defMap) {
+                defMap[moduleName].dependencies.forEach(depName => discoverExternalModules(depName, result, visited));
+            }
+            else {
+                result.push(moduleName);
+            }
+        }
+        return result;
+    }
+    function requireExternal(names, onOk, onError) {
+        if (params.preferCommonjs) {
+            try {
+                onOk(names.map(name => commondjsRequire(name)));
+            }
+            catch (e) {
+                onError(e);
+            }
+        }
+        else {
+            amdRequire(names, function () { onOk(arguments); }, onError);
+        }
+    }
+    function preloadExternalModules(entryPoint, onDone) {
+        let externalNames = discoverExternalModules(entryPoint);
+        requireExternal(externalNames, externalValues => {
+            externalNames.forEach((name, i) => {
+                products[name] = externalValues[i];
+            });
+            onDone();
+        }, handleError);
+    }
+    function start() {
+        preloadExternalModules(params.entryPoint.module, () => {
+            let mainProduct = getProduct(params.entryPoint.module);
+            Object.keys(defMap).forEach(name => {
+                if (!(name in products)) {
+                    getProduct(name);
+                }
+            });
+            let res = null;
+            let err = null;
+            try {
+                res = mainProduct[params.entryPoint.function].call(null);
+            }
+            catch (e) {
+                err = e;
+            }
+            if (params.afterEntryPointExecuted) {
+                params.afterEntryPointExecuted(err, res);
+            }
+        });
+    }
+    start();
 });
