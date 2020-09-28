@@ -1,16 +1,13 @@
 import * as tsc from "typescript";
+import {TSToolConfig} from "config";
 import * as path from "path";
-import {BundlerConfig} from "config";
-import {logErrorAndExit, logError, logWarn, logInfo} from "log";
 import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
-import {isPathNested, stripTsExt} from "path_utils";
 import {ModuleMetadataStorage} from "module_meta_storage";
 import {Bundler} from "bundler";
 import {writeTextFile} from "afs";
 import {ModulePathResolver} from "module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
-
-type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
+import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "tsc_diagnostics";
 
 /*
 Полезные доки и примеры: 
@@ -57,34 +54,27 @@ compilerOptions.rootDirs
 Не влияет на структуру outDir.
 */
 
+type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
 
-/** содержимое блока bundlerConfig внутри tsconfig.json */
-type TsconfigBundlerInclusion = {
-	entryModule: string;
-	entryFunction: string;
-	outFile: string;
-	errorHandlerName?: string;
-	amdRequireName?: string;
-	commonjsRequireName?: string;
-	preferCommonjs?: boolean;
-	noLoaderCode?: boolean;
-}
-
-// TODO: отпилить конфиг в отдельный класс
 export class Compiler {
 
 	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
 	private _program: tsc.Program | null = null;
 
-	private readonly config: BundlerConfig;
+	readonly config: TSToolConfig;
+	private readonly tscMergedConfig: MergedTscConfig;
 	private readonly transformers: tsc.CustomTransformerFactory[];
 	readonly metaStorage: ModuleMetadataStorage;
-	private readonly modulePathResolver: ModulePathResolver;
+	readonly modulePathResolver: ModulePathResolver;
 	readonly bundler: Bundler;
 
-	constructor(config: BundlerConfig, transformers: tsc.CustomTransformerFactory[] = []){
+	constructor(config: TSToolConfig, transformers: tsc.CustomTransformerFactory[] = []){
 		this.config = config;
-		this.modulePathResolver = new ModulePathResolver(this.tsconfigPath, this.mergedConfig.options);
+		this.tscMergedConfig = {
+			...config.tscParsedCommandLine,
+			rootNames: [path.resolve(path.dirname(config.tsconfigPath), config.entryModule)]
+		}
+		this.modulePathResolver = new ModulePathResolver(config.tsconfigPath, this.tscMergedConfig.options);
 		this.transformers = [
 			context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
 			...transformers
@@ -105,8 +95,8 @@ export class Compiler {
 
 	startWatch(){
 		let watchHost = tsc.createWatchCompilerHost(
-			this.config.configPath,
-			this.mergedConfig.options,
+			this.config.tsconfigPath,
+			this.tscMergedConfig.options,
 			tsc.sys,
 			undefined,
 			processTypescriptDiagnosticEntry
@@ -118,7 +108,7 @@ export class Compiler {
 
 	/** Запуститься для разовой компиляции */
 	async runSingle(){
-		this._program = tsc.createProgram(this.mergedConfig);
+		this._program = tsc.createProgram(this.tscMergedConfig);
 
 		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 
@@ -150,165 +140,7 @@ export class Compiler {
 		processTypescriptDiagnostics(emitResult.diagnostics);
 
 		let bundle = await this.bundler.produceBundle();
-		await writeTextFile(this.inclusionConfig.outFile, bundle);
+		await writeTextFile(this.config.outFile, bundle);
 	}
 
-	private _inclusionConfig: TsconfigBundlerInclusion | null = null;
-	private _mergedConfig: MergedTscConfig | null = null;
-	private loadTsconfig(){
-		let [rawConfig, inclusion] = this.getTsconfigRaw();
-		this.validateFixConfig(rawConfig, inclusion);
-		this._mergedConfig = {
-			...rawConfig,
-			rootNames: [path.resolve(path.dirname(this.tsconfigPath), inclusion.entryModule)]
-		}
-		this._inclusionConfig = inclusion;
-	}
-
-	get mergedConfig(): MergedTscConfig {
-		if(!this._mergedConfig){
-			this.loadTsconfig();
-		}
-		return this._mergedConfig as MergedTscConfig;
-	}
-
-	get inclusionConfig(): TsconfigBundlerInclusion {
-		if(!this._inclusionConfig){
-			this.loadTsconfig();
-		}
-		return this._inclusionConfig as TsconfigBundlerInclusion;
-	}
-
-	private validateFixConfig(config: tsc.ParsedCommandLine, inclusion: TsconfigBundlerInclusion): void{
-		if(config.fileNames.length < 1){
-			logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
-		}
-
-		inclusion.outFile = path.resolve(path.dirname(this.config.configPath), inclusion.outFile);
-
-		if(config.options.module === undefined){
-			config.options.module = tsc.ModuleKind.AMD;
-		} else if(config.options.module !== tsc.ModuleKind.AMD){
-			logErrorAndExit("This tool is only able to work with AMD modules. Adjust compiler options in tsconfig.json.");
-		}
-
-		if(config.options.outFile){
-			logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to bundlerConfig).");
-		}
-
-		if(config.options.incremental){
-			logErrorAndExit("This tool is not able to work with incremental passed in compilerOptions.");
-		}
-
-		if(!config.options.outDir){
-			logErrorAndExit("You must explicitly pass outDir within compilerOptions.");
-		}
-
-		if(!config.options.rootDir){
-			config.options.rootDir = path.dirname(this.config.configPath);
-		}
-
-		if(config.options.rootDirs){
-			let dirs = config.options.rootDirs;
-			let haveNestedDirs = false;
-			for(let i = 0; i < dirs.length; i++){
-				for(let j = i + 1; j < dirs.length; j++){
-					if(isPathNested(dirs[i], dirs[j])){
-						logError("Values of rootDirs must not be nested within one another, but there are \"" + dirs[i] + "\" and \"" + dirs[j] + "\" which are nested.");
-						haveNestedDirs = true;
-					}
-				}
-			}
-			if(haveNestedDirs){
-				process.exit(1);
-			}
-		}
-
-		// опции про tslib: все вспомогательные функции импортировать из tslib, не прописывать в компилированном коде по новой
-		config.options.importHelpers = true;
-		config.options.noEmitHelpers = true;
-
-		if(!config.options.moduleResolution){
-			config.options.moduleResolution = tsc.ModuleResolutionKind.NodeJs;
-		} else if(config.options.moduleResolution !== tsc.ModuleResolutionKind.NodeJs){
-			logErrorAndExit("Module resolution types other than node are not supported.");
-		}
-	}
-
-	private getTsconfigRaw(): [tsc.ParsedCommandLine, TsconfigBundlerInclusion] {
-		let parseConfigHost: tsc.ParseConfigHost = {
-			useCaseSensitiveFileNames: false,
-			readDirectory: tsc.sys.readDirectory,
-			fileExists: tsc.sys.fileExists,
-			readFile: tsc.sys.readFile,
-		};
-
-		let fileContentStr = tsc.sys.readFile(this.config.configPath);
-		if(!fileContentStr){
-			logErrorAndExit("Failed to read " + this.config.configPath);
-		}
-		let fileContentParsed = tsc.parseJsonText(this.config.configPath, fileContentStr)
-		let rawJson = JSON.parse(fileContentStr);
-		let projectRoot = path.dirname(this.config.configPath);
-		let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
-		processTypescriptDiagnostics(result.errors)
-		return [result, rawJson.bundlerConfig];
-	}
-
-	get outDir(): string { return this.mergedConfig.options.outDir as string }
-	get entryModule(): string { 
-		let absPath = path.resolve(path.dirname(this.tsconfigPath), this.inclusionConfig.entryModule);
-		let name = stripTsExt(this.modulePathResolver.getAbsoluteModulePath(absPath));
-		return name;
-	}
-	get entryFunction(): string { return this.inclusionConfig.entryFunction }
-	get errorHandlerName(): string | null { return this.inclusionConfig.errorHandlerName || null }
-	get amdRequireName(): string { return this.inclusionConfig.amdRequireName || "require" }
-	get commonjsRequireName(): string { return this.inclusionConfig.commonjsRequireName || "require" }
-	get preferCommonjs(): boolean { return this.inclusionConfig.preferCommonjs === false? false: true }
-	get noLoaderCode(): boolean { return !!this.inclusionConfig.noLoaderCode }
-	get tsconfigPath(): string { return this.config.configPath; }
-
-}
-
-export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
-	let msg: (string | null)[] = [];
-
-	if(d.file) {
-		let origin = d.file.fileName;
-
-		if(typeof(d.start) === "number"){
-			let { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
-			origin += ` (${line + 1}:${character + 1}`;
-		}
-
-		msg.push(origin);
-	}
-	
-	msg.push(tsc.DiagnosticCategory[d.category] + ":")
-	msg.push(tsc.flattenDiagnosticMessageText(d.messageText, '\n'));
-	msg.push(d.code.toString());
-
-	let msgString = msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
-	if(d.category == tsc.DiagnosticCategory.Error){
-		logError(msgString)
-		return true;
-	} else if(d.category === tsc.DiagnosticCategory.Warning) {
-		logWarn(msgString);
-	} else {
-		logInfo(msgString);
-	}
-
-	return false;
-}
-
-export function processTypescriptDiagnostics(diagnostics?: Iterable<tsc.Diagnostic> | null){
-	let haveErrors = false;
-    for(let d of diagnostics || []) {
-		haveErrors = haveErrors || processTypescriptDiagnosticEntry(d);
-	}
-	
-	if(haveErrors){
-		process.exit(1)
-	}
 }

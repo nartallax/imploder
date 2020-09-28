@@ -1,29 +1,31 @@
-import {getConfig} from "config";
 import {runAllTests, runSingleTest} from "test";
 import {logErrorAndExit, setLogVerbosityLevel} from "log";
 import {Compiler} from "compiler";
+import {updateCliArgsWithTsconfig, parseToolCliArgs} from "config";
+import {CLI} from "cli";
 
 export async function tsBundlerMain(){
-	let config = getConfig();
+	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
-	if(config.verbose){
+	if(cliArgs.verbose){
 		setLogVerbosityLevel(1);
 	}
 
-	if(config.test){
+	if(cliArgs.test){
 		await runAllTests();
 		return;
 	}
 
-	if(config.testSingle){
-		await runSingleTest(config.testSingle);
+	if(cliArgs.testSingle){
+		await runSingleTest(cliArgs.testSingle);
 		return
 	}
 
-	if(!config.configPath){
+	if(!cliArgs.tsconfigPath){
 		logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
 	}
 
+	let config = updateCliArgsWithTsconfig(cliArgs);
 	let compiler = new Compiler(config);
 	compiler.runSingle();
 

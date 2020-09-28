@@ -5,6 +5,7 @@ import {logDebug} from "log";
 import * as path from "path";
 import {readTextFile} from "afs";
 import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
+import {stripTsExt} from "path_utils";
 
 /** сборщик бандл-файла из кучи исходников */
 export class Bundler {
@@ -17,23 +18,29 @@ export class Bundler {
 
 	async produceBundle(): Promise<string>{
 		let result = [] as string[];
-		if(!this.compiler.noLoaderCode){
+		if(!this.compiler.config.noLoaderCode){
 			result.push(this.getPrefixCode());
 		}
 
 		await this.loadAbsentModuleCode();
 
-		let moduleOrder = new ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.compiler.entryModule);
+		let moduleOrder = new ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
 		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
 
 		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
 		result.push(JSON.stringify(defArrArr));
 		
-		if(!this.compiler.noLoaderCode){
+		if(!this.compiler.config.noLoaderCode){
 			result.push(this.getPostfixCode());
 		}
 
 		return result.join("\n");
+	}
+
+	private getEntryModuleName(): string {
+		let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
+		let name = stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
+		return name;
 	}
 
 	private buildModuleDefinitionArrayArray(modules: string[], circularDependentModules: Set<string>): ModuleDefinitonArray[] {
@@ -76,22 +83,23 @@ export class Bundler {
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
 	getPostfixCode(thenCode?: string): string {
+		let cfg = this.compiler.config;
 		let params: any = {
 			entryPoint: {
-				module: this.compiler.entryModule,
-				function: this.compiler.entryFunction
+				module: this.getEntryModuleName(),
+				function: cfg.entryFunction
 			}
 		};
-		if(this.compiler.errorHandlerName){
-			params.errorHandler = this.compiler.errorHandlerName;
+		if(cfg.errorHandlerName){
+			params.errorHandler = cfg.errorHandlerName;
 		}
-		if(this.compiler.amdRequireName !== "require"){
-			params.amdRequire = this.compiler.amdRequireName
+		if(cfg.amdRequireName !== "require"){
+			params.amdRequire = cfg.amdRequireName
 		}
-		if(this.compiler.commonjsRequireName !== "require"){
-			params.commonjsRequire = this.compiler.commonjsRequireName;
+		if(cfg.commonjsRequireName !== "require"){
+			params.commonjsRequire = cfg.commonjsRequireName;
 		}
-		if(this.compiler.preferCommonjs){
+		if(cfg.preferCommonjs){
 			params.preferCommonjs = true;
 		}
 		let paramStr = JSON.stringify(params);
@@ -105,10 +113,11 @@ export class Bundler {
 		let storage = this.compiler.metaStorage;
 		let proms = [] as Promise<void>[];
 		let names = storage.getNames();
+		let outDir = this.compiler.config.tscParsedCommandLine.options.outDir as string;
 		names.forEach(moduleName => {
 			let mod = storage.get(moduleName);
 			if(!mod.jsCode){
-				let modulePath = path.join(this.compiler.outDir, moduleName + ".js");
+				let modulePath = path.join(outDir, moduleName + ".js");
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
 					mod.jsCode = code;

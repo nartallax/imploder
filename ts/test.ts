@@ -4,6 +4,7 @@ import {Compiler} from "compiler";
 import {logInfo, logError} from "log";
 import {testListStr} from "generated/test_list_str";
 import {fileExists, unlinkRecursive} from "afs";
+import {getFullConfigFromCliArgs} from "config";
 
 class TestProject {
 
@@ -28,9 +29,10 @@ class TestProject {
 	private _compiler: Compiler | null = null
 	private get compiler(): Compiler {
 		if(!this._compiler){
-			this._compiler = new Compiler({
-				configPath: path.join(TestProject.testsRoot, this.name, "./tsconfig.json")
-			});
+			let config = getFullConfigFromCliArgs([
+				"--tsconfig", path.join(TestProject.testsRoot, this.name, "./tsconfig.json")
+			])
+			this._compiler = new Compiler(config);
 		}
 		return this._compiler;
 	}
