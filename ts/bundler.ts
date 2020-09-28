@@ -1,3 +1,4 @@
+import * as tsc from "typescript";
 import {Compiler} from "compiler";
 import {ModuleOrderer} from "module_orderer";
 import {loaderCode} from "generated/loader_code";
@@ -6,6 +7,7 @@ import * as path from "path";
 import {readTextFile} from "afs";
 import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
 import {stripTsExt} from "path_utils";
+import {minifyJsCode} from "minification";
 
 /** сборщик бандл-файла из кучи исходников */
 export class Bundler {
@@ -51,8 +53,9 @@ export class Bundler {
 				throw new Error("Code for module " + name + " is not loaded at bundling time.");
 			}
 
-			let haveModuleRefs = meta.exportModuleReferences.length > 0;
-			let needExports = meta.exports.length > 0 && circularDependentModules.has(name)
+			let isInCircularDependency = circularDependentModules.has(name);
+			let haveModuleRefs = meta.exportModuleReferences.length > 0 && isInCircularDependency;
+			let needExports = meta.exports.length > 0 && isInCircularDependency
 			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
 
 				let short: ModuleMetaShort = {}
@@ -90,9 +93,6 @@ export class Bundler {
 				function: cfg.entryFunction
 			}
 		};
-		if(cfg.errorHandlerName){
-			params.errorHandler = cfg.errorHandlerName;
-		}
 		if(cfg.amdRequireName !== "require"){
 			params.amdRequire = cfg.amdRequireName
 		}
@@ -105,6 +105,9 @@ export class Bundler {
 		let paramStr = JSON.stringify(params);
 		if(thenCode){
 			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("afterEntryPointExecuted")}:${thenCode}}`;
+		}
+		if(cfg.errorHandlerName){
+			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
 		}
 		return ",\n" + paramStr + ");"
 	}
@@ -120,6 +123,10 @@ export class Bundler {
 				let modulePath = path.join(outDir, moduleName + ".js");
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
+					if(this.compiler.config.minify){
+						let target: tsc.ScriptTarget = tsc.ScriptTarget[this.compiler.config.target];
+						code = await minifyJsCode(code, target, moduleName);
+					}
 					mod.jsCode = code;
 				})());
 			}

@@ -4,7 +4,9 @@
         "entryFunction": "main",
         "outFile": "js/bundle.js",
         "noLoaderCode": true,
-        "errorHandlerName": "nop"
+        "errorHandlerName": "nop",
+        "minify": true,
+        "target": "ES2018"
     },
     
     "compilerOptions": {

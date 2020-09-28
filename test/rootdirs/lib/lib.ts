@@ -1,3 +1,3 @@
-export function getValue(): number {
-	return 1;
+export function getValue(): string {
+	return "one";
 }

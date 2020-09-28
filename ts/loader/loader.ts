@@ -59,7 +59,7 @@ interface LauncherParams {
 	}
 
 	let amdRequire: AmdRequire = params.amdRequire || (require as any as AmdRequire);
-	let commondjsRequire: CommonjsRequire = params.commonjsRequire || require;
+	let commonjsRequire: CommonjsRequire = params.commonjsRequire || require;
 
 	/** функция, которую будут дергать в качестве require изнутри модулей */
 	function requireAny(names: string | string[], onOk?: (...modules: any) => void, onError?: (error: Error) => void){
@@ -72,7 +72,7 @@ interface LauncherParams {
 			if(name in defMap){
 				return getProduct(name);
 			} else {
-				return commondjsRequire(name)
+				return commonjsRequire(name)
 			}
 		} else {
 			try {
@@ -146,11 +146,16 @@ interface LauncherParams {
 					if(name in renames){
 						name = renames[name];
 					}
+					let product = products[name];
+					if(product){
+						deps.push(product);
+						return;
+					}
 					let depMeta = defMap[name];
 					if(!depMeta){
 						throw new Error("Failed to get module \"" + name + "\": no definition is known and no preloaded external module is present.");
 					}
-					deps.push(depMeta.arbitraryType || !depMeta.exports? getProduct(name): getProxy(depMeta));
+					deps.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs)? getProduct(name): getProxy(depMeta));
 				});
 				let defFunc: Function = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
 				let returnProduct = defFunc.apply(null, deps);
@@ -226,7 +231,7 @@ interface LauncherParams {
 	function requireExternal(names: string[], onOk: (moduleVals: ArrayLike<any>) => void, onError: (error: Error) => void){
 		if(params.preferCommonjs){
 			try {
-				onOk(names.map(name => commondjsRequire(name)))
+				onOk(names.map(name => commonjsRequire(name)))
 			} catch(e){
 				onError(e);
 			}

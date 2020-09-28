@@ -25,7 +25,7 @@ export const loaderCode = `
         defMap[def.name] = def;
     }
     var amdRequire = params.amdRequire || require;
-    var commondjsRequire = params.commonjsRequire || require;
+    var commonjsRequire = params.commonjsRequire || require;
     /** функция, которую будут дергать в качестве require изнутри модулей */
     function requireAny(names, onOk, onError) {
         if (Array.isArray(names) && !onOk) {
@@ -37,7 +37,7 @@ export const loaderCode = `
                 return getProduct(name_1);
             }
             else {
-                return commondjsRequire(name_1);
+                return commonjsRequire(name_1);
             }
         }
         else {
@@ -109,11 +109,16 @@ export const loaderCode = `
                     if (name in renames) {
                         name = renames[name];
                     }
+                    var product = products[name];
+                    if (product) {
+                        deps_1.push(product);
+                        return;
+                    }
                     var depMeta = defMap[name];
                     if (!depMeta) {
                         throw new Error("Failed to get module \\"" + name + "\\": no definition is known and no preloaded external module is present.");
                     }
-                    deps_1.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
+                    deps_1.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
                 var defFunc = eval("(" + meta.code + ")\\n//# sourceURL=" + meta.name);
                 var returnProduct = defFunc.apply(null, deps_1);
@@ -191,7 +196,7 @@ export const loaderCode = `
     function requireExternal(names, onOk, onError) {
         if (params.preferCommonjs) {
             try {
-                onOk(names.map(function (name) { return commondjsRequire(name); }));
+                onOk(names.map(function (name) { return commonjsRequire(name); }));
             }
             catch (e) {
                 onError(e);

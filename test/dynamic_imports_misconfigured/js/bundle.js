@@ -1,1 +1,1 @@
-[["/main",[],{"exports":["main"]},"function (exports, require) {\n    Object.defineProperty(exports, \"__esModule\", { value: true });\n    exports.main = void 0;\n    async function main() {\n        console.log(\"importing...\");\n        let ref = await new Promise((resolve_1, reject_1) => { require([\"./fs\"], resolve_1, reject_1); });\n        console.log(ref.x + \"!\");\n    }\n    exports.main = main;\n}\n"]]
+[["/main","(n,o)=>{n.main=async function main(){console.log('importing...');let n=await new Promise((n,i)=>{o(['./fs'],n,i)});console.log(n.x+'!')}}"]]

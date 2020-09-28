@@ -129,14 +129,19 @@ function tryApplyMappings(mappings: PathMappings, modulePath: string, absBaseUrl
 		return matchedFiles[0];
 	}
 
-	// что именно должен делать компилятор в случаях коллизий - доки умалчивают
-	// ну, видимо, буду выдавать ошибку
 	if(matchedPrefixes.length > 0){
 		if(matchedFiles.length < 1){
+			// такое может случиться в случае внешних модулей
+			// мы не можем чисто по названию понять, внешний модуль или нет, и поэтому нам нужно поискать
+			// если не нашли - значит, видимо, внешний
+			/*
 			logWarn("For module dependency path \"" 
 				+ modulePath + "\" there some wildcard path roots that are matched (\"" 
 				+ matchedPrefixes.join("\", \"") + "\"), but no file is found within these roots.");
+			*/
 		} else {
+			// что именно должен делать компилятор в случаях коллизий - доки умалчивают
+			// ну, видимо, буду выдавать ошибку
 			logWarn("For module dependency path \"" 
 				+ modulePath + "\" there some wildcard path roots that are matched (\"" 
 				+ matchedPrefixes.join("\", \"") + "\", and multiple files are found within these roots: \""

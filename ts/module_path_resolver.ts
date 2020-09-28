@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import {getModulePathMatcher, PathMatcher} from "./transformer/tsconfig_paths_parser";
+import {getModulePathMatcher, PathMatcher} from "./tsconfig_paths_parser";
 import {getRelativeModulePath, isModulePathRelative, isPathNested, typescriptFileExists, joinModulePath} from "path_utils";
 import {logError, logDebug} from "log";
 

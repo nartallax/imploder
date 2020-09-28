@@ -1,6 +1,6 @@
 function (exports, require) {
     function getValue() {
-        return 1;
+        return "one";
     }
     exports.getValue = getValue;
 }

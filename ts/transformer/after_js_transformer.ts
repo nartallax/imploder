@@ -136,6 +136,24 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 					}
 				}
 
+				if(tsc.isCallExpression(expr)){
+					let c: tsc.CallExpression = expr;
+					let ce = c.expression;
+					let args = c.arguments;
+					if(args.length > 1){
+						let argA = args[0];
+						let argB = args[1];
+						if(tsc.isPropertyAccessExpression(ce) 
+							&& tsc.isIdentifier(ce.expression) && ce.expression.text === "Object"
+							&& tsc.isIdentifier(ce.name) && ce.name.text === "defineProperty"
+							&& tsc.isIdentifier(argA) && argA.text === "exports"
+							&& tsc.isStringLiteral(argB) && argB.text === "__esModule"){
+								startWith = i + 1;
+								continue;
+						}
+					}
+				}
+
 				firstMeaninfulStatementReached = true;
 			}
 

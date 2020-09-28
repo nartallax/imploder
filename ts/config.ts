@@ -18,8 +18,13 @@ export interface TSToolCLIArgs {
 }
 
 /** Содержимое блока bundlerConfig внутри tsconfig.json
- * обязательные поля - только entryModule, entryFunction, outFile
- */
+ * обязательные поля - только entryModule, entryFunction, outFile. target рекомендуется выставить
+*/
+export interface TsconfigTSToolInclusion extends TSToolProfile {
+	profiles?: { [profileName: string]: TSToolProfile }
+}
+
+/** Описание профиля тула в tsconfig.json */
 export interface TSToolProfile {
 	entryModule: string;
 	entryFunction: string;
@@ -29,14 +34,12 @@ export interface TSToolProfile {
 	commonjsRequireName: string;
 	preferCommonjs: boolean;
 	noLoaderCode: boolean;
-	compress: boolean;
+	minify: boolean;
 	devmode: boolean;
+	target: keyof typeof tsc.ScriptTarget;
 }
 
-export interface TsconfigTSToolInclusion extends TSToolProfile {
-	profiles?: { [profileName: string]: TSToolProfile }
-}
-
+/** Конфиг всего тула в целом */
 export interface TSToolConfig extends TSToolCLIArgs, TSToolProfile { 
 	tscParsedCommandLine: tsc.ParsedCommandLine;
 };
@@ -65,16 +68,20 @@ export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
 
 export function updateCliArgsWithTsconfig(cliArgs: TSToolCLIArgs): TSToolConfig {
 	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(cliArgs.tsconfigPath);
-	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, inclusionConfig);
 	
 	let profile: TSToolProfile = inclusionConfig;
 	if(cliArgs.profile){
 		if(!inclusionConfig.profiles || !(cliArgs.profile in inclusionConfig.profiles)){
 			logErrorAndExit(`Profile name is passed in command-line arguments ("${cliArgs.profile}"), but there is no such profile defined.`);
 		}
-		profile = inclusionConfig.profiles[cliArgs.profile];
+		profile = {
+			...profile,
+			...inclusionConfig.profiles[cliArgs.profile]
+		};
 	}
-	fixProfile(profile);
+	fixProfile(profile, cliArgs.tsconfigPath);
+
+	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
 
 	let config: TSToolConfig = {
 		...cliArgs,
@@ -109,12 +116,10 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TsconfigT
 	return [result, rawJson.bundlerConfig];
 }
 
-function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, inclusion: TSToolProfile): void{
+function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: TSToolProfile): void{
 	if(config.fileNames.length < 1){
 		logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
-
-	inclusion.outFile = path.resolve(path.dirname(tsconfigPath), inclusion.outFile);
 
 	if(config.options.module === undefined){
 		config.options.module = tsc.ModuleKind.AMD;
@@ -158,6 +163,8 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	config.options.importHelpers = true;
 	config.options.noEmitHelpers = true;
 
+	config.options.target = tsc.ScriptTarget[profile.target];
+
 	if(!config.options.moduleResolution){
 		config.options.moduleResolution = tsc.ModuleResolutionKind.NodeJs;
 	} else if(config.options.moduleResolution !== tsc.ModuleResolutionKind.NodeJs){
@@ -166,11 +173,13 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 
 }
 
-function fixProfile(profile: TSToolProfile){
+function fixProfile(profile: TSToolProfile, tsconfigPath: string){
+	profile.outFile = path.resolve(path.dirname(tsconfigPath), profile.outFile);
 	profile.preferCommonjs = profile.preferCommonjs === false? false: true;
 	profile.amdRequireName = profile.amdRequireName || "require";
 	profile.commonjsRequireName = profile.commonjsRequireName || "require";
 	profile.noLoaderCode = !!profile.noLoaderCode;
-	profile.compress = !!profile.compress;
+	profile.minify = !!profile.minify;
 	profile.devmode = !!profile.devmode;
+	profile.target = profile.target || "ES5"
 }

@@ -1,1 +1,1 @@
-export const fromRootDirVal = 123;
+export const fromRootDirVal = "nya";

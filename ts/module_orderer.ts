@@ -47,7 +47,7 @@ export class ModuleOrderer {
 	private getSortedModules(entryPoint: string, circularDependencyModules: Set<string>): [string[], string[]] {
 		let nameStack = new SeqSet<string>();
 		let absentModules = new Set<string>();
-		let result = [] as string[];
+		let result = new Set<string>();
 
 		let visit = (name: string) => {
 			if(nameStack.has(name)){
@@ -58,7 +58,7 @@ export class ModuleOrderer {
 				absentModules.add(name);
 			} else {
 				nameStack.push(name);
-				result.push(name);
+				result.add(name);
 				this.storage.get(name).dependencies.forEach(dep => visit(dep));
 				nameStack.pop();
 			}
@@ -68,7 +68,7 @@ export class ModuleOrderer {
 		visit(entryPoint);
 
 		return [
-			result.sort((a, b) => a < b? -1: a > b? 1: 0),
+			[...result].sort((a, b) => a < b? -1: a > b? 1: 0),
 			[...absentModules]
 		]
 	}

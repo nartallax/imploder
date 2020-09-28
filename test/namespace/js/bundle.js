@@ -1,1 +1,1 @@
-[["/main",["/namespace_loc"],{"exports":["main"]},"function (exports, require, namespace_loc_1) {\n    function main() {\n        console.log(namespace_loc_1.LocNs.t);\n    }\n    exports.main = main;\n}\n"],["/namespace_loc",[],{"exports":["LocNs"]},"function (exports, require) {\n    var LocNs;\n    (function (LocNs) {\n        LocNs.t = 3;\n    })(LocNs = exports.LocNs || (exports.LocNs = {}));\n}\n"]]
+[["/main",["/namespace_loc"],"(n,o,c)=>{n.main=function main(){console.log(c.LocNs.t)}}"],["/namespace_loc","c=>{(c=>{c.t=3})(c.LocNs||(c.LocNs={}))}"]]

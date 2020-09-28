@@ -466,15 +466,18 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
     exports.parseToolCliArgs = parseToolCliArgs;
     function updateCliArgsWithTsconfig(cliArgs) {
         let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(cliArgs.tsconfigPath);
-        validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, inclusionConfig);
         let profile = inclusionConfig;
         if (cliArgs.profile) {
             if (!inclusionConfig.profiles || !(cliArgs.profile in inclusionConfig.profiles)) {
                 log_3.logErrorAndExit(`Profile name is passed in command-line arguments ("${cliArgs.profile}"), but there is no such profile defined.`);
             }
-            profile = inclusionConfig.profiles[cliArgs.profile];
+            profile = {
+                ...profile,
+                ...inclusionConfig.profiles[cliArgs.profile]
+            };
         }
-        fixProfile(profile);
+        fixProfile(profile, cliArgs.tsconfigPath);
+        validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
         let config = {
             ...cliArgs,
             ...profile,
@@ -506,11 +509,10 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
         tsc_diagnostics_1.processTypescriptDiagnostics(result.errors);
         return [result, rawJson.bundlerConfig];
     }
-    function validateFixConfig(tsconfigPath, config, inclusion) {
+    function validateFixConfig(tsconfigPath, config, profile) {
         if (config.fileNames.length < 1) {
             log_3.logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
         }
-        inclusion.outFile = path.resolve(path.dirname(tsconfigPath), inclusion.outFile);
         if (config.options.module === undefined) {
             config.options.module = tsc.ModuleKind.AMD;
         }
@@ -546,6 +548,7 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
         }
         config.options.importHelpers = true;
         config.options.noEmitHelpers = true;
+        config.options.target = tsc.ScriptTarget[profile.target];
         if (!config.options.moduleResolution) {
             config.options.moduleResolution = tsc.ModuleResolutionKind.NodeJs;
         }
@@ -553,20 +556,22 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
             log_3.logErrorAndExit("Module resolution types other than node are not supported.");
         }
     }
-    function fixProfile(profile) {
+    function fixProfile(profile, tsconfigPath) {
+        profile.outFile = path.resolve(path.dirname(tsconfigPath), profile.outFile);
         profile.preferCommonjs = profile.preferCommonjs === false ? false : true;
         profile.amdRequireName = profile.amdRequireName || "require";
         profile.commonjsRequireName = profile.commonjsRequireName || "require";
         profile.noLoaderCode = !!profile.noLoaderCode;
-        profile.compress = !!profile.compress;
+        profile.minify = !!profile.minify;
         profile.devmode = !!profile.devmode;
+        profile.target = profile.target || "ES5";
     }
 });
 define("utils", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
 });
-define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript", "path", "log", "path_utils"], function (require, exports, tsc, path, log_4, path_utils_2) {
+define("tsconfig_paths_parser", ["require", "exports", "typescript", "path", "log", "path_utils"], function (require, exports, tsc, path, log_4, path_utils_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getModulePathMatcher = void 0;
@@ -657,9 +662,6 @@ define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript",
         }
         if (matchedPrefixes.length > 0) {
             if (matchedFiles.length < 1) {
-                log_4.logWarn("For module dependency path \""
-                    + modulePath + "\" there some wildcard path roots that are matched (\""
-                    + matchedPrefixes.join("\", \"") + "\"), but no file is found within these roots.");
             }
             else {
                 log_4.logWarn("For module dependency path \""
@@ -671,7 +673,7 @@ define("transformer/tsconfig_paths_parser", ["require", "exports", "typescript",
         return null;
     }
 });
-define("module_path_resolver", ["require", "exports", "path", "transformer/tsconfig_paths_parser", "path_utils", "log"], function (require, exports, path, tsconfig_paths_parser_1, path_utils_3, log_5) {
+define("module_path_resolver", ["require", "exports", "path", "tsconfig_paths_parser", "path_utils", "log"], function (require, exports, path, tsconfig_paths_parser_1, path_utils_3, log_5) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ModulePathResolver = void 0;
@@ -828,7 +830,7 @@ define("transformer/abstract_transformer", ["require", "exports", "typescript", 
             }
             this.visitRecursive(fileNode, (node, depth) => {
                 console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-            });
+            }, () => true);
         }
         moduleNameByNode(fileNode) {
             return path_utils_4.stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
@@ -1007,6 +1009,23 @@ define("transformer/after_js_transformer", ["require", "exports", "transformer/a
                             }
                         }
                     }
+                    if (tsc.isCallExpression(expr)) {
+                        let c = expr;
+                        let ce = c.expression;
+                        let args = c.arguments;
+                        if (args.length > 1) {
+                            let argA = args[0];
+                            let argB = args[1];
+                            if (tsc.isPropertyAccessExpression(ce)
+                                && tsc.isIdentifier(ce.expression) && ce.expression.text === "Object"
+                                && tsc.isIdentifier(ce.name) && ce.name.text === "defineProperty"
+                                && tsc.isIdentifier(argA) && argA.text === "exports"
+                                && tsc.isStringLiteral(argB) && argB.text === "__esModule") {
+                                startWith = i + 1;
+                                continue;
+                            }
+                        }
+                    }
                     firstMeaninfulStatementReached = true;
                 }
                 if (this.isExportAssignment(expr)) {
@@ -1167,7 +1186,7 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
         getSortedModules(entryPoint, circularDependencyModules) {
             let nameStack = new seq_set_1.SeqSet();
             let absentModules = new Set();
-            let result = [];
+            let result = new Set();
             let visit = (name) => {
                 if (nameStack.has(name)) {
                     this.unwindNameStack(nameStack, name).forEach(x => circularDependencyModules.add(x));
@@ -1178,14 +1197,14 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
                 }
                 else {
                     nameStack.push(name);
-                    result.push(name);
+                    result.add(name);
                     this.storage.get(name).dependencies.forEach(dep => visit(dep));
                     nameStack.pop();
                 }
             };
             visit(entryPoint);
             return [
-                result.sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
+                [...result].sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
                 [...absentModules]
             ];
         }
@@ -1223,7 +1242,7 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
         defMap[def.name] = def;
     }
     var amdRequire = params.amdRequire || require;
-    var commondjsRequire = params.commonjsRequire || require;
+    var commonjsRequire = params.commonjsRequire || require;
     /** функция, которую будут дергать в качестве require изнутри модулей */
     function requireAny(names, onOk, onError) {
         if (Array.isArray(names) && !onOk) {
@@ -1235,7 +1254,7 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
                 return getProduct(name_1);
             }
             else {
-                return commondjsRequire(name_1);
+                return commonjsRequire(name_1);
             }
         }
         else {
@@ -1307,11 +1326,16 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
                     if (name in renames) {
                         name = renames[name];
                     }
+                    var product = products[name];
+                    if (product) {
+                        deps_1.push(product);
+                        return;
+                    }
                     var depMeta = defMap[name];
                     if (!depMeta) {
                         throw new Error("Failed to get module \\"" + name + "\\": no definition is known and no preloaded external module is present.");
                     }
-                    deps_1.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
+                    deps_1.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
                 var defFunc = eval("(" + meta.code + ")\\n//# sourceURL=" + meta.name);
                 var returnProduct = defFunc.apply(null, deps_1);
@@ -1389,7 +1413,7 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
     function requireExternal(names, onOk, onError) {
         if (params.preferCommonjs) {
             try {
-                onOk(names.map(function (name) { return commondjsRequire(name); }));
+                onOk(names.map(function (name) { return commonjsRequire(name); }));
             }
             catch (e) {
                 onError(e);
@@ -1438,7 +1462,102 @@ define("loader/loader_types", ["require", "exports"], function (require, exports
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
 });
-define("bundler", ["require", "exports", "module_orderer", "generated/loader_code", "log", "path", "afs", "path_utils"], function (require, exports, module_orderer_1, loader_code_1, log_9, path, afs_2, path_utils_6) {
+define("minification", ["require", "exports", "terser", "typescript", "log"], function (require, exports, terser, tsc, log_9) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.minifyJsCode = void 0;
+    async function minifyJsCode(code, tscEcmaVersion, moduleName) {
+        let ecma = tscEcmaToTerserEcma(tscEcmaVersion);
+        try {
+            let res = await terser.minify("return " + code, {
+                compress: {
+                    passes: 3,
+                    toplevel: false,
+                    arrows: tscEcmaVersion > tsc.ScriptTarget.ES5,
+                    arguments: true,
+                    booleans: true,
+                    booleans_as_integers: false,
+                    collapse_vars: true,
+                    comparisons: true,
+                    computed_props: true,
+                    conditionals: true,
+                    dead_code: true,
+                    directives: true,
+                    drop_console: false,
+                    drop_debugger: false,
+                    ecma: ecma,
+                    evaluate: true,
+                    hoist_funs: true,
+                    hoist_props: true,
+                    if_return: true,
+                    inline: false,
+                    join_vars: true,
+                    keep_classnames: true,
+                    keep_fnames: true,
+                    keep_fargs: false,
+                    keep_infinity: false,
+                    loops: true,
+                    module: false,
+                    negate_iife: false,
+                    properties: true,
+                    pure_getters: false,
+                    reduce_vars: true,
+                    sequences: true,
+                    side_effects: true,
+                    switches: true,
+                    typeofs: false,
+                    unsafe_arrows: true,
+                    unsafe_comps: true,
+                    unsafe_Function: false,
+                    unsafe_math: false,
+                    unsafe_symbols: false,
+                    unsafe_methods: false,
+                    unsafe_proto: false,
+                    unsafe_regexp: false,
+                    unused: true
+                },
+                mangle: {
+                    eval: false,
+                    keep_classnames: true,
+                    keep_fnames: true,
+                    module: false
+                },
+                format: {
+                    ascii_only: false,
+                    braces: false,
+                    comments: "some",
+                    ecma: ecma,
+                    quote_style: 1,
+                    keep_quoted_props: false,
+                    wrap_func_args: false
+                },
+                parse: {
+                    bare_returns: true
+                },
+                ecma: ecma
+            });
+            if (!res.code) {
+                log_9.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}`);
+            }
+            let resultCode = res.code.replace(/^return\s*/, "").replace(/;\s*$/, "");
+            return resultCode;
+        }
+        catch (e) {
+            log_9.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}\n${e}`);
+        }
+    }
+    exports.minifyJsCode = minifyJsCode;
+    function tscEcmaToTerserEcma(tscEcma) {
+        if (tscEcma === tsc.ScriptTarget.ES5) {
+            return 5;
+        }
+        if (tscEcma > tsc.ScriptTarget.ES5 && tscEcma < Math.min(90, tsc.ScriptTarget.Latest)) {
+            return (2013 + tscEcma);
+        }
+        log_9.logErrorAndExit(`Could not minify code with this target (${tscEcma}): no conversion to minifier ECMA version exists.`);
+    }
+});
+define("bundler", ["require", "exports", "typescript", "module_orderer", "generated/loader_code", "log", "path", "afs", "path_utils", "minification"], function (require, exports, tsc, module_orderer_1, loader_code_1, log_10, path, afs_2, path_utils_6, minification_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Bundler = void 0;
@@ -1453,7 +1572,7 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
             }
             await this.loadAbsentModuleCode();
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
-            log_9.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
+            log_10.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
             let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
             result.push(JSON.stringify(defArrArr));
             if (!this.compiler.config.noLoaderCode) {
@@ -1473,8 +1592,9 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
                 if (!code) {
                     throw new Error("Code for module " + name + " is not loaded at bundling time.");
                 }
-                let haveModuleRefs = meta.exportModuleReferences.length > 0;
-                let needExports = meta.exports.length > 0 && circularDependentModules.has(name);
+                let isInCircularDependency = circularDependentModules.has(name);
+                let haveModuleRefs = meta.exportModuleReferences.length > 0 && isInCircularDependency;
+                let needExports = meta.exports.length > 0 && isInCircularDependency;
                 if (needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs) {
                     let short = {};
                     if (haveModuleRefs) {
@@ -1507,9 +1627,6 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
                     function: cfg.entryFunction
                 }
             };
-            if (cfg.errorHandlerName) {
-                params.errorHandler = cfg.errorHandlerName;
-            }
             if (cfg.amdRequireName !== "require") {
                 params.amdRequire = cfg.amdRequireName;
             }
@@ -1522,6 +1639,9 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
             let paramStr = JSON.stringify(params);
             if (thenCode) {
                 paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("afterEntryPointExecuted")}:${thenCode}}`;
+            }
+            if (cfg.errorHandlerName) {
+                paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
             }
             return ",\n" + paramStr + ");";
         }
@@ -1536,6 +1656,10 @@ define("bundler", ["require", "exports", "module_orderer", "generated/loader_cod
                     let modulePath = path.join(outDir, moduleName + ".js");
                     proms.push((async () => {
                         let code = await afs_2.readTextFile(modulePath);
+                        if (this.compiler.config.minify) {
+                            let target = tsc.ScriptTarget[this.compiler.config.target];
+                            code = await minification_1.minifyJsCode(code, target, moduleName);
+                        }
                         mod.jsCode = code;
                     })());
                 }
@@ -1564,7 +1688,7 @@ type_only_imports
 unresolvable_cyclic_reference
 `;
 });
-define("test", ["require", "exports", "path", "fs", "compiler", "log", "generated/test_list_str", "afs", "config"], function (require, exports, path, fs, compiler_1, log_10, test_list_str_1, afs_3, config_1) {
+define("test", ["require", "exports", "path", "fs", "compiler", "log", "generated/test_list_str", "afs", "config"], function (require, exports, path, fs, compiler_1, log_11, test_list_str_1, afs_3, config_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.runSingleTest = exports.runAllTests = void 0;
@@ -1607,7 +1731,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             return fs.readFileSync(p, "utf8").trim();
         }
         outputError(error) {
-            log_10.logError("Test " + this.name + " failed: " + error);
+            log_11.logError("Test " + this.name + " failed: " + error);
             return false;
         }
         checkError(err, errType, errString) {
@@ -1690,7 +1814,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             }
         }
         async run() {
-            log_10.logInfo("Running test for " + this.name);
+            log_11.logInfo("Running test for " + this.name);
             await this.rmOutDir();
             let err = null;
             try {
@@ -1729,7 +1853,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
         .filter(_ => !!_)
         .filter(_ => _ !== "proj_synth");
     async function runAllTests() {
-        log_10.logInfo("Running all tests.");
+        log_11.logInfo("Running all tests.");
         let failCount = 0;
         for (let testName of knownTestNames) {
             let result = await new TestProject(testName).run();
@@ -1737,42 +1861,42 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
                 failCount++;
         }
         if (failCount < 1) {
-            log_10.logInfo("Done. Testing successful.");
+            log_11.logInfo("Done. Testing successful.");
             process.exit(0);
         }
         else {
-            log_10.logInfo("Done. Testing failed (" + failCount + " / " + knownTestNames.length + " tests failed)");
+            log_11.logInfo("Done. Testing failed (" + failCount + " / " + knownTestNames.length + " tests failed)");
             process.exit(1);
         }
     }
     exports.runAllTests = runAllTests;
     async function runSingleTest(name) {
         if (knownTestNames.indexOf(name) < 0) {
-            log_10.logError("Test name \"" + name + "\" is not known.");
+            log_11.logError("Test name \"" + name + "\" is not known.");
             process.exit(1);
         }
         let ok = await new TestProject(name).run();
         if (!ok) {
-            log_10.logInfo("Done. Test failed.");
+            log_11.logInfo("Done. Test failed.");
             await new Promise(ok => setTimeout(ok, 1000));
             process.exit(1);
         }
         else {
-            log_10.logInfo("Done. Testing successful.");
+            log_11.logInfo("Done. Testing successful.");
             await new Promise(ok => setTimeout(ok, 1000));
             process.exit(0);
         }
     }
     exports.runSingleTest = runSingleTest;
 });
-define("bundler_main", ["require", "exports", "test", "log", "compiler", "config", "cli"], function (require, exports, test_1, log_11, compiler_2, config_2, cli_2) {
+define("bundler_main", ["require", "exports", "test", "log", "compiler", "config", "cli"], function (require, exports, test_1, log_12, compiler_2, config_2, cli_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.tsBundlerMain = void 0;
     async function tsBundlerMain() {
         let cliArgs = config_2.parseToolCliArgs(cli_2.CLI.processArgvWithoutExecutables);
         if (cliArgs.verbose) {
-            log_11.setLogVerbosityLevel(1);
+            log_12.setLogVerbosityLevel(1);
         }
         if (cliArgs.test) {
             await test_1.runAllTests();
@@ -1783,7 +1907,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
             return;
         }
         if (!cliArgs.tsconfigPath) {
-            log_11.logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
+            log_12.logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
         }
         let config = config_2.updateCliArgsWithTsconfig(cliArgs);
         let compiler = new compiler_2.Compiler(config);
@@ -1816,7 +1940,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
         defMap[def.name] = def;
     }
     let amdRequire = params.amdRequire || require;
-    let commondjsRequire = params.commonjsRequire || require;
+    let commonjsRequire = params.commonjsRequire || require;
     function requireAny(names, onOk, onError) {
         if (Array.isArray(names) && !onOk) {
             throw new Error("Passed array of module names to require (" + names.join(", ") + "), but provided no callback! This is inconsistent.");
@@ -1827,7 +1951,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
                 return getProduct(name);
             }
             else {
-                return commondjsRequire(name);
+                return commonjsRequire(name);
             }
         }
         else {
@@ -1899,11 +2023,16 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
                     if (name in renames) {
                         name = renames[name];
                     }
+                    let product = products[name];
+                    if (product) {
+                        deps.push(product);
+                        return;
+                    }
                     let depMeta = defMap[name];
                     if (!depMeta) {
                         throw new Error("Failed to get module \"" + name + "\": no definition is known and no preloaded external module is present.");
                     }
-                    deps.push(depMeta.arbitraryType || !depMeta.exports ? getProduct(name) : getProxy(depMeta));
+                    deps.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
                 let defFunc = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
                 let returnProduct = defFunc.apply(null, deps);
@@ -1977,7 +2106,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
     function requireExternal(names, onOk, onError) {
         if (params.preferCommonjs) {
             try {
-                onOk(names.map(name => commondjsRequire(name)));
+                onOk(names.map(name => commonjsRequire(name)));
             }
             catch (e) {
                 onError(e);

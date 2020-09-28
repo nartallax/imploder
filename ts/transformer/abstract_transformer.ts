@@ -72,7 +72,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 		}
 		this.visitRecursive(fileNode, (node, depth) => {
 			console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-		})
+		}, () => true)
 	}
 
 	protected moduleNameByNode(fileNode: tsc.SourceFile): string {
