@@ -18,8 +18,8 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 		let moduleName = this.moduleNameByNode(fileNode);
 		let moduleMeta = this.metaStorage.get(moduleName);
 		
-		//let rootStatements: tsc.Statement[] | null = null;
 		let definingFunction: tsc.Node | null = null
+		//this.traverseDumpFileAst(fileNode);
 
 		this.visitRecursive(fileNode, node => {
 			if(!tsc.isCallExpression(node) || !tsc.isIdentifier(node.expression) || node.expression.text !== "define" && !!definingFunction){
@@ -125,15 +125,18 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 					if(exportName === "__esModule"){
 						startWith = i + 1;
 						continue;
-					} else {
-						moduleMeta.exports.push(exportName);
-						if(tsc.isVoidExpression(expr.right)){
-							// скипаем перечисление экспортов вида exports.someItem = void 0;
-							// оно автоматически генерируется для соответствия чему-то там, не помню
-							startWith = i + 1;
-							continue;
-						}
 					}
+				}
+
+				// скипаем перечисление экспортов вида exports.someItem = void 0;
+				// оно автоматически генерируется для соответствия чему-то там, не помню
+				// тут иногда случается двойная проверка на isExportAssignment, не очень красиво
+				// впрочем, я не уверен, что компилятор не будет схлопывать несколько присвоений void 0 в одно
+				// даже если это не относится к экспортам. а не относящееся к экспортам присвоение скипать не надо
+				// поэтому лучше проверить всю цепочку
+				if(this.isVoidExportAssignmentChain(expr, moduleMeta.exports)){
+					startWith = i + 1;
+					continue;
 				}
 
 				if(tsc.isCallExpression(expr)){
@@ -180,6 +183,21 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 		result.parameters = tsc.createNodeArray(params);
 		
 		return result;
+	}
+
+	// узнать, является ли это выражение присвоением вида exports.value = void 0;
+	// иногда компилятор схлопывает несколько деклараций в цепочку вида exports.a = exports.b = ... = void 0;
+	// эта цепочка тут тоже детектится
+	private isVoidExportAssignmentChain(expr: tsc.Expression, exportedNames: string[]): boolean {
+		if(!this.isExportAssignment(expr)){
+			return false;
+		}
+		exportedNames.push(this.getExportAssignmentName(expr));
+		if(tsc.isVoidExpression(expr.right)){
+			return true;
+		} else {
+			return this.isVoidExportAssignmentChain(expr.right, exportedNames);
+		}
 	}
 
 	private isExportAssignment(node: tsc.Node): node is (tsc.BinaryExpression & {left: tsc.PropertyAccessExpression}) {

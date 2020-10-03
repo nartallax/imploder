@@ -29,7 +29,7 @@ export class Bundler {
 		let moduleOrder = new ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
 		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
 
-		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
+		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
 		result.push(JSON.stringify(defArrArr));
 		
 		if(!this.compiler.config.noLoaderCode){
@@ -45,7 +45,7 @@ export class Bundler {
 		return name;
 	}
 
-	private buildModuleDefinitionArrayArray(modules: string[], circularDependentModules: Set<string>): ModuleDefinitonArray[] {
+	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): ModuleDefinitonArray[] {
 		return modules.map(name => {
 			let meta = this.compiler.metaStorage.get(name);
 			let code = meta.jsCode;
@@ -53,9 +53,9 @@ export class Bundler {
 				throw new Error("Code for module " + name + " is not loaded at bundling time.");
 			}
 
-			let isInCircularDependency = circularDependentModules.has(name);
-			let haveModuleRefs = meta.exportModuleReferences.length > 0 && isInCircularDependency;
-			let needExports = meta.exports.length > 0 && isInCircularDependency
+			let shouldIncludeFullExportInfo = circularDependentRelatedModules.has(name);
+			let haveModuleRefs = meta.exportModuleReferences.length > 0 && shouldIncludeFullExportInfo;
+			let needExports = meta.exports.length > 0 && shouldIncludeFullExportInfo
 			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
 
 				let short: ModuleMetaShort = {}

@@ -161,6 +161,8 @@ function tstoolLoader(defs, params, evl) {
         }
         if (meta.exportRefs) {
             meta.exportRefs.forEach(function (ref) {
+                // тут, теоретически, могла бы возникнуть бесконечная рекурсия
+                // но не возникнет, еще при компиляции есть проверка
                 getAllExportNames(defMap[ref], result, true);
             });
         }
@@ -168,7 +170,6 @@ function tstoolLoader(defs, params, evl) {
     }
     function defineProxyProp(meta, proxy, name) {
         if (proxy.hasOwnProperty(name)) {
-            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
             return;
         }
         Object.defineProperty(proxy, name, {

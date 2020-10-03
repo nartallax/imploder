@@ -1001,13 +1001,10 @@ define("transformer/after_js_transformer", ["require", "exports", "transformer/a
                             startWith = i + 1;
                             continue;
                         }
-                        else {
-                            moduleMeta.exports.push(exportName);
-                            if (tsc.isVoidExpression(expr.right)) {
-                                startWith = i + 1;
-                                continue;
-                            }
-                        }
+                    }
+                    if (this.isVoidExportAssignmentChain(expr, moduleMeta.exports)) {
+                        startWith = i + 1;
+                        continue;
                     }
                     if (tsc.isCallExpression(expr)) {
                         let c = expr;
@@ -1046,6 +1043,18 @@ define("transformer/after_js_transformer", ["require", "exports", "transformer/a
             ];
             result.parameters = tsc.createNodeArray(params);
             return result;
+        }
+        isVoidExportAssignmentChain(expr, exportedNames) {
+            if (!this.isExportAssignment(expr)) {
+                return false;
+            }
+            exportedNames.push(this.getExportAssignmentName(expr));
+            if (tsc.isVoidExpression(expr.right)) {
+                return true;
+            }
+            else {
+                return this.isVoidExportAssignmentChain(expr.right, exportedNames);
+            }
         }
         isExportAssignment(node) {
             if (tsc.isBinaryExpression(node)
@@ -1152,10 +1161,11 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
             this.storage = storage;
         }
         getModuleOrder(entryPointModule) {
-            let circularDependentModules = new Set();
-            let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentModules);
+            let circularDependentRelatedModules = new Set();
+            let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentRelatedModules);
             modules.forEach(name => this.detectRecursiveRefExport(name));
-            return { modules, absentModules, circularDependentModules };
+            this.updateCircularRelatedModules(circularDependentRelatedModules);
+            return { modules, absentModules, circularDependentRelatedModules };
         }
         unwindNameStack(nameStack, name) {
             let referenceCircle = [name];
@@ -1183,13 +1193,13 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
             };
             visit(entryPoint);
         }
-        getSortedModules(entryPoint, circularDependencyModules) {
+        getSortedModules(entryPoint, circularDependentRelatedModules) {
             let nameStack = new seq_set_1.SeqSet();
             let absentModules = new Set();
             let result = new Set();
             let visit = (name) => {
                 if (nameStack.has(name)) {
-                    this.unwindNameStack(nameStack, name).forEach(x => circularDependencyModules.add(x));
+                    this.unwindNameStack(nameStack, name).forEach(x => circularDependentRelatedModules.add(x));
                     return;
                 }
                 if (!this.storage.has(name)) {
@@ -1207,6 +1217,16 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
                 [...result].sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
                 [...absentModules]
             ];
+        }
+        updateCircularRelatedModules(s) {
+            let addRefs = (module) => this.storage.get(module).exportModuleReferences.forEach(add);
+            let add = (module) => {
+                s.add(module);
+                addRefs(module);
+            };
+            for (let module of s) {
+                addRefs(module);
+            }
         }
     }
     exports.ModuleOrderer = ModuleOrderer;
@@ -1378,6 +1398,8 @@ function tstoolLoader(defs, params, evl) {
         }
         if (meta.exportRefs) {
             meta.exportRefs.forEach(function (ref) {
+                // тут, теоретически, могла бы возникнуть бесконечная рекурсия
+                // но не возникнет, еще при компиляции есть проверка
                 getAllExportNames(defMap[ref], result, true);
             });
         }
@@ -1385,7 +1407,6 @@ function tstoolLoader(defs, params, evl) {
     }
     function defineProxyProp(meta, proxy, name) {
         if (proxy.hasOwnProperty(name)) {
-            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
             return;
         }
         Object.defineProperty(proxy, name, {
@@ -1575,7 +1596,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             await this.loadAbsentModuleCode();
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
             log_10.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
-            let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentModules);
+            let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
             result.push(JSON.stringify(defArrArr));
             if (!this.compiler.config.noLoaderCode) {
                 result.push(this.getPostfixCode());
@@ -1587,16 +1608,16 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             let name = path_utils_6.stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
             return name;
         }
-        buildModuleDefinitionArrayArray(modules, circularDependentModules) {
+        buildModuleDefinitionArrayArray(modules, circularDependentRelatedModules) {
             return modules.map(name => {
                 let meta = this.compiler.metaStorage.get(name);
                 let code = meta.jsCode;
                 if (!code) {
                     throw new Error("Code for module " + name + " is not loaded at bundling time.");
                 }
-                let isInCircularDependency = circularDependentModules.has(name);
-                let haveModuleRefs = meta.exportModuleReferences.length > 0 && isInCircularDependency;
-                let needExports = meta.exports.length > 0 && isInCircularDependency;
+                let shouldIncludeFullExportInfo = circularDependentRelatedModules.has(name);
+                let haveModuleRefs = meta.exportModuleReferences.length > 0 && shouldIncludeFullExportInfo;
+                let needExports = meta.exports.length > 0 && shouldIncludeFullExportInfo;
                 if (needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs) {
                     let short = {};
                     if (haveModuleRefs) {
@@ -1689,11 +1710,16 @@ define("generated/test_list_str", ["require", "exports"], function (require, exp
     exports.testListStr = void 0;
     exports.testListStr = `
 cyclic_exportall
+default_exportstar
 dynamic_imports_misconfigured
 exports
+exportstar
+exportstar_name_collision
 namespace
+nested_exportstar
 paths
 proj_synth
+recursive_exportstar
 resolvable_cyclic_reference
 rootdirs
 type_only_imports
@@ -2099,7 +2125,6 @@ function tstoolLoader(defs, params, evl) {
     }
     function defineProxyProp(meta, proxy, name) {
         if (proxy.hasOwnProperty(name)) {
-            console.warn("Module " + meta.name + " has more than one exported member " + name + ". Will pick first defined one.");
             return;
         }
         Object.defineProperty(proxy, name, {

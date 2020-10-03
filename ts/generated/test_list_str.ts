@@ -1,10 +1,15 @@
 export const testListStr = `
 cyclic_exportall
+default_exportstar
 dynamic_imports_misconfigured
 exports
+exportstar
+exportstar_name_collision
 namespace
+nested_exportstar
 paths
 proj_synth
+recursive_exportstar
 resolvable_cyclic_reference
 rootdirs
 type_only_imports
