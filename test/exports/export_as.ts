@@ -1,0 +1,1 @@
+export {ordinaryValue as notSoOrdinaryValue} from "export_ordinary";

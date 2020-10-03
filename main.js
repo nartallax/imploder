@@ -1712,9 +1712,11 @@ define("generated/test_list_str", ["require", "exports"], function (require, exp
 cyclic_exportall
 default_exportstar
 dynamic_imports_misconfigured
+exportas_circular_dependency
 exports
 exportstar
 exportstar_name_collision
+multicycled
 namespace
 nested_exportstar
 paths
@@ -1722,6 +1724,7 @@ proj_synth
 recursive_exportstar
 resolvable_cyclic_reference
 rootdirs
+side_effect_import
 type_only_imports
 unresolvable_cyclic_reference
 use_strict
