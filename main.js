@@ -1216,7 +1216,8 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.loaderCode = void 0;
     exports.loaderCode = `
-(function (defs, params) {
+function tstoolLoader(defs, params, evl) {
+    "use strict";
     function handleError(e, action) {
         if (params.errorHandler) {
             params.errorHandler(e, action);
@@ -1337,7 +1338,7 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
                     }
                     deps_1.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
-                var defFunc = eval("(" + meta.code + ")\\n//# sourceURL=" + meta.name);
+                var defFunc = evl("'use strict';(" + meta.code + ")\\n//# sourceURL=" + meta.name);
                 var returnProduct = defFunc.apply(null, deps_1);
                 if (meta.arbitraryType) {
                     product = returnProduct;
@@ -1455,7 +1456,7 @@ define("generated/loader_code", ["require", "exports"], function (require, expor
         });
     }
     start();
-});
+}
 `;
 });
 define("loader/loader_types", ["require", "exports"], function (require, exports) {
@@ -1469,7 +1470,7 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
     async function minifyJsCode(code, tscEcmaVersion, moduleName) {
         let ecma = tscEcmaToTerserEcma(tscEcmaVersion);
         try {
-            let res = await terser.minify("return " + code, {
+            let res = await terser.minify("return " + code.replace(/^[\n\r\s]+/, ""), {
                 compress: {
                     passes: 3,
                     toplevel: false,
@@ -1563,12 +1564,13 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
     exports.Bundler = void 0;
     class Bundler {
         constructor(compiler) {
+            this.minifiedLoaderCode = null;
             this.compiler = compiler;
         }
         async produceBundle() {
             let result = [];
             if (!this.compiler.config.noLoaderCode) {
-                result.push(this.getPrefixCode());
+                result.push(await this.getPrefixCode());
             }
             await this.loadAbsentModuleCode();
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
@@ -1616,8 +1618,16 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
                 }
             });
         }
-        getPrefixCode() {
-            return loader_code_1.loaderCode.replace(/;?[\n\s]*$/, "") + "(\n";
+        async getPrefixCode() {
+            let resultLoaderCode = loader_code_1.loaderCode;
+            if (this.compiler.config.minify) {
+                if (this.minifiedLoaderCode === null) {
+                    this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", tsc.ScriptTarget.ES5);
+                }
+                resultLoaderCode = this.minifiedLoaderCode;
+            }
+            resultLoaderCode = resultLoaderCode.replace(/;?[\n\s]*$/, "");
+            return "(" + resultLoaderCode + ")(\n";
         }
         getPostfixCode(thenCode) {
             let cfg = this.compiler.config;
@@ -1643,7 +1653,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             if (cfg.errorHandlerName) {
                 paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
             }
-            return ",\n" + paramStr + ");";
+            return ",\n" + paramStr + ",eval);";
         }
         async loadAbsentModuleCode() {
             let storage = this.compiler.metaStorage;
@@ -1657,8 +1667,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
                     proms.push((async () => {
                         let code = await afs_2.readTextFile(modulePath);
                         if (this.compiler.config.minify) {
-                            let target = tsc.ScriptTarget[this.compiler.config.target];
-                            code = await minification_1.minifyJsCode(code, target, moduleName);
+                            code = await this.minify(code, moduleName);
                         }
                         mod.jsCode = code;
                     })());
@@ -1667,6 +1676,9 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             if (proms.length > 0) {
                 await Promise.all(proms);
             }
+        }
+        minify(code, moduleName, target) {
+            return minification_1.minifyJsCode(code, target || tsc.ScriptTarget[this.compiler.config.target], moduleName);
         }
     }
     exports.Bundler = Bundler;
@@ -1686,6 +1698,7 @@ resolvable_cyclic_reference
 rootdirs
 type_only_imports
 unresolvable_cyclic_reference
+use_strict
 `;
 });
 define("test", ["require", "exports", "path", "fs", "compiler", "log", "generated/test_list_str", "afs", "config"], function (require, exports, path, fs, compiler_1, log_11, test_list_str_1, afs_3, config_1) {
@@ -1759,7 +1772,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             let outerConsole = console;
             let stdout = [];
             await (() => {
-                return new Promise((ok, bad) => {
+                return new Promise(async (ok, bad) => {
                     let console = {
                         ...outerConsole,
                         log: (...values) => {
@@ -1767,34 +1780,40 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
                             stdout.push(str);
                         }
                     };
-                    let nop = () => { };
-                    let mainThen = async (err, result) => {
-                        if (err) {
-                            bad(err);
-                        }
-                        else {
-                            try {
-                                await Promise.resolve(result);
-                                ok();
-                            }
-                            catch (e) {
-                                bad(e);
-                            }
-                        }
-                    };
-                    void console;
-                    void nop;
-                    void mainThen;
-                    let allCode = [
-                        this.compiler.bundler.getPrefixCode(),
-                        this.producedBundleText,
-                        this.compiler.bundler.getPostfixCode("mainThen")
-                    ].join("\n");
+                    global.console = console;
                     try {
-                        eval(allCode);
+                        let nop = () => { };
+                        let mainThen = async (err, result) => {
+                            if (err) {
+                                bad(err);
+                            }
+                            else {
+                                try {
+                                    await Promise.resolve(result);
+                                    ok();
+                                }
+                                catch (e) {
+                                    bad(e);
+                                }
+                            }
+                        };
+                        void console;
+                        void nop;
+                        void mainThen;
+                        let allCode = [
+                            await this.compiler.bundler.getPrefixCode(),
+                            this.producedBundleText,
+                            this.compiler.bundler.getPostfixCode("mainThen")
+                        ].join("\n");
+                        try {
+                            eval(allCode);
+                        }
+                        catch (e) {
+                            bad(e);
+                        }
                     }
-                    catch (e) {
-                        bad(e);
+                    finally {
+                        global.console = outerConsole;
                     }
                 });
             })();
@@ -1915,7 +1934,8 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
     }
     exports.tsBundlerMain = tsBundlerMain;
 });
-(function (defs, params) {
+function tstoolLoader(defs, params, evl) {
+    "use strict";
     function handleError(e, action) {
         if (params.errorHandler) {
             params.errorHandler(e, action);
@@ -2034,7 +2054,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
                     }
                     deps.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
-                let defFunc = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
+                let defFunc = evl("'use strict';(" + meta.code + ")\n//# sourceURL=" + meta.name);
                 let returnProduct = defFunc.apply(null, deps);
                 if (meta.arbitraryType) {
                     product = returnProduct;
@@ -2147,4 +2167,4 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
         });
     }
     start();
-});
+}

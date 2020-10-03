@@ -28,8 +28,8 @@ interface LauncherParams {
 	preferCommonjs?: boolean;
 }
 
-(function(defs: ModuleDefinitonArray[], params: LauncherParams){
-
+function tstoolLoader(defs: ModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
+	"use strict";
 	function handleError(e: Error, action?: string): never {
 		if(params.errorHandler){
 			params.errorHandler(e, action);
@@ -157,7 +157,7 @@ interface LauncherParams {
 					}
 					deps.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs)? getProduct(name): getProxy(depMeta));
 				});
-				let defFunc: Function = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
+				let defFunc: Function = evl("'use strict';(" + meta.code + ")\n//# sourceURL=" + meta.name);
 				let returnProduct = defFunc.apply(null, deps);
 				if(meta.arbitraryType){
 					product = returnProduct;
@@ -276,4 +276,4 @@ interface LauncherParams {
 
 	start();
 
-})
+}

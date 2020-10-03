@@ -9,4 +9,5 @@ resolvable_cyclic_reference
 rootdirs
 type_only_imports
 unresolvable_cyclic_reference
+use_strict
 `;

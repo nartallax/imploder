@@ -21,7 +21,7 @@ export class Bundler {
 	async produceBundle(): Promise<string>{
 		let result = [] as string[];
 		if(!this.compiler.config.noLoaderCode){
-			result.push(this.getPrefixCode());
+			result.push(await this.getPrefixCode());
 		}
 
 		await this.loadAbsentModuleCode();
@@ -79,8 +79,17 @@ export class Bundler {
 		});
 	}
 
-	getPrefixCode(): string {
-		return loaderCode.replace(/;?[\n\s]*$/, "") + "(\n";
+	private minifiedLoaderCode: string | null = null;
+	async getPrefixCode(): Promise<string> {
+		let resultLoaderCode = loaderCode;
+		if(this.compiler.config.minify){
+			if(this.minifiedLoaderCode === null){
+				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", tsc.ScriptTarget.ES5);
+			}
+			resultLoaderCode = this.minifiedLoaderCode;
+		}
+		resultLoaderCode = resultLoaderCode.replace(/;?[\n\s]*$/, "");
+		return "(" + resultLoaderCode + ")(\n";
 	}
 
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
@@ -109,7 +118,7 @@ export class Bundler {
 		if(cfg.errorHandlerName){
 			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
 		}
-		return ",\n" + paramStr + ");"
+		return ",\n" + paramStr + ",eval);"
 	}
 
 	private async loadAbsentModuleCode(): Promise<void> {
@@ -124,8 +133,7 @@ export class Bundler {
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
 					if(this.compiler.config.minify){
-						let target: tsc.ScriptTarget = tsc.ScriptTarget[this.compiler.config.target];
-						code = await minifyJsCode(code, target, moduleName);
+						code = await this.minify(code, moduleName);
 					}
 					mod.jsCode = code;
 				})());
@@ -134,6 +142,10 @@ export class Bundler {
 		if(proms.length > 0){
 			await Promise.all(proms);
 		}
+	}
+
+	private minify(code: string, moduleName: string, target?: tsc.ScriptTarget): Promise<string> {
+		return minifyJsCode(code, target || tsc.ScriptTarget[this.compiler.config.target], moduleName);
 	}
 
 }

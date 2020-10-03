@@ -5,7 +5,7 @@ import {logErrorAndExit} from "log";
 export async function minifyJsCode(code: string, tscEcmaVersion: tsc.ScriptTarget,  moduleName: string): Promise<string> {
 	let ecma = tscEcmaToTerserEcma(tscEcmaVersion);
 	try {
-		let res = await terser.minify("return " + code, {
+		let res = await terser.minify("return " + code.replace(/^[\n\r\s]+/, ""), {
 			compress: {
 				passes: 3,
 				toplevel: false, // true probably will drop entire module definition

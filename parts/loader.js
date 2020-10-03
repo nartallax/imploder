@@ -1,4 +1,5 @@
-(function (defs, params) {
+function tstoolLoader(defs, params, evl) {
+    "use strict";
     function handleError(e, action) {
         if (params.errorHandler) {
             params.errorHandler(e, action);
@@ -119,7 +120,7 @@
                     }
                     deps_1.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs) ? getProduct(name) : getProxy(depMeta));
                 });
-                var defFunc = eval("(" + meta.code + ")\n//# sourceURL=" + meta.name);
+                var defFunc = evl("'use strict';(" + meta.code + ")\n//# sourceURL=" + meta.name);
                 var returnProduct = defFunc.apply(null, deps_1);
                 if (meta.arbitraryType) {
                     product = returnProduct;
@@ -237,4 +238,4 @@
         });
     }
     start();
-});
+}

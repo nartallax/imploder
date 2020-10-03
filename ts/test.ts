@@ -85,7 +85,7 @@ class TestProject {
 		let outerConsole = console;
 		let stdout = [] as string[];
 		await (() => {
-			return new Promise((ok, bad) => {
+			return new Promise(async (ok, bad) => {
 				let console = { 
 					...outerConsole,
 					log: (...values: string[]) => {
@@ -93,39 +93,44 @@ class TestProject {
 						stdout.push(str);
 					}
 				};
-				let nop = () => {};
+				(global as any).console = console;
+				try {
+					let nop = () => {};
 				
-				// смысл в изворотах с mainThen - в том, что код энтрипоинта исполняется асинхронно
-				// а нам нужно дождаться, когда он все-таки закончит исполняться, или кинет ошибку
-				// в каких-то случаях он все-таки исполняется синхронно (отсутствие асинхронного кода/асинхронных импортов)
-				// и тогда в этом всем нет особого смысла
-				// но в случае, например, если нам нужно поймать асинхронно кидаемую из энтрипоинта ошибку - 
-				// то нам нужен результат его исполнения (который мы здесь и получаем, и await-им, ибо это Promise)
-				let mainThen = async (err: Error | null, result: any) => {
-					if(err){
-						bad(err);
-					} else {
-						try {
-							await Promise.resolve(result);
-							ok();
-						} catch(e){
-							bad(e);
+					// смысл в изворотах с mainThen - в том, что код энтрипоинта исполняется асинхронно
+					// а нам нужно дождаться, когда он все-таки закончит исполняться, или кинет ошибку
+					// в каких-то случаях он все-таки исполняется синхронно (отсутствие асинхронного кода/асинхронных импортов)
+					// и тогда в этом всем нет особого смысла
+					// но в случае, например, если нам нужно поймать асинхронно кидаемую из энтрипоинта ошибку - 
+					// то нам нужен результат его исполнения (который мы здесь и получаем, и await-им, ибо это Promise)
+					let mainThen = async (err: Error | null, result: any) => {
+						if(err){
+							bad(err);
+						} else {
+							try {
+								await Promise.resolve(result);
+								ok();
+							} catch(e){
+								bad(e);
+							}
 						}
 					}
-				}
-				
-				void console;
-				void nop;
-				void mainThen;
-				let allCode = [
-					this.compiler.bundler.getPrefixCode(), 
-					this.producedBundleText, 
-					this.compiler.bundler.getPostfixCode("mainThen")
-				].join("\n");
-				try {
-					eval(allCode);
-				} catch(e){
-					bad(e)
+					
+					void console;
+					void nop;
+					void mainThen;
+					let allCode = [
+						await this.compiler.bundler.getPrefixCode(), 
+						this.producedBundleText, 
+						this.compiler.bundler.getPostfixCode("mainThen")
+					].join("\n");
+					try {
+						eval(allCode);
+					} catch(e){
+						bad(e)
+					}
+				} finally {
+					(global as any).console = outerConsole;
 				}
 			});
 		})();
