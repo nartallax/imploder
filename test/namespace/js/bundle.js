@@ -1,1 +1,0 @@
-[["/main",["/namespace_loc"],"(n,o,c)=>{n.main=function main(){console.log(c.LocNs.t)}}"],["/namespace_loc","c=>{(c=>{c.t=3})(c.LocNs||(c.LocNs={}))}"]]
