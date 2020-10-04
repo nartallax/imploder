@@ -58,14 +58,10 @@ type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
 
 export class Compiler {
 
-	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
-	private _program: tsc.Program | null = null;
-
 	readonly config: TSToolConfig;
 	private readonly tscMergedConfig: MergedTscConfig;
 	private readonly transformers: tsc.CustomTransformerFactory[];
 	readonly metaStorage: ModuleMetadataStorage;
-	readonly modulePathResolver: ModulePathResolver;
 	readonly bundler: Bundler;
 
 	constructor(config: TSToolConfig, transformers: tsc.CustomTransformerFactory[] = []){
@@ -74,16 +70,14 @@ export class Compiler {
 			...config.tscParsedCommandLine,
 			rootNames: [path.resolve(path.dirname(config.tsconfigPath), config.entryModule)]
 		}
-		this.modulePathResolver = new ModulePathResolver(config.tsconfigPath, this.tscMergedConfig.options);
-		this.transformers = [
-			context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
-			...transformers
-		];
+		this.transformers = transformers;
 		this.bundler = new Bundler(this);
 		this.metaStorage = new ModuleMetadataStorage();
 	}
 
-	private get program(): tsc.Program {
+	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
+	private _program: tsc.Program | null = null;
+	get program(): tsc.Program {
 		if(this._program){
 			return this._program;
 		}
@@ -91,6 +85,22 @@ export class Compiler {
 			return this._watch.getProgram().getProgram();
 		}
 		throw new Error("Compiler not started in any of available modes.");
+	}
+
+	private _host: tsc.CompilerHost | null = null;
+	get compilerHost(): tsc.CompilerHost {
+		if(!this._host){
+			throw new Error("Compiler not started, no compiler host available.");
+		}
+		return this._host;
+	}
+
+	private _modulePathResolver: ModulePathResolver | null = null;
+	get modulePathResolver(){
+		if(this._modulePathResolver === null){
+			this._modulePathResolver = new ModulePathResolver(this.config.tsconfigPath, this.tscMergedConfig.options, this);
+		}
+		return this._modulePathResolver;
 	}
 
 	startWatch(){
@@ -102,18 +112,26 @@ export class Compiler {
 			processTypescriptDiagnosticEntry
 		);
 		this._watch = tsc.createWatchProgram(watchHost);
+		this._host = tsc.createCompilerHost(this._watch.getProgram().getCompilerOptions())
 
 		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 	}
 
 	/** Запуститься для разовой компиляции */
 	async runSingle(){
-		this._program = tsc.createProgram(this.tscMergedConfig);
-
+		this._host = tsc.createCompilerHost(this.tscMergedConfig.options);
+		this._program = tsc.createProgram({
+			...this.tscMergedConfig,
+			host: this._host
+		});
+		
 		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 
 		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, {
-			before: this.transformers,
+			before: [
+				context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
+				...this.transformers
+			],
 			after: [
 				context => new AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
 			]

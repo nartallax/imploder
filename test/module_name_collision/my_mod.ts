@@ -1,0 +1,1 @@
+export const ttt = 555;

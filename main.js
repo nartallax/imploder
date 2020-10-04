@@ -567,184 +567,45 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
         profile.target = profile.target || "ES5";
     }
 });
-define("utils", ["require", "exports"], function (require, exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-});
-define("tsconfig_paths_parser", ["require", "exports", "typescript", "path", "log", "path_utils"], function (require, exports, tsc, path, log_4, path_utils_2) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.getModulePathMatcher = void 0;
-    function getModulePathMatcher(compilerOptions, tsconfigPath) {
-        let absBaseUrl = compilerOptions.baseUrl || ".";
-        if (!isPathAbsolute(absBaseUrl)) {
-            absBaseUrl = path.join(path.dirname(tsconfigPath), absBaseUrl);
-        }
-        let mappings = parsePathsFromTsconfig(absBaseUrl, compilerOptions.paths || {});
-        return modulePath => tryApplyMappings(mappings, modulePath, absBaseUrl);
-    }
-    exports.getModulePathMatcher = getModulePathMatcher;
-    function parsePathsFromTsconfig(absBaseUrl, paths) {
-        let fixedMappings = {};
-        let wildcardMappings = {};
-        for (let moduleNamePart in paths) {
-            let pathParts = paths[moduleNamePart];
-            if (moduleNamePart.endsWith("*")) {
-                let nonWildPaths = pathParts.filter(_ => !_.endsWith("*"));
-                if (nonWildPaths.length > 0) {
-                    log_4.logWarn("Value of paths compiler option is strange: as key \""
-                        + moduleNamePart + "\" is wildcard, value(s) \""
-                        + nonWildPaths.join("\", \"") + "\" are not. Will treat them as wildcarded.");
-                }
-                let cleanAbsPaths = pathParts.map(_ => path.join(absBaseUrl, _.replace(/\*$/, "")));
-                let cleanNamePart = moduleNamePart.replace(/\*$/, "");
-                wildcardMappings[cleanNamePart] = cleanAbsPaths;
-            }
-            else {
-                let wildPaths = pathParts.filter(_ => _.endsWith("*"));
-                if (wildPaths.length > 0) {
-                    log_4.logWarn("Value of paths compiler option is strange: as key \""
-                        + moduleNamePart + "\" is not wildcard, value(s) \""
-                        + wildPaths.join("\", \"") + "\" are. I don't know what do you expect from this; will ignore this value(s).");
-                }
-                let existingValues = pathParts
-                    .filter(_ => !_.endsWith("*"))
-                    .map(_ => path.join(absBaseUrl, _))
-                    .filter(_ => tsc.sys.fileExists(_))
-                    .map(_ => path_utils_2.stripTsExt(_));
-                if (existingValues.length < 1) {
-                    log_4.logWarn("Found none of targets of path \"" + moduleNamePart + "\": tried \"" + existingValues.join("\", \"") + "\".");
-                }
-                else {
-                    fixedMappings[moduleNamePart] = existingValues[0];
-                }
-            }
-        }
-        return {
-            fixed: fixedMappings,
-            wildcard: wildcardMappings
-        };
-    }
-    function isPathAbsolute(p) {
-        if (!p)
-            return false;
-        let isUnixAbsolutePath = p[0] === "/";
-        let isWindowsAbsolutePath = /^[A-Z]:\//.test(p);
-        return isUnixAbsolutePath || isWindowsAbsolutePath;
-    }
-    function tryApplyMappings(mappings, modulePath, absBaseUrl) {
-        let fixedPath = mappings.fixed[modulePath];
-        if (fixedPath) {
-            return fixedPath;
-        }
-        let matchedPrefixes = [];
-        let matchedFiles = [];
-        function tryUsePrefix(modulePrefix, substitutes) {
-            if (modulePath.startsWith(modulePrefix)) {
-                matchedPrefixes.push(modulePrefix);
-                let pathPostfix = modulePath.substr(modulePrefix.length);
-                for (let pathPrefix of substitutes) {
-                    let fullModulePath = path_utils_2.joinModulePath(pathPrefix, pathPostfix);
-                    if (path_utils_2.typescriptFileExists(fullModulePath)) {
-                        matchedFiles.push(fullModulePath);
-                    }
-                }
-            }
-        }
-        for (let modulePrefix in mappings.wildcard) {
-            tryUsePrefix(modulePrefix, mappings.wildcard[modulePrefix]);
-        }
-        if (matchedPrefixes.length === 0) {
-            tryUsePrefix("", [path.join(absBaseUrl, "./")]);
-        }
-        if (matchedFiles.length === 1) {
-            return matchedFiles[0];
-        }
-        if (matchedPrefixes.length > 0) {
-            if (matchedFiles.length < 1) {
-            }
-            else {
-                log_4.logWarn("For module dependency path \""
-                    + modulePath + "\" there some wildcard path roots that are matched (\""
-                    + matchedPrefixes.join("\", \"") + "\", and multiple files are found within these roots: \""
-                    + matchedFiles.join("\", \"") + "\". For sake of consistency, will pick neither of them.");
-            }
-        }
-        return null;
-    }
-});
-define("module_path_resolver", ["require", "exports", "path", "tsconfig_paths_parser", "path_utils", "log"], function (require, exports, path, tsconfig_paths_parser_1, path_utils_3, log_5) {
+define("module_path_resolver", ["require", "exports", "path", "typescript", "path_utils"], function (require, exports, path, tsc, path_utils_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ModulePathResolver = void 0;
     class ModulePathResolver {
-        constructor(tsconfigPath, compilerOpts) {
-            this.pathMatcher = tsconfig_paths_parser_1.getModulePathMatcher(compilerOpts, tsconfigPath);
+        constructor(tsconfigPath, compilerOpts, compiler) {
+            this.compiler = compiler;
             this.moduleRoot = path.resolve(path.dirname(tsconfigPath), compilerOpts.rootDir || ".");
-            this.rootDirWrangler = new RootDirWrangler(this.moduleRoot, compilerOpts.rootDirs);
+            let ambientMods = this.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
+            this.ambientModules = new Set(ambientMods);
         }
-        getRootdirRelativePath(moduleDesignator, sourceFile, isKnownPath = false) {
-            if (path_utils_3.isModulePathRelative(moduleDesignator) || isKnownPath) {
-                return "/" + this.rootDirWrangler.getRelativePath(sourceFile, moduleDesignator);
+        resolveModuleDesignator(moduleDesignator, sourceFile) {
+            if (this.ambientModules.has(moduleDesignator)) {
+                return moduleDesignator;
             }
             else {
-                void mappedModulePathToRelative;
-                let abs = this.pathMatcher(moduleDesignator);
-                return abs ? this.getAbsoluteModulePath(abs) : moduleDesignator;
+                let res = tsc.resolveModuleName(moduleDesignator, sourceFile, this.compiler.program.getCompilerOptions(), this.compiler.compilerHost);
+                if (res.resolvedModule) {
+                    if (res.resolvedModule.isExternalLibraryImport) {
+                        return moduleDesignator;
+                    }
+                    else {
+                        return this.getAbsoluteModulePath(path_utils_2.stripTsExt(res.resolvedModule.resolvedFileName));
+                    }
+                }
             }
-        }
-        resolveModuleDesignator(moduleDesignator, sourceFile, isKnownPath = false) {
-            let resultModulePath = this.getRootdirRelativePath(moduleDesignator, sourceFile, isKnownPath);
-            log_5.logDebug("Resolved module path " + moduleDesignator + " to " + resultModulePath + " (is known path = " + isKnownPath + ")");
-            return resultModulePath || moduleDesignator;
+            return moduleDesignator;
         }
         getAbsoluteModulePath(absPath) {
-            return "/" + path_utils_3.getRelativeModulePath(this.moduleRoot, absPath);
+            return "/" + path_utils_2.getRelativeModulePath(this.moduleRoot, absPath);
         }
     }
     exports.ModulePathResolver = ModulePathResolver;
-    class RootDirWrangler {
-        constructor(rootDir, rootDirs) {
-            this.rootDir = rootDir;
-            this.rootDirs = rootDirs;
-        }
-        getRelativePath(sourceFile, modulePath) {
-            if (!this.rootDirs) {
-                return path_utils_3.getRelativeModulePath(this.rootDir, path.resolve(path.dirname(sourceFile), modulePath));
-            }
-            let sourceRootDir = this.rootDirs.find(_ => path_utils_3.isPathNested(_, sourceFile));
-            if (!sourceRootDir) {
-                log_5.logError("Source file \"" + sourceFile + "\" is not found in any of rootDirs. Don't know how to resolve relative dependencies of it.");
-                return null;
-            }
-            let fakeAbsPath = path.resolve(path.dirname(sourceFile), modulePath);
-            let targetRootRelPath = path_utils_3.getRelativeModulePath(sourceRootDir, fakeAbsPath);
-            let targetRootDirs = this.rootDirs.filter(_ => path_utils_3.typescriptFileExists(path_utils_3.joinModulePath(_, targetRootRelPath)));
-            if (targetRootDirs.length < 1) {
-                log_5.logError("Relative dependency \"" + modulePath + "\" (referenced from \"" + sourceFile + "\") is not found in any of rootDirs.");
-                return null;
-            }
-            if (targetRootDirs.length > 1) {
-                log_5.logError("Relative dependency \"" + modulePath + "\" (referenced from \"" + sourceFile + "\") is not found in more than one of rootDirs: \"" + targetRootDirs.join("\", \"") + "\". Could not decide; won't pick any.");
-                return null;
-            }
-            let targetRootDir = targetRootDirs[0];
-            return path_utils_3.getRelativeModulePath(this.rootDir, path.join(targetRootDir, targetRootRelPath));
-        }
-    }
-    function mappedModulePathToRelative(sourcePath, absModulePath, matcher) {
-        let resolvedPath = matcher(absModulePath);
-        if (!resolvedPath) {
-            return null;
-        }
-        let result = path_utils_3.getRelativeModulePath(sourcePath, resolvedPath);
-        if (!path_utils_3.isModulePathRelative(result)) {
-            result = "./" + result;
-        }
-        return result;
-    }
 });
-define("module_meta_storage", ["require", "exports", "log"], function (require, exports, log_6) {
+define("utils", ["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+});
+define("module_meta_storage", ["require", "exports", "log"], function (require, exports, log_4) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ModuleMetadataStorage = void 0;
@@ -753,7 +614,7 @@ define("module_meta_storage", ["require", "exports", "log"], function (require, 
             this.data = {};
         }
         set(name, data) {
-            log_6.logDebug("Got info on " + name + " module: " + JSON.stringify(data));
+            log_4.logDebug("Got info on " + name + " module: " + JSON.stringify(data));
             this.data[name] = data;
         }
         get(name) {
@@ -774,7 +635,7 @@ define("module_meta_storage", ["require", "exports", "log"], function (require, 
     }
     exports.ModuleMetadataStorage = ModuleMetadataStorage;
 });
-define("transformer/abstract_transformer", ["require", "exports", "typescript", "path_utils"], function (require, exports, tsc, path_utils_4) {
+define("transformer/abstract_transformer", ["require", "exports", "typescript", "path_utils"], function (require, exports, tsc, path_utils_3) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.AbstractTransformer = void 0;
@@ -833,12 +694,12 @@ define("transformer/abstract_transformer", ["require", "exports", "typescript", 
             }, () => true);
         }
         moduleNameByNode(fileNode) {
-            return path_utils_4.stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
+            return path_utils_3.stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
         }
     }
     exports.AbstractTransformer = AbstractTransformer;
 });
-define("transformer/before_js_transformer", ["require", "exports", "typescript", "log", "transformer/abstract_transformer"], function (require, exports, tsc, log_7, abstract_transformer_1) {
+define("transformer/before_js_transformer", ["require", "exports", "typescript", "log", "transformer/abstract_transformer"], function (require, exports, tsc, log_5, abstract_transformer_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.BeforeJsBundlerTransformer = void 0;
@@ -849,7 +710,7 @@ define("transformer/before_js_transformer", ["require", "exports", "typescript",
         }
         transformSourceFile(fileNode) {
             let moduleName = this.moduleNameByNode(fileNode);
-            log_7.logDebug("Visiting " + this.resolver.getAbsoluteModulePath(fileNode.fileName) + " as module " + moduleName);
+            log_5.logDebug("Visiting " + this.resolver.getAbsoluteModulePath(fileNode.fileName) + " as module " + moduleName);
             let meta = {
                 dependencies: [],
                 exportModuleReferences: [],
@@ -860,7 +721,7 @@ define("transformer/before_js_transformer", ["require", "exports", "typescript",
                 hasImportOrExport: false
             };
             if (fileNode.referencedFiles.length > 0) {
-                log_7.logWarn("File " + moduleName + " references some other files. They will not be included in bundle.");
+                log_5.logWarn("File " + moduleName + " references some other files. They will not be included in bundle.");
             }
             if (fileNode.moduleName) {
                 meta.altName = fileNode.moduleName;
@@ -878,7 +739,7 @@ define("transformer/before_js_transformer", ["require", "exports", "typescript",
                 if (tsc.isExportDeclaration(node)) {
                     if (!node.exportClause) {
                         if (!node.moduleSpecifier || !tsc.isStringLiteral(node.moduleSpecifier)) {
-                            log_7.logErrorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
+                            log_5.logErrorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
                         }
                         moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text);
                     }
@@ -908,7 +769,7 @@ define("transformer/before_js_transformer", ["require", "exports", "typescript",
     }
     exports.BeforeJsBundlerTransformer = BeforeJsBundlerTransformer;
 });
-define("transformer/after_js_transformer", ["require", "exports", "transformer/abstract_transformer", "typescript", "path_utils", "log"], function (require, exports, abstract_transformer_2, tsc, path_utils_5, log_8) {
+define("transformer/after_js_transformer", ["require", "exports", "transformer/abstract_transformer", "typescript"], function (require, exports, abstract_transformer_2, tsc) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.AfterJsBundlerTransformer = void 0;
@@ -938,31 +799,17 @@ define("transformer/after_js_transformer", ["require", "exports", "transformer/a
                     return fileNode;
                 }
             }
-            this.setImportExportFlag(moduleMeta, fileNode, moduleName);
+            this.setImportExportFlag(moduleMeta);
             let result = tsc.getMutableClone(fileNode);
             result.statements = tsc.createNodeArray([definingFunction]);
             return result;
         }
-        setImportExportFlag(moduleMeta, fileNode, moduleName) {
+        setImportExportFlag(moduleMeta) {
             moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
                 || moduleMeta.exports.length > 0
                 || moduleMeta.hasOmniousExport
                 || moduleMeta.dependencies.length > 0
                 || moduleMeta.exportModuleReferences.length > 0;
-            if (moduleMeta.hasImportOrExport) {
-                fileNode.amdDependencies.forEach(dep => {
-                    let path = this.resolver.resolveModuleDesignator(path_utils_5.stripTsExt(dep.path), fileNode.fileName, true);
-                    moduleMeta.dependencies.push(path);
-                });
-            }
-            else {
-                if (fileNode.amdDependencies.length > 0) {
-                    log_8.logWarn("Source file " + moduleName + " has <amd-dependency>, but is not a module (does not exports or imports anything). Dependency information will be lost.");
-                }
-                if (moduleMeta.altName) {
-                    log_8.logWarn("Source file " + moduleName + " has <amd-module>, but is not a module (does not exports or imports anything). Value of module name will be lost.");
-                }
-            }
         }
         processDefineCall(moduleMeta, defineCallNode, fileNode) {
             let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2];
@@ -1079,16 +926,14 @@ define("compiler", ["require", "exports", "typescript", "path", "transformer/bef
         constructor(config, transformers = []) {
             this._watch = null;
             this._program = null;
+            this._host = null;
+            this._modulePathResolver = null;
             this.config = config;
             this.tscMergedConfig = {
                 ...config.tscParsedCommandLine,
                 rootNames: [path.resolve(path.dirname(config.tsconfigPath), config.entryModule)]
             };
-            this.modulePathResolver = new module_path_resolver_1.ModulePathResolver(config.tsconfigPath, this.tscMergedConfig.options);
-            this.transformers = [
-                context => new before_js_transformer_1.BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
-                ...transformers
-            ];
+            this.transformers = transformers;
             this.bundler = new bundler_1.Bundler(this);
             this.metaStorage = new module_meta_storage_1.ModuleMetadataStorage();
         }
@@ -1101,16 +946,36 @@ define("compiler", ["require", "exports", "typescript", "path", "transformer/bef
             }
             throw new Error("Compiler not started in any of available modes.");
         }
+        get compilerHost() {
+            if (!this._host) {
+                throw new Error("Compiler not started, no compiler host available.");
+            }
+            return this._host;
+        }
+        get modulePathResolver() {
+            if (this._modulePathResolver === null) {
+                this._modulePathResolver = new module_path_resolver_1.ModulePathResolver(this.config.tsconfigPath, this.tscMergedConfig.options, this);
+            }
+            return this._modulePathResolver;
+        }
         startWatch() {
             let watchHost = tsc.createWatchCompilerHost(this.config.tsconfigPath, this.tscMergedConfig.options, tsc.sys, undefined, tsc_diagnostics_2.processTypescriptDiagnosticEntry);
             this._watch = tsc.createWatchProgram(watchHost);
+            this._host = tsc.createCompilerHost(this._watch.getProgram().getCompilerOptions());
             tsc_diagnostics_2.processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
         }
         async runSingle() {
-            this._program = tsc.createProgram(this.tscMergedConfig);
+            this._host = tsc.createCompilerHost(this.tscMergedConfig.options);
+            this._program = tsc.createProgram({
+                ...this.tscMergedConfig,
+                host: this._host
+            });
             tsc_diagnostics_2.processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
             let emitResult = this.program.emit(undefined, undefined, undefined, undefined, {
-                before: this.transformers,
+                before: [
+                    context => new before_js_transformer_1.BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
+                    ...this.transformers
+                ],
                 after: [
                     context => new after_js_transformer_1.AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
                 ]
@@ -1484,7 +1349,7 @@ define("loader/loader_types", ["require", "exports"], function (require, exports
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
 });
-define("minification", ["require", "exports", "terser", "typescript", "log"], function (require, exports, terser, tsc, log_9) {
+define("minification", ["require", "exports", "terser", "typescript", "log"], function (require, exports, terser, tsc, log_6) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.minifyJsCode = void 0;
@@ -1559,13 +1424,13 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
                 ecma: ecma
             });
             if (!res.code) {
-                log_9.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}`);
+                log_6.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}`);
             }
             let resultCode = res.code.replace(/^return\s*/, "").replace(/;\s*$/, "");
             return resultCode;
         }
         catch (e) {
-            log_9.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}\n${e}`);
+            log_6.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}\n${e}`);
         }
     }
     exports.minifyJsCode = minifyJsCode;
@@ -1576,10 +1441,10 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
         if (tscEcma > tsc.ScriptTarget.ES5 && tscEcma < Math.min(90, tsc.ScriptTarget.Latest)) {
             return (2013 + tscEcma);
         }
-        log_9.logErrorAndExit(`Could not minify code with this target (${tscEcma}): no conversion to minifier ECMA version exists.`);
+        log_6.logErrorAndExit(`Could not minify code with this target (${tscEcma}): no conversion to minifier ECMA version exists.`);
     }
 });
-define("bundler", ["require", "exports", "typescript", "module_orderer", "generated/loader_code", "log", "path", "afs", "path_utils", "minification"], function (require, exports, tsc, module_orderer_1, loader_code_1, log_10, path, afs_2, path_utils_6, minification_1) {
+define("bundler", ["require", "exports", "typescript", "module_orderer", "generated/loader_code", "log", "path", "afs", "path_utils", "minification"], function (require, exports, tsc, module_orderer_1, loader_code_1, log_7, path, afs_2, path_utils_4, minification_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Bundler = void 0;
@@ -1595,7 +1460,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             }
             await this.loadAbsentModuleCode();
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
-            log_10.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
+            log_7.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
             let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
             result.push(JSON.stringify(defArrArr));
             if (!this.compiler.config.noLoaderCode) {
@@ -1605,7 +1470,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
         }
         getEntryModuleName() {
             let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
-            let name = path_utils_6.stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
+            let name = path_utils_4.stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
             return name;
         }
         buildModuleDefinitionArrayArray(modules, circularDependentRelatedModules) {
@@ -1716,6 +1581,7 @@ exportas_circular_dependency
 exports
 exportstar
 exportstar_name_collision
+module_name_collision
 multicycled
 namespace
 nested_exportstar
@@ -1730,7 +1596,7 @@ unresolvable_cyclic_reference
 use_strict
 `;
 });
-define("test", ["require", "exports", "path", "fs", "compiler", "log", "generated/test_list_str", "afs", "config"], function (require, exports, path, fs, compiler_1, log_11, test_list_str_1, afs_3, config_1) {
+define("test", ["require", "exports", "path", "fs", "compiler", "log", "generated/test_list_str", "afs", "config"], function (require, exports, path, fs, compiler_1, log_8, test_list_str_1, afs_3, config_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.runSingleTest = exports.runAllTests = void 0;
@@ -1773,7 +1639,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             return fs.readFileSync(p, "utf8").trim();
         }
         outputError(error) {
-            log_11.logError("Test " + this.name + " failed: " + error);
+            log_8.logError("Test " + this.name + " failed: " + error);
             return false;
         }
         checkError(err, errType, errString) {
@@ -1862,7 +1728,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             }
         }
         async run() {
-            log_11.logInfo("Running test for " + this.name);
+            log_8.logInfo("Running test for " + this.name);
             await this.rmOutDir();
             let err = null;
             try {
@@ -1901,7 +1767,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
         .filter(_ => !!_)
         .filter(_ => _ !== "proj_synth");
     async function runAllTests() {
-        log_11.logInfo("Running all tests.");
+        log_8.logInfo("Running all tests.");
         let failCount = 0;
         for (let testName of knownTestNames) {
             let result = await new TestProject(testName).run();
@@ -1909,42 +1775,42 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
                 failCount++;
         }
         if (failCount < 1) {
-            log_11.logInfo("Done. Testing successful.");
+            log_8.logInfo("Done. Testing successful.");
             process.exit(0);
         }
         else {
-            log_11.logInfo("Done. Testing failed (" + failCount + " / " + knownTestNames.length + " tests failed)");
+            log_8.logInfo("Done. Testing failed (" + failCount + " / " + knownTestNames.length + " tests failed)");
             process.exit(1);
         }
     }
     exports.runAllTests = runAllTests;
     async function runSingleTest(name) {
         if (knownTestNames.indexOf(name) < 0) {
-            log_11.logError("Test name \"" + name + "\" is not known.");
+            log_8.logError("Test name \"" + name + "\" is not known.");
             process.exit(1);
         }
         let ok = await new TestProject(name).run();
         if (!ok) {
-            log_11.logInfo("Done. Test failed.");
+            log_8.logInfo("Done. Test failed.");
             await new Promise(ok => setTimeout(ok, 1000));
             process.exit(1);
         }
         else {
-            log_11.logInfo("Done. Testing successful.");
+            log_8.logInfo("Done. Testing successful.");
             await new Promise(ok => setTimeout(ok, 1000));
             process.exit(0);
         }
     }
     exports.runSingleTest = runSingleTest;
 });
-define("bundler_main", ["require", "exports", "test", "log", "compiler", "config", "cli"], function (require, exports, test_1, log_12, compiler_2, config_2, cli_2) {
+define("bundler_main", ["require", "exports", "test", "log", "compiler", "config", "cli"], function (require, exports, test_1, log_9, compiler_2, config_2, cli_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.tsBundlerMain = void 0;
     async function tsBundlerMain() {
         let cliArgs = config_2.parseToolCliArgs(cli_2.CLI.processArgvWithoutExecutables);
         if (cliArgs.verbose) {
-            log_12.setLogVerbosityLevel(1);
+            log_9.setLogVerbosityLevel(1);
         }
         if (cliArgs.test) {
             await test_1.runAllTests();
@@ -1955,7 +1821,7 @@ define("bundler_main", ["require", "exports", "test", "log", "compiler", "config
             return;
         }
         if (!cliArgs.tsconfigPath) {
-            log_12.logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
+            log_9.logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
         }
         let config = config_2.updateCliArgsWithTsconfig(cliArgs);
         let compiler = new compiler_2.Compiler(config);

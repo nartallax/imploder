@@ -2,8 +2,6 @@ import {AbstractTransformer} from "./abstract_transformer";
 import * as tsc from "typescript";
 import {ModuleMetadataStorage, ModuleMeta} from "module_meta_storage";
 import {ModulePathResolver} from "module_path_resolver";
-import {stripTsExt} from "path_utils";
-import {logWarn} from "log";
 
 export class AfterJsBundlerTransformer extends AbstractTransformer {
 
@@ -47,34 +45,19 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 			}
 		}
 
-		this.setImportExportFlag(moduleMeta, fileNode, moduleName);
+		this.setImportExportFlag(moduleMeta);
 
 		let result = tsc.getMutableClone(fileNode);
 		result.statements = tsc.createNodeArray([definingFunction]);
 		return result;
 	}
 
-	private setImportExportFlag(moduleMeta: ModuleMeta, fileNode: tsc.SourceFile, moduleName: string){
+	private setImportExportFlag(moduleMeta: ModuleMeta){
 		moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
 			|| moduleMeta.exports.length > 0
 			|| moduleMeta.hasOmniousExport
 			|| moduleMeta.dependencies.length > 0
 			|| moduleMeta.exportModuleReferences.length > 0;
-
-		if(moduleMeta.hasImportOrExport){
-			fileNode.amdDependencies.forEach(dep => {
-				let path = this.resolver.resolveModuleDesignator(stripTsExt(dep.path), fileNode.fileName, true);
-				moduleMeta.dependencies.push(path);
-			});
-		} else {
-			if(fileNode.amdDependencies.length > 0){
-				// интересно, зачем это вообще может пригодиться. но пусть будет
-				logWarn("Source file " + moduleName + " has <amd-dependency>, but is not a module (does not exports or imports anything). Dependency information will be lost.");
-			}
-			if(moduleMeta.altName){
-				logWarn("Source file " + moduleName + " has <amd-module>, but is not a module (does not exports or imports anything). Value of module name will be lost.");
-			}
-		}
 	}
 
 	private processDefineCall(moduleMeta: ModuleMeta, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {

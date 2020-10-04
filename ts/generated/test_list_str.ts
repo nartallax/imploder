@@ -6,6 +6,7 @@ exportas_circular_dependency
 exports
 exportstar
 exportstar_name_collision
+module_name_collision
 multicycled
 namespace
 nested_exportstar
