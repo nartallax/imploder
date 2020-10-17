@@ -15,7 +15,7 @@ cat ./parts/loader.js | sed 's;\\;\\\\;g' >> ts/generated/loader_code.ts
 echo "\`;" >> ts/generated/loader_code.ts
 
 echo "export const testListStr = \`" > ts/generated/test_list_str.ts
-ls ./test >> ts/generated/test_list_str.ts
+ls ./test_projects >> ts/generated/test_list_str.ts
 echo "\`;" >> ts/generated/test_list_str.ts
 
 ./node_modules/typescript/bin/tsc --project tsconfig.json --outFile ./main.js

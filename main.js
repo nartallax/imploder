@@ -507,7 +507,7 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
         let projectRoot = path.dirname(tsconfigPath);
         let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
         tsc_diagnostics_1.processTypescriptDiagnostics(result.errors);
-        return [result, rawJson.bundlerConfig];
+        return [result, rawJson.tstoolConfig];
     }
     function validateFixConfig(tsconfigPath, config, profile) {
         if (config.fileNames.length < 1) {
@@ -520,7 +520,7 @@ define("config", ["require", "exports", "cli", "path", "typescript", "log", "tsc
             log_3.logErrorAndExit("This tool is only able to work with AMD modules. Adjust compiler options in tsconfig.json.");
         }
         if (config.options.outFile) {
-            log_3.logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to bundlerConfig).");
+            log_3.logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to tstoolConfig).");
         }
         if (config.options.incremental) {
             log_3.logErrorAndExit("This tool is not able to work with incremental passed in compilerOptions.");
@@ -582,15 +582,13 @@ define("module_path_resolver", ["require", "exports", "path", "typescript", "pat
             if (this.ambientModules.has(moduleDesignator)) {
                 return moduleDesignator;
             }
-            else {
-                let res = tsc.resolveModuleName(moduleDesignator, sourceFile, this.compiler.program.getCompilerOptions(), this.compiler.compilerHost);
-                if (res.resolvedModule) {
-                    if (res.resolvedModule.isExternalLibraryImport) {
-                        return moduleDesignator;
-                    }
-                    else {
-                        return this.getAbsoluteModulePath(path_utils_2.stripTsExt(res.resolvedModule.resolvedFileName));
-                    }
+            let res = tsc.resolveModuleName(moduleDesignator, sourceFile, this.compiler.program.getCompilerOptions(), this.compiler.compilerHost);
+            if (res.resolvedModule) {
+                if (res.resolvedModule.isExternalLibraryImport) {
+                    return moduleDesignator;
+                }
+                else {
+                    return this.getAbsoluteModulePath(path_utils_2.stripTsExt(res.resolvedModule.resolvedFileName));
                 }
             }
             return moduleDesignator;
@@ -1760,7 +1758,7 @@ define("test", ["require", "exports", "path", "fs", "compiler", "log", "generate
             return this.checkBundle();
         }
     }
-    TestProject.testsRoot = path.resolve(__dirname, "./test/");
+    TestProject.testsRoot = path.resolve(__dirname, "./test_projects/");
     const knownTestNames = test_list_str_1.testListStr
         .split("\n")
         .map(_ => _.trim())

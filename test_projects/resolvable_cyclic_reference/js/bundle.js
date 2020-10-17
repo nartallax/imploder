@@ -1,0 +1,1 @@
+[["/button",["/control"],{"exports":["Button"]},"function(t,n,o){class Button extends o.Control{constructor(){super()}}t.Button=Button}"],["/control",["/button"],{"exports":["Control"]},"function(t,o,n){let r=0;t.Control=class Control{constructor(){this.prop=n.Button,this.id=++r}}}"],["/main",["/button"],"(n,o,i)=>{n.main=function main(){console.log((new i.Button).id)}}"]]

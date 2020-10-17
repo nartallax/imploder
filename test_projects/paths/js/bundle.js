@@ -1,0 +1,1 @@
+[["/lib/my_lib","e=>{e.myLibValue=10}"],["/lib/other_lib","e=>{e.otherLibValue=5}"],["/ts/helper",["/lib/my_lib","/lib/other_lib"],"(c,e,r,u)=>{c.calc=function calc(){return r.myLibValue+u.otherLibValue}}"],["/ts/main",["/ts/helper","/lib/my_lib","/lib/other_lib"],"(n,a,e,i,l)=>{n.main=function main(){console.log(e.calc()+i.myLibValue+l.otherLibValue)}}"]]

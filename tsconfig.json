@@ -1,5 +1,5 @@
 { 
-    "exclude": ["./test", "./loader/loader.ts", "./loader/loader_old.ts"],
+    "exclude": ["test_projects", "./loader/loader.ts", "./loader/loader_old.ts"],
     "compilerOptions": {
         "moduleResolution": "Node",
         "lib": [
