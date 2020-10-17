@@ -17,7 +17,7 @@ export interface TSToolCLIArgs {
 	profile?: string;
 }
 
-/** Содержимое блока bundlerConfig внутри tsconfig.json
+/** Содержимое блока tstoolConfig внутри tsconfig.json
  * обязательные поля - только entryModule, entryFunction, outFile. target рекомендуется выставить
 */
 export interface TsconfigTSToolInclusion extends TSToolProfile {
@@ -113,7 +113,7 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TsconfigT
 	let projectRoot = path.dirname(tsconfigPath);
 	let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
 	processTypescriptDiagnostics(result.errors)
-	return [result, rawJson.bundlerConfig];
+	return [result, rawJson.tstoolConfig];
 }
 
 function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: TSToolProfile): void{
@@ -128,7 +128,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	}
 
 	if(config.options.outFile){
-		logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to bundlerConfig).");
+		logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to tstoolConfig).");
 	}
 
 	if(config.options.incremental){

@@ -8,7 +8,7 @@ import {getFullConfigFromCliArgs} from "config";
 
 class TestProject {
 
-	private static testsRoot = path.resolve(__dirname, "./test/");
+	private static testsRoot = path.resolve(__dirname, "./test_projects/");
 
 	private readonly compileErrorText: string | null = this.fileContentOrNull("./compile_error.txt");
 	private readonly runtimeErrorText: string | null = this.fileContentOrNull("./runtime_error.txt");
