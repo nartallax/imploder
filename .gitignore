@@ -2,3 +2,5 @@ node_modules
 test_projects/*/js
 test_projects/*/node_modules
 ts/generated/*
+parts/loader.js
+main.js
