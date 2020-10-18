@@ -4,7 +4,7 @@ import * as path from "path";
 import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
 import {ModuleMetadataStorage} from "module_meta_storage";
 import {Bundler} from "bundler";
-import {writeTextFile} from "afs";
+import {writeTextFile, unlinkRecursive, fileExists} from "afs";
 import {ModulePathResolver} from "module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
 import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "tsc_diagnostics";
@@ -13,45 +13,7 @@ import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "ts
 Полезные доки и примеры: 
 https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
 https://basarat.gitbook.io/typescript/overview/
-
-Про резолв модулей и создание файлов-результатов.
-
 https://www.typescriptlang.org/docs/handbook/module-resolution.html
-
-Существует несколько пропертей про указание исходных файлов и контроль выхода:
-
-files
-Перечисление файлов, которые должны быть скомпилированы.
-Если это свойство использовано совместно с каким-либо еще способом указания исходников - то это множество файлов будет добавлено к полученному в результате обработки других свойств.
-
-include
-Перечисление включаемых файлов, с wildcard-ами.
-В нашем случае не очень полезно, т.к. мы используем files как множество начальных файлов, а не всех. Т.е. если эти файлы ссылаются на еще какие-нибудь файлы - то эти другие файлы будут включены в множество компилируемых.
-
-exclude
-Перечисление исключаемых файлов, с wildcard-ами.
-
-compilerOptions.baseUrl
-Путь, по которому резолвятся не-относительные импорты.
-
-compilerOptions.paths
-Способ потюнить алгоритм разрешения модулей по их имени, а также еще один способ указать множество входных файлов.
-С помощью этого свойства можно задавать альтернативные пути, по которым будут резолвиться те же модули.
-Не влияет на структуру выходной директории.
-
-compilerOptions.outDir
-Директория, в которую кладутся выходные файлы.
-
-compilerOptions.rootDir
-Свойство для контроля того, относительно какой директории будут резолвиться пути внутри compilerOptions.outDir
-Грубо говоря, если все исходники лежат внутри ./ts, а rootDir указан как . - то внутри outDir будет создана директория ts, в которой будут лежать сгенерированные файлы; если rootDir будет указан как ./ts - то в outDir будут лежать прямо сгенерированные файлы из ts.
-Если не указан - будет нетривиально выведен из множества исходных файлов, что может привести к багам. Поэтому мы назначаем это свойство вручную.
-
-compilerOptions.rootDirs
-Еще один способ тюнить алгоритм разрешения модулей.
-Позволяет изнутри файлов внутри любой указанной директории ссылаться на файлы из любой другой указанной директории так, как если бы все указанные директории были бы одной директорией.
-Например, если у нас есть ts/main.ts и lib/lib.ts, и rootDirs: ["ts", "lib"], то из main.ts можно будет импортнуть lib.ts по пути "./lib", несмотря на то, что фактически они лежат в разных директориях.
-Не влияет на структуру outDir.
 */
 
 type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
@@ -73,6 +35,14 @@ export class Compiler {
 		this.transformers = transformers;
 		this.bundler = new Bundler(this);
 		this.metaStorage = new ModuleMetadataStorage();
+	}
+
+	private async beforeStart(){
+		if(!this.config.preserveOutDir && this.config.tscParsedCommandLine.options.outDir){
+			if(await fileExists(this.config.tscParsedCommandLine.options.outDir)){
+				await unlinkRecursive(this.config.tscParsedCommandLine.options.outDir);
+			}
+		}
 	}
 
 	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
@@ -103,7 +73,9 @@ export class Compiler {
 		return this._modulePathResolver;
 	}
 
-	startWatch(){
+	async startWatch(){
+		await this.beforeStart();
+
 		let watchHost = tsc.createWatchCompilerHost(
 			this.config.tsconfigPath,
 			this.tscMergedConfig.options,
@@ -119,6 +91,8 @@ export class Compiler {
 
 	/** Запуститься для разовой компиляции */
 	async runSingle(){
+		await this.beforeStart();
+
 		this._host = tsc.createCompilerHost(this.tscMergedConfig.options);
 		this._program = tsc.createProgram({
 			...this.tscMergedConfig,
@@ -135,25 +109,6 @@ export class Compiler {
 			after: [
 				context => new AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
 			]
-			/*
-			after: [
-				context => ({
-					transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
-						let prefix = fileNode.fileName;
-						if(prefix.length > 30){
-							prefix = "..." + prefix.substr(prefix.length - 30);
-						}
-						return visitNodeRecursive(fileNode, context, (node, depth) => {
-							console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
-							return node;
-						}) as tsc.SourceFile;
-					},
-					transformBundle(node: tsc.Bundle): tsc.Bundle {
-						return node;
-					}
-				})
-			]
-			*/
 		});
 		processTypescriptDiagnostics(emitResult.diagnostics);
 

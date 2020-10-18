@@ -38,6 +38,7 @@ export interface TSToolProfile {
 	devmode: boolean;
 	target: keyof typeof tsc.ScriptTarget;
 	embedTslib?: boolean;
+	preserveOutDir?: boolean;
 }
 
 /** Конфиг всего тула в целом */
