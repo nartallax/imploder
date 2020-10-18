@@ -1,7 +1,7 @@
 {
-  "name": "tsbundler_3",
+  "name": "tstool",
   "version": "1.0.0",
-  "description": "A tool to assemble Typescript projects into Javascript bundle files.",
+  "description": "A tool to work with Typescript projects.",
   "main": "main.js",
   "scripts": {
     "test": "./install_tests.sh && node main.js --test"

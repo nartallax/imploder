@@ -1,1 +1,0 @@
-[["/main","(n,o)=>{n.main=async function main(){console.log('importing...');let n=await new Promise((n,i)=>{o(['./fs'],n,i)});console.log(n.x+'!')}}"]]

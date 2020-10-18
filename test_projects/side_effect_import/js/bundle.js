@@ -1,1 +1,0 @@
-[["/dict","r=>{r.dictionary={}}"],["/effector",["/dict"],"(r,d,i)=>{i.dictionary.my_word=100501}"],["/main",["/dict","/effector"],"(n,o,i)=>{n.main=function main(){console.log(i.dictionary.my_word)}}"]]

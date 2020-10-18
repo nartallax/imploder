@@ -1,3 +1,4 @@
 node_modules
-test/*/js
-test/*/node_modules
+test_projects/*/js
+test_projects/*/node_modules
+ts/generated/*

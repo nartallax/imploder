@@ -1,1 +1,0 @@
-[["/in_root","r=>{r.fromRootDirVal='nya'}"],["/lib/lib","e=>{e.getValue=function getValue(){return'one'}}"],["/lib/lib2",["/lib/lib"],"(e,t,u)=>{e.getValue2=function getValue2(){return u.getValue()+'sie'}}"],["/ts/main",["/lib/lib","/lib/lib2","/in_root"],"(o,e,n,a,l)=>{o.main=function main(){console.log(n.getValue()+a.getValue2()+l.fromRootDirVal)}}"]]

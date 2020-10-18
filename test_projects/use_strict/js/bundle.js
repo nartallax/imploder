@@ -1,1 +1,0 @@
-[["/main","function(n){n.main=function main(){console.log(function testFn(){return typeof this}())}}"]]
