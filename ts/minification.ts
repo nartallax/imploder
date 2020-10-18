@@ -2,14 +2,21 @@ import * as terser from "terser";
 import * as tsc from "typescript";
 import {logErrorAndExit} from "log";
 
-export async function minifyJsCode(code: string, tscEcmaVersion: tsc.ScriptTarget,  moduleName: string): Promise<string> {
-	let ecma = tscEcmaToTerserEcma(tscEcmaVersion);
+export interface MinifierOptions {
+	removeLegalComments?: boolean;
+	target: tsc.ScriptTarget;
+	code: string;
+	moduleName: string;	
+}
+
+export async function minifyJsCode(opts: MinifierOptions): Promise<string> {
+	let ecma = tscEcmaToTerserEcma(opts.target);
 	try {
-		let res = await terser.minify("return " + code.replace(/^[\n\r\s]+/, ""), {
+		let res = await terser.minify("return " + opts.code.replace(/^[\n\r\s]+/, ""), {
 			compress: {
 				passes: 3,
 				toplevel: false, // true probably will drop entire module definition
-				arrows: tscEcmaVersion > tsc.ScriptTarget.ES5,
+				arrows: opts.target > tsc.ScriptTarget.ES5,
 				arguments: true,
 				booleans: true,
 				booleans_as_integers: false,
@@ -61,7 +68,7 @@ export async function minifyJsCode(code: string, tscEcmaVersion: tsc.ScriptTarge
 			format: {
 				ascii_only: false,
 				braces: false,
-				comments: "some",
+				comments: opts.removeLegalComments? false: "some",
 				ecma: ecma,
 				quote_style: 1, // код потом будет положен в JSON, а в JSON всегда двойные кавычки, т.е. нам тут нужны одинарные, чтобы было меньше эскейпинга
 				keep_quoted_props: false,
@@ -74,14 +81,14 @@ export async function minifyJsCode(code: string, tscEcmaVersion: tsc.ScriptTarge
 		});
 		
 		if(!res.code){
-			logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}`);
+			logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}`);
 		}
 
 		let resultCode = res.code.replace(/^return\s*/, "").replace(/;\s*$/, "");
 		return resultCode;
 
 	} catch(e){
-		logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}\n${e}`);
+		logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}\n${e}`);
 	}
 }
 

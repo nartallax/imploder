@@ -1078,7 +1078,7 @@ define("module_orderer", ["require", "exports", "seq_set"], function (require, e
             visit(entryPoint);
             return [
                 [...result].sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
-                [...absentModules]
+                absentModules
             ];
         }
         updateCircularRelatedModules(s) {
@@ -1351,14 +1351,14 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.minifyJsCode = void 0;
-    async function minifyJsCode(code, tscEcmaVersion, moduleName) {
-        let ecma = tscEcmaToTerserEcma(tscEcmaVersion);
+    async function minifyJsCode(opts) {
+        let ecma = tscEcmaToTerserEcma(opts.target);
         try {
-            let res = await terser.minify("return " + code.replace(/^[\n\r\s]+/, ""), {
+            let res = await terser.minify("return " + opts.code.replace(/^[\n\r\s]+/, ""), {
                 compress: {
                     passes: 3,
                     toplevel: false,
-                    arrows: tscEcmaVersion > tsc.ScriptTarget.ES5,
+                    arrows: opts.target > tsc.ScriptTarget.ES5,
                     arguments: true,
                     booleans: true,
                     booleans_as_integers: false,
@@ -1410,7 +1410,7 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
                 format: {
                     ascii_only: false,
                     braces: false,
-                    comments: "some",
+                    comments: opts.removeLegalComments ? false : "some",
                     ecma: ecma,
                     quote_style: 1,
                     keep_quoted_props: false,
@@ -1422,13 +1422,13 @@ define("minification", ["require", "exports", "terser", "typescript", "log"], fu
                 ecma: ecma
             });
             if (!res.code) {
-                log_6.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}`);
+                log_6.logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}`);
             }
             let resultCode = res.code.replace(/^return\s*/, "").replace(/;\s*$/, "");
             return resultCode;
         }
         catch (e) {
-            log_6.logErrorAndExit(`Minifier failed on JS code of module ${moduleName}: \n${code}\n${e}`);
+            log_6.logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}\n${e}`);
         }
     }
     exports.minifyJsCode = minifyJsCode;
@@ -1460,6 +1460,9 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             let moduleOrder = new module_orderer_1.ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
             log_7.logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
             let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
+            if (this.compiler.config.embedTslib && moduleOrder.absentModules.has("tslib")) {
+                defArrArr.push(await this.getTslibDefArr());
+            }
             result.push(JSON.stringify(defArrArr));
             if (!this.compiler.config.noLoaderCode) {
                 result.push(this.getPostfixCode());
@@ -1470,6 +1473,26 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
             let name = path_utils_4.stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
             return name;
+        }
+        async getTslibDefArr() {
+            let root = path.resolve(path.dirname(this.compiler.config.tsconfigPath), "./node_modules/tslib/");
+            let stats;
+            try {
+                stats = await afs_2.stat(root);
+            }
+            catch (e) {
+                throw new Error("Failed to fstat tslib directory " + root);
+            }
+            if (!stats.isDirectory()) {
+                throw new Error("Expected " + root + " to be tslib directory, but it's not directory.");
+            }
+            let libPath = path.resolve(root, "./tslib.js");
+            let libCode = await afs_2.readTextFile(libPath);
+            if (this.compiler.config.minify) {
+                libCode = "function(global){var define=function(){};" + libCode + "}";
+                libCode = await this.minify(libCode, "tslib", { removeLegalComments: true });
+            }
+            return ["tslib", libCode];
         }
         buildModuleDefinitionArrayArray(modules, circularDependentRelatedModules) {
             return modules.map(name => {
@@ -1506,7 +1529,7 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
             let resultLoaderCode = loader_code_1.loaderCode;
             if (this.compiler.config.minify) {
                 if (this.minifiedLoaderCode === null) {
-                    this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", tsc.ScriptTarget.ES5);
+                    this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 });
                 }
                 resultLoaderCode = this.minifiedLoaderCode;
             }
@@ -1561,8 +1584,13 @@ define("bundler", ["require", "exports", "typescript", "module_orderer", "genera
                 await Promise.all(proms);
             }
         }
-        minify(code, moduleName, target) {
-            return minification_1.minifyJsCode(code, target || tsc.ScriptTarget[this.compiler.config.target], moduleName);
+        minify(code, moduleName, opts = {}) {
+            return minification_1.minifyJsCode({
+                target: tsc.ScriptTarget[this.compiler.config.target],
+                ...opts,
+                code,
+                moduleName
+            });
         }
     }
     exports.Bundler = Bundler;
@@ -1589,6 +1617,7 @@ recursive_exportstar
 resolvable_cyclic_reference
 rootdirs
 side_effect_import
+tslib_embed
 type_only_imports
 unresolvable_cyclic_reference
 use_strict

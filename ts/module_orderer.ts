@@ -5,7 +5,7 @@ import {SeqSet} from "seq_set";
 export class ModuleOrderer {
 	constructor(private readonly storage: ModuleMetadataStorage){}
 
-	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: string[], circularDependentRelatedModules: Set<string>}{
+	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>}{
 		let circularDependentRelatedModules = new Set<string>();
 		let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentRelatedModules);
 		//let nonModules = this.getSortedNonModules(modules);
@@ -45,7 +45,7 @@ export class ModuleOrderer {
 		visit(entryPoint);
 	}
 
-	private getSortedModules(entryPoint: string, circularDependentRelatedModules: Set<string>): [string[], string[]] {
+	private getSortedModules(entryPoint: string, circularDependentRelatedModules: Set<string>): [string[], Set<string>] {
 		let nameStack = new SeqSet<string>();
 		let absentModules = new Set<string>();
 		let result = new Set<string>();
@@ -70,7 +70,7 @@ export class ModuleOrderer {
 
 		return [
 			[...result].sort((a, b) => a < b? -1: a > b? 1: 0),
-			[...absentModules]
+			absentModules
 		]
 	}
 

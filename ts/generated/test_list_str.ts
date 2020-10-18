@@ -16,6 +16,7 @@ recursive_exportstar
 resolvable_cyclic_reference
 rootdirs
 side_effect_import
+tslib_embed
 type_only_imports
 unresolvable_cyclic_reference
 use_strict

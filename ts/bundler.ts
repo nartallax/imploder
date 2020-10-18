@@ -4,10 +4,11 @@ import {ModuleOrderer} from "module_orderer";
 import {loaderCode} from "generated/loader_code";
 import {logDebug} from "log";
 import * as path from "path";
-import {readTextFile} from "afs";
+import {readTextFile, stat} from "afs";
 import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
 import {stripTsExt} from "path_utils";
-import {minifyJsCode} from "minification";
+import {minifyJsCode, MinifierOptions} from "minification";
+import * as fs from "fs";
 
 /** сборщик бандл-файла из кучи исходников */
 export class Bundler {
@@ -30,7 +31,10 @@ export class Bundler {
 		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
 
 		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
-		result.push(JSON.stringify(defArrArr));
+		if(this.compiler.config.embedTslib && moduleOrder.absentModules.has("tslib")){
+			defArrArr.push(await this.getTslibDefArr());
+		}
+		result.push(JSON.stringify(defArrArr));		
 		
 		if(!this.compiler.config.noLoaderCode){
 			result.push(this.getPostfixCode());
@@ -43,6 +47,27 @@ export class Bundler {
 		let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
 		let name = stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
 		return name;
+	}
+
+	private async getTslibDefArr(): Promise<ModuleDefinitonArray> {
+		let root = path.resolve(path.dirname(this.compiler.config.tsconfigPath), "./node_modules/tslib/");
+		let stats: fs.Stats;
+		try {
+			stats = await stat(root);
+		} catch(e){
+			throw new Error("Failed to fstat tslib directory " + root);
+		}
+		if(!stats.isDirectory()){
+			throw new Error("Expected " + root + " to be tslib directory, but it's not directory.");
+		}
+
+		let libPath = path.resolve(root, "./tslib.js");
+		let libCode = await readTextFile(libPath);
+		if(this.compiler.config.minify){
+			libCode = "function(global){var define=function(){};" + libCode + "}"
+			libCode = await this.minify(libCode, "tslib", { removeLegalComments: true });
+		}
+		return ["tslib", libCode];
 	}
 
 	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): ModuleDefinitonArray[] {
@@ -84,7 +109,7 @@ export class Bundler {
 		let resultLoaderCode = loaderCode;
 		if(this.compiler.config.minify){
 			if(this.minifiedLoaderCode === null){
-				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", tsc.ScriptTarget.ES5);
+				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 });
 			}
 			resultLoaderCode = this.minifiedLoaderCode;
 		}
@@ -144,8 +169,13 @@ export class Bundler {
 		}
 	}
 
-	private minify(code: string, moduleName: string, target?: tsc.ScriptTarget): Promise<string> {
-		return minifyJsCode(code, target || tsc.ScriptTarget[this.compiler.config.target], moduleName);
+	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}): Promise<string> {
+		return minifyJsCode({
+			target: tsc.ScriptTarget[this.compiler.config.target],
+			...opts,
+			code, 
+			moduleName
+		});
 	}
 
 }

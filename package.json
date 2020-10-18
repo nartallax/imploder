@@ -4,8 +4,7 @@
   "description": "A tool to assemble Typescript projects into Javascript bundle files.",
   "main": "main.js",
   "scripts": {
-    "postinstall": "./compile.sh",
-    "test": "node main.js --test"
+    "test": "./install_tests.sh && node main.js --test"
   },
   "author": "Nartallax",
   "license": "ISC",
@@ -13,7 +12,7 @@
     "@types/node": "^13.7.6",
     "@types/terser": "^3.12.0",
     "terser": "^5.3.2",
-    "tslib": "^2.0.0",
+    "tslib": "^2.0.3",
     "typescript": "^3.9.7"
   }
 }

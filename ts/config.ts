@@ -37,6 +37,7 @@ export interface TSToolProfile {
 	minify: boolean;
 	devmode: boolean;
 	target: keyof typeof tsc.ScriptTarget;
+	embedTslib?: boolean;
 }
 
 /** Конфиг всего тула в целом */
