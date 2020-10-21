@@ -35,7 +35,7 @@ export interface TSToolProfile {
 	preferCommonjs: boolean;
 	noLoaderCode: boolean;
 	minify: boolean;
-	devmode: boolean;
+	watchMode: boolean;
 	target: keyof typeof tsc.ScriptTarget;
 	embedTslib?: boolean;
 	preserveOutDir?: boolean;
@@ -52,8 +52,8 @@ export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
 		definition: {
 			tsconfigPath: CLI.str({ keys: "--tsconfig", definition: "Path to tsconfig.json.", default: ""}),
 			profile: CLI.str({ keys: "--profile", definition: "Name of tool profile to use. Profiles are defined in tsconfig.json.", default: ""}),
-			useStdio: CLI.bool({ keys: "--use-stdio", definition: "Enables communication with outside world through STDIO. Only usable in devmode." }),
-			httpPort: CLI.int({ keys: "--port", definition: "Enables tool to listen on specified port. Any HTTP request to this port will trigger bundling, and response to this request will be bundled code. Devmode only.", default: 0 }),
+			useStdio: CLI.bool({ keys: "--use-stdio", definition: "Enables communication with outside world through STDIO. Only usable in watchmode." }),
+			httpPort: CLI.int({ keys: "--port", definition: "Enables tool to listen on specified port. Any HTTP request to this port will trigger bundling, and response to this request will be bundled code. Watchmode only.", default: 0 }),
 			verbose: CLI.bool({ keys: ["-v", "--verbose"], definition: "Adds some more bundler-debug-related trash in stderr." }),
 			help: CLI.help({ keys: ["-h", "--h", "-help", "--help"], definition: "Shows list of commands." }),
 			test: CLI.bool({ keys: ["--test"], definition: "Run autotests." }),
@@ -123,8 +123,16 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
 
+	let rawOptions: any;
+	if(config.raw){
+		rawOptions = config.raw.compilerOptions;
+	} else {
+		throw new Error("No raw options supplied.");
+	}
+
 	if(config.options.module === undefined){
 		config.options.module = tsc.ModuleKind.AMD;
+		rawOptions.module = "amd";
 	} else if(config.options.module !== tsc.ModuleKind.AMD){
 		logErrorAndExit("This tool is only able to work with AMD modules. Adjust compiler options in tsconfig.json.");
 	}
@@ -142,7 +150,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	}
 
 	if(!config.options.rootDir){
-		config.options.rootDir = path.dirname(tsconfigPath);
+		rawOptions.rootDir = config.options.rootDir = path.dirname(tsconfigPath);
 	}
 
 	if(config.options.rootDirs){
@@ -162,13 +170,15 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	}
 
 	// опции про tslib: все вспомогательные функции импортировать из tslib, не прописывать в компилированном коде по новой
-	config.options.importHelpers = true;
-	config.options.noEmitHelpers = true;
+	rawOptions.importHelpers = config.options.importHelpers = true;
+	rawOptions.noEmitHelpers = config.options.noEmitHelpers = true;
 
 	config.options.target = tsc.ScriptTarget[profile.target];
+	rawOptions.target = profile.target;
 
 	if(!config.options.moduleResolution){
 		config.options.moduleResolution = tsc.ModuleResolutionKind.NodeJs;
+		rawOptions.moduleResolution = "node";
 	} else if(config.options.moduleResolution !== tsc.ModuleResolutionKind.NodeJs){
 		logErrorAndExit("Module resolution types other than node are not supported.");
 	}
@@ -182,6 +192,6 @@ function fixProfile(profile: TSToolProfile, tsconfigPath: string){
 	profile.commonjsRequireName = profile.commonjsRequireName || "require";
 	profile.noLoaderCode = !!profile.noLoaderCode;
 	profile.minify = !!profile.minify;
-	profile.devmode = !!profile.devmode;
+	profile.watchMode = !!profile.watchMode;
 	profile.target = profile.target || "ES5"
 }

@@ -3,8 +3,10 @@ import {logErrorAndExit, setLogVerbosityLevel} from "log";
 import {Compiler} from "compiler";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "config";
 import {CLI} from "cli";
+import {Bundler} from "bundler";
+import {writeTextFile} from "afs";
 
-export async function tsBundlerMain(){
+export async function tstoolMain(){
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
 	if(cliArgs.verbose){
@@ -27,6 +29,20 @@ export async function tsBundlerMain(){
 
 	let config = updateCliArgsWithTsconfig(cliArgs);
 	let compiler = new Compiler(config);
-	compiler.runSingle();
+
+	if(!config.watchMode){
+		await compiler.runSingle();
+		let bundler = new Bundler(compiler);
+		let bundle = await bundler.produceBundle();
+		await writeTextFile(config.outFile, bundle);
+	} else {
+		await compiler.startWatch();
+		if(config.useStdio){
+			// TODO: stdio interface
+		}
+		if(typeof(config.httpPort) === "number"){
+			// TODO: http interface
+		}
+	}
 
 }

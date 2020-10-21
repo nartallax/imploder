@@ -29,6 +29,10 @@ export function stat(path: string): Promise<fs.Stats>{
 	return wrap(cb => fs.stat(path, cb))
 }
 
+export function mkdir(path: fs.PathLike, options?: number | string | fs.MakeDirectoryOptions | undefined | null): Promise<void>{
+	return wrap(cb => fs.mkdir(path, options, err => cb(err)))
+}
+
 export async function fileExists(path: string): Promise<boolean>{
 	return wrap(cb => fs.stat(path, err => cb(null, !err)))
 }

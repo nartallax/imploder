@@ -9,7 +9,7 @@ export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 
 		if(typeof(d.start) === "number"){
 			let { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
-			origin += ` (${line + 1}:${character + 1}`;
+			origin += ` (${line + 1}:${character + 1})`;
 		}
 
 		msg.push(origin);
@@ -17,7 +17,8 @@ export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 	
 	msg.push(tsc.DiagnosticCategory[d.category] + ":")
 	msg.push(tsc.flattenDiagnosticMessageText(d.messageText, '\n'));
-	msg.push(d.code.toString());
+	// why do I need code? maybe for something very specific. will comment it out yet
+	//msg.push(d.code.toString());
 
 	let msgString = msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
 	if(d.category == tsc.DiagnosticCategory.Error){

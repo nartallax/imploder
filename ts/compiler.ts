@@ -4,10 +4,11 @@ import * as path from "path";
 import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
 import {ModuleMetadataStorage} from "module_meta_storage";
 import {Bundler} from "bundler";
-import {writeTextFile, unlinkRecursive, fileExists} from "afs";
+import {unlinkRecursive, fileExists, mkdir} from "afs";
 import {ModulePathResolver} from "module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
 import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "tsc_diagnostics";
+import {logInfo, logErrorAndExit} from "log";
 
 /*
 Полезные доки и примеры: 
@@ -38,21 +39,31 @@ export class Compiler {
 	}
 
 	private async beforeStart(){
-		if(!this.config.preserveOutDir && this.config.tscParsedCommandLine.options.outDir){
-			if(await fileExists(this.config.tscParsedCommandLine.options.outDir)){
-				await unlinkRecursive(this.config.tscParsedCommandLine.options.outDir);
+		const outDir = this.config.tscParsedCommandLine.options.outDir;
+		if(!this.config.preserveOutDir && outDir){
+			if(await fileExists(outDir)){
+				await unlinkRecursive(outDir);
+				// создавать тут директорию нужно для вотчмода
+				// потому что иначе он сразу же после начала работы дергается на свежесозданную директорию с выходными данными
+				// это не очень страшно, но неприятно
+				await mkdir(outDir);
 			}
 		}
 	}
 
-	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
+	private _proj: tsc.BuildInvalidedProject<tsc.BuilderProgram> | null = null;
 	private _program: tsc.Program | null = null;
 	get program(): tsc.Program {
 		if(this._program){
 			return this._program;
 		}
-		if(this._watch){
-			return this._watch.getProgram().getProgram();
+		if(this._proj){
+			let prog = this._proj.getProgram();
+			if(!prog){
+				// what? why?
+				logErrorAndExit("There is no program returned in watchmode.");
+			}
+			return prog;
 		}
 		throw new Error("Compiler not started in any of available modes.");
 	}
@@ -73,20 +84,120 @@ export class Compiler {
 		return this._modulePathResolver;
 	}
 
+	private _errorCount: number = 0;
+	get isInSuccessfulState(): boolean {
+		return this._errorCount === 0;
+	}
+
+	private isCompiling = false;
+	private filesChangedSinceLastCompile = 0;
+
+	private compileEndWaiters: (() => void)[] = [];
+	waitCompileEnd(): Promise<void>{
+		if(!this.isCompiling && this.filesChangedSinceLastCompile < 1){
+			return Promise.resolve();
+		} else {
+			return new Promise(ok => this.compileEndWaiters.push(ok));
+		}
+	}
+
+	private startCompileLog(sourcePath?: string){
+		if(this.filesChangedSinceLastCompile === 0){
+			logInfo(`Compilation starting: change detected${sourcePath !== undefined? " (in " + sourcePath + ")": ""}`);
+		}
+	}
+
+	private endCompile(){
+		let wasCompiling = this.isCompiling;
+		this.isCompiling = false;
+		if(this.filesChangedSinceLastCompile < 1){
+			if(wasCompiling){
+				logInfo(`Compilation ended (errors: ${this._errorCount})`);
+			}
+			let waiters = this.compileEndWaiters;
+			this.compileEndWaiters = [];
+			waiters.forEach(watcher => watcher());
+		} else {
+			logInfo(`Compilation ended, but soon new will start (unprocessed changes: ${this.filesChangedSinceLastCompile})`);
+		}
+	}
+
+	private createTransformers(): tsc.CustomTransformers {
+		return {
+			before: [
+				context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
+				...this.transformers
+			],
+			after: [
+				context => new AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
+			]
+		}
+	}
+
+
 	async startWatch(){
 		await this.beforeStart();
 
-		let watchHost = tsc.createWatchCompilerHost(
-			this.config.tsconfigPath,
-			this.tscMergedConfig.options,
-			tsc.sys,
-			undefined,
-			processTypescriptDiagnosticEntry
-		);
-		this._watch = tsc.createWatchProgram(watchHost);
-		this._host = tsc.createCompilerHost(this._watch.getProgram().getCompilerOptions())
+		let system: tsc.System = {
+			...tsc.sys,
+			readFile: (filePath, encoding) => {
+				if(path.resolve(filePath) === this.config.tsconfigPath){
+					// TODO: test for enum values; that is, "target"
+					console.log(JSON.stringify(this.config.tscParsedCommandLine.raw, null, 4));
+					return JSON.stringify(this.config.tscParsedCommandLine.raw);
+				}
+				return tsc.sys.readFile(filePath, encoding);
+			}
+		}
 
-		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
+		let host = tsc.createSolutionBuilderWithWatchHost(
+			system, 
+			undefined,
+			diag => {
+				console.log("DIAG A");
+				processTypescriptDiagnosticEntry(diag);
+			}, 
+			diag => {
+				console.log("DIAG B");
+				processTypescriptDiagnosticEntry(diag);
+			},
+			(diagnostic: tsc.Diagnostic, newLine: string, options: tsc.CompilerOptions, errorCount?: number) =>{
+				console.log("WATCHSTATUS: ERRORS = " + errorCount);
+				void newLine;
+				void options;
+				processTypescriptDiagnosticEntry(diagnostic);
+			}
+		);
+
+		let builder = tsc.createSolutionBuilderWithWatch(host, [path.dirname(this.tscMergedConfig.options.outDir as string)], { incremental: false }, {});
+
+		void this.startCompileLog;
+		void this.endCompile;
+		void builder;
+
+		let proj = builder.getNextInvalidatedProject();
+
+		if(!proj){
+			logErrorAndExit("Got no project for initial compilation.");
+		}
+
+		if(proj.kind !== tsc.InvalidatedProjectKind.Build){
+			logErrorAndExit("Wrong initial compilation project kind: " + tsc.InvalidatedProjectKind[proj.kind]);
+		}
+
+		this._proj = proj;
+		let program = proj.getProgram();
+		if(!program){
+			throw new Error("No program get from initial project.");
+		}
+		this._host = tsc.createCompilerHost(program.getCompilerOptions());
+		let transformers = this.createTransformers();
+		console.log("EMITTING");
+		proj.emit(undefined, undefined, undefined, undefined, transformers)
+		console.log("BUILDING");
+
+		builder.build();
+		console.log("DONE");
 	}
 
 	/** Запуститься для разовой компиляции */
@@ -101,19 +212,8 @@ export class Compiler {
 		
 		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 
-		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, {
-			before: [
-				context => new BeforeJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver),
-				...this.transformers
-			],
-			after: [
-				context => new AfterJsBundlerTransformer(context, this.metaStorage, this.modulePathResolver)
-			]
-		});
+		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, this.createTransformers());
 		processTypescriptDiagnostics(emitResult.diagnostics);
-
-		let bundle = await this.bundler.produceBundle();
-		await writeTextFile(this.config.outFile, bundle);
 	}
 
 }
