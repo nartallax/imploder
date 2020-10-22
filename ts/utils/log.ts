@@ -1,5 +1,3 @@
-import * as tsc from "typescript";
-
 let logVerbosityLevel: number = 0;
 
 function twoDig(x: number){ return (x > 9? "": "0") + x }
@@ -15,14 +13,16 @@ export function setLogVerbosityLevel(level: number){
 }
 
 function logWithLevel(verbosityLevel: number, str: string){
-	if(verbosityLevel <= logVerbosityLevel)
-		tsc.sys.write(timeStr() + "\t" + str + "\n");
+	if(verbosityLevel <= logVerbosityLevel){
+		process.stderr.write(timeStr() + "\t" + str + "\n");
+	}
 }
 
-export function logError(str: string){ return logWithLevel(-2, str) }
-export function logWarn(str: string){ return logWithLevel(-1, str) }
-export function logInfo(str: string){ return logWithLevel(0, str) }
-export function logDebug(str: string){ return logWithLevel(1, str) }
+export const logError = logWithLevel.bind(null, -2);
+export const logWarn = logWithLevel.bind(null, -1);
+export const logInfo = logWithLevel.bind(null, 0);
+export const logDebug = logWithLevel.bind(null, 1);
+
 export function logErrorAndExit(str: string): never {
 	logError(str);
 	process.exit(1);

@@ -1,6 +1,6 @@
 import * as terser from "terser";
 import * as tsc from "typescript";
-import {logErrorAndExit} from "log";
+import {logErrorAndExit} from "utils/log";
 
 export interface MinifierOptions {
 	removeLegalComments?: boolean;

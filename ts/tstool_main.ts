@@ -1,10 +1,9 @@
-import {runAllTests, runSingleTest} from "test";
-import {logErrorAndExit, setLogVerbosityLevel} from "log";
-import {Compiler} from "compiler";
-import {updateCliArgsWithTsconfig, parseToolCliArgs} from "config";
-import {CLI} from "cli";
-import {Bundler} from "bundler";
-import {writeTextFile} from "afs";
+import {runAllTests, runSingleTest} from "test/test";
+import {logErrorAndExit, setLogVerbosityLevel} from "utils/log";
+import {Compiler} from "impl/compiler";
+import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
+import {CLI} from "utils/cli";
+import {Bundler} from "impl/bundler";
 
 export async function tstoolMain(){
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
@@ -29,12 +28,11 @@ export async function tstoolMain(){
 
 	let config = updateCliArgsWithTsconfig(cliArgs);
 	let compiler = new Compiler(config);
+	let bundler = new Bundler(compiler);
 
 	if(!config.watchMode){
 		await compiler.runSingle();
-		let bundler = new Bundler(compiler);
-		let bundle = await bundler.produceBundle();
-		await writeTextFile(config.outFile, bundle);
+		await bundler.produceBundle();
 	} else {
 		await compiler.startWatch();
 		if(config.useStdio){

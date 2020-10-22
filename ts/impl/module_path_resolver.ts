@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import {getRelativeModulePath, stripTsExt} from "path_utils";
-import {Compiler} from "compiler";
+import {stripTsExt} from "utils/path_utils";
+import {Compiler} from "impl/compiler";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
 export class ModulePathResolver {
@@ -44,4 +44,12 @@ export class ModulePathResolver {
 		return "/" + getRelativeModulePath(this.moduleRoot, absPath);
 	}
 
+}
+
+function normalizeModulePath(p: string): string {
+	return p.replace(/\\/g, "/");
+}
+
+function getRelativeModulePath(startAt: string, relModulePath: string): string {
+	return normalizeModulePath(path.relative(startAt, relModulePath));
 }

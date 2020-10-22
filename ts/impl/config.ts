@@ -1,9 +1,9 @@
-import {CLI} from "cli";
+import {CLI} from "utils/cli";
 import * as path from "path";
 import * as tsc from "typescript";
-import {logErrorAndExit, logError} from "log";
-import {processTypescriptDiagnostics} from "tsc_diagnostics";
-import {isPathNested} from "path_utils";
+import {logErrorAndExit, logError} from "utils/log";
+import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
+import {isPathNested} from "utils/path_utils";
 
 /** Опции, которые можно передать тулу через командную строку */
 export interface TSToolCLIArgs {

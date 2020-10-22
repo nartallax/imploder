@@ -1,5 +1,5 @@
-import {ModuleMetadataStorage} from "module_meta_storage";
-import {SeqSet} from "seq_set";
+import {ModuleMetadataStorage} from "impl/module_meta_storage";
+import {SeqSet} from "utils/seq_set";
 
 /** упорядочиватель файлов-результатов компиляции. определяет порядок их размещения в бандле */
 export class ModuleOrderer {

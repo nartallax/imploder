@@ -1,0 +1,19 @@
+{ 
+    "tstoolConfig": {
+        "entryModule": "main.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "noLoaderCode": true,
+        "minify": true,
+		"target": "ES2018",
+		"watchMode": true
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["*"]
+        }
+    }
+}

@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 
 function wrap<T>(call: (callback: (err: Error | NodeJS.ErrnoException | null, res: T) => void) => void | Promise<void>): Promise<T>{
 	return new Promise<T>(async (ok, bad) => {
@@ -64,4 +65,47 @@ export function unlinkRecursive(fsEntryPath: string): Promise<void>{
 		}
 		cb(null);
 	});
+}
+
+export function withTempDir<T>(prefix: string, action: (path: string) => T | Promise<T>): Promise<T>{
+	return new Promise((ok, bad) => {
+		fs.mkdtemp(path.join(os.tmpdir(), prefix), async (err, dir) => {
+			if(err){
+				bad(err);
+				return;
+			}
+
+			try {
+				ok(await Promise.resolve(action(dir)));
+			} catch(e){
+				bad(e);
+			} finally {
+				await unlinkRecursive(dir);
+			}
+
+		})
+	})
+	
+}
+
+export function copyFile(src: fs.PathLike, dest: fs.PathLike): Promise<void>{
+	return wrap<void>(cb => fs.copyFile(src, dest, err => cb(err)));
+}
+
+export function copyDir(src: string, dest: string): Promise<void>{
+	return wrap<void>(async cb => {
+		let st = await stat(src);
+		if(st.isDirectory()){
+			let list = await readdir(src);
+			if(!(await fileExists(dest))){
+				await mkdir(dest);
+			}
+			await Promise.all(list.map(name => {
+				return copyDir(path.join(src, name), path.join(dest, name));
+			}));
+		} else {
+			await copyFile(src, dest);
+		}
+		cb(null);
+	})
 }

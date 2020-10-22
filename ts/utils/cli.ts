@@ -1,4 +1,4 @@
-import {logError} from "log";
+import {logError} from "utils/log";
 
 type ErrorHandler = (e: Error) => never;
 type HelpShower = (lines: string[]) => void;

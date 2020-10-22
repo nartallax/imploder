@@ -1,5 +1,4 @@
-import {OMap} from "utils";
-import {logDebug} from "log";
+import {logDebug} from "utils/log";
 
 export interface ModuleMeta {
 	// множество имен модулей, от которых зависит данный (как amd-зависимости)
@@ -33,7 +32,7 @@ export interface ModuleMeta {
 /** хранилище метаданных о модулях */
 export class ModuleMetadataStorage {
 
-	private readonly data: OMap<ModuleMeta> = {};
+	private readonly data: { [k: string]: ModuleMeta } = {};
 
 	set(name: string, data: ModuleMeta){
 		logDebug("Got info on " + name + " module: " + JSON.stringify(data));

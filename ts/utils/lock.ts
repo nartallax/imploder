@@ -1,4 +1,4 @@
-import {Queue} from "queue"
+import {Queue} from "utils/queue"
 
 export class Lock {
 	private lockLevel = 0

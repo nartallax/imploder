@@ -1,5 +1,5 @@
 import * as tsc from "typescript";
-import {logError, logWarn, logInfo} from "log";
+import {logError, logWarn, logInfo} from "utils/log";
 
 export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 	let msg: (string | null)[] = [];

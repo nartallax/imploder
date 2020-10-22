@@ -1,7 +1,7 @@
 import {AbstractTransformer} from "./abstract_transformer";
 import * as tsc from "typescript";
-import {ModuleMetadataStorage, ModuleMeta} from "module_meta_storage";
-import {ModulePathResolver} from "module_path_resolver";
+import {ModuleMetadataStorage, ModuleMeta} from "impl/module_meta_storage";
+import {ModulePathResolver} from "impl/module_path_resolver";
 
 export class AfterJsBundlerTransformer extends AbstractTransformer {
 

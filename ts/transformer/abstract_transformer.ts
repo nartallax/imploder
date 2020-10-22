@@ -1,6 +1,6 @@
 import * as tsc from "typescript";
-import {ModulePathResolver} from "module_path_resolver";
-import {stripTsExt} from "path_utils";
+import {ModulePathResolver} from "impl/module_path_resolver";
+import {stripTsExt} from "utils/path_utils";
 
 export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.Node[]}
 

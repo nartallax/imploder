@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
-import {ModulePathResolver} from "../module_path_resolver";
-import {logDebug, logErrorAndExit, logWarn} from "log";
-import {ModuleMetadataStorage, ModuleMeta} from "module_meta_storage";
+import {ModulePathResolver} from "../impl/module_path_resolver";
+import {logDebug, logErrorAndExit, logWarn} from "utils/log";
+import {ModuleMetadataStorage, ModuleMeta} from "impl/module_meta_storage";
 import {AbstractTransformer} from "./abstract_transformer";
 
 export class BeforeJsBundlerTransformer extends AbstractTransformer {

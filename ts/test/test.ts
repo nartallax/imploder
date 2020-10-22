@@ -1,10 +1,11 @@
 import * as path from "path";
 import * as fs from "fs";
-import {Compiler} from "compiler";
-import {logInfo, logError} from "log";
+import {Compiler} from "impl/compiler";
+import {logInfo, logError} from "utils/log";
 import {testListStr} from "generated/test_list_str";
-import {fileExists, unlinkRecursive} from "afs";
-import {getFullConfigFromCliArgs} from "config";
+import {fileExists, unlinkRecursive} from "utils/afs";
+import {getFullConfigFromCliArgs} from "impl/config";
+import {Bundler} from "impl/bundler";
 
 class TestProject {
 
@@ -153,12 +154,14 @@ class TestProject {
 	}
 
 	async run(): Promise<boolean> {
-		logInfo("Running test for " + this.name);
+		logInfo("Running test project: " + this.name);
 		await this.rmOutDir();
 		let err: Error | null = null;
 
 		try {
 			await this.compiler.runSingle();
+			let bundler = new Bundler(this.compiler);
+			await bundler.produceBundle();
 		} catch(e){
 			err = e;
 		}
@@ -193,8 +196,7 @@ class TestProject {
 const knownTestNames: ReadonlyArray<string> = testListStr
 	.split("\n")
 	.map(_ => _.trim())
-	.filter(_ => !!_)
-	.filter(_ => _ !== "proj_synth")
+	.filter(_ => !!_ && _ !== "watch")
 
 export async function runAllTests(){
 	logInfo("Running all tests.");

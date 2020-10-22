@@ -1,13 +1,13 @@
 import * as tsc from "typescript";
-import {Compiler} from "compiler";
-import {ModuleOrderer} from "module_orderer";
+import {Compiler} from "impl/compiler";
+import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
-import {logDebug} from "log";
+import {logDebug} from "utils/log";
 import * as path from "path";
-import {readTextFile, stat} from "afs";
+import {readTextFile, stat, writeTextFile} from "utils/afs";
 import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
-import {stripTsExt} from "path_utils";
-import {minifyJsCode, MinifierOptions} from "minification";
+import {stripTsExt} from "utils/path_utils";
+import {minifyJsCode, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
 
 /** сборщик бандл-файла из кучи исходников */
@@ -19,7 +19,14 @@ export class Bundler {
 		this.compiler = compiler;
 	}
 
-	async produceBundle(): Promise<string>{
+	/** собрать бандл, положить в outFile, указанный в конфиге */
+	async produceBundle(): Promise<void>{
+		let code = await this.assembleBundleCode();
+		await writeTextFile(this.compiler.config.outFile, code);
+	}
+
+	/** собрать бандл, выдать в виде строки */
+	async assembleBundleCode(): Promise<string>{
 		let result = [] as string[];
 		if(!this.compiler.config.noLoaderCode){
 			result.push(await this.getPrefixCode());

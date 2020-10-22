@@ -1,15 +1,15 @@
 import * as tsc from "typescript";
-import {TSToolConfig} from "config";
+import {TSToolConfig} from "impl/config";
 import * as path from "path";
 import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
-import {ModuleMetadataStorage} from "module_meta_storage";
-import {Bundler} from "bundler";
-import {unlinkRecursive, fileExists, mkdir} from "afs";
-import {ModulePathResolver} from "module_path_resolver";
+import {ModuleMetadataStorage} from "impl/module_meta_storage";
+import {Bundler} from "impl/bundler";
+import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
+import {ModulePathResolver} from "impl/module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
-import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "tsc_diagnostics";
-import {logInfo, logError, logDebug, logWarn} from "log";
-import {Lock} from "lock";
+import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "utils/tsc_diagnostics";
+import {logInfo, logError, logDebug, logWarn} from "utils/log";
+import {Lock} from "utils/lock";
 
 /*
 Полезные доки и примеры: 
