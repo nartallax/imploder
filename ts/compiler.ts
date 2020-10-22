@@ -8,28 +8,30 @@ import {unlinkRecursive, fileExists, mkdir} from "afs";
 import {ModulePathResolver} from "module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
 import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "tsc_diagnostics";
-import {logInfo, logErrorAndExit} from "log";
+import {logInfo, logError, logDebug, logWarn} from "log";
+import {Lock} from "lock";
 
 /*
 Полезные доки и примеры: 
 https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
 https://basarat.gitbook.io/typescript/overview/
 https://www.typescriptlang.org/docs/handbook/module-resolution.html
+https://stackoverflow.com/questions/62026189/typescript-custom-transformers-with-ts-createwatchprogram
 */
 
-type MergedTscConfig = tsc.ParsedCommandLine & { rootNames: string[] }
-
+/** обертка над компилятором tsc */
 export class Compiler {
 
 	readonly config: TSToolConfig;
-	private readonly tscMergedConfig: MergedTscConfig;
+	private readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
 	private readonly transformers: tsc.CustomTransformerFactory[];
 	readonly metaStorage: ModuleMetadataStorage;
 	readonly bundler: Bundler;
+	readonly buildLock = new Lock();
 
 	constructor(config: TSToolConfig, transformers: tsc.CustomTransformerFactory[] = []){
 		this.config = config;
-		this.tscMergedConfig = {
+		this.tscConfig = {
 			...config.tscParsedCommandLine,
 			rootNames: [path.resolve(path.dirname(config.tsconfigPath), config.entryModule)]
 		}
@@ -51,19 +53,18 @@ export class Compiler {
 		}
 	}
 
-	private _proj: tsc.BuildInvalidedProject<tsc.BuilderProgram> | null = null;
+	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
 	private _program: tsc.Program | null = null;
+	private _builderProgram: tsc.BuilderProgram | null = null;
 	get program(): tsc.Program {
 		if(this._program){
 			return this._program;
 		}
-		if(this._proj){
-			let prog = this._proj.getProgram();
-			if(!prog){
-				// what? why?
-				logErrorAndExit("There is no program returned in watchmode.");
-			}
-			return prog;
+		if(this._watch){
+			return this._watch.getProgram().getProgram();
+		}
+		if(this._builderProgram){
+			return this._builderProgram.getProgram();
 		}
 		throw new Error("Compiler not started in any of available modes.");
 	}
@@ -79,7 +80,7 @@ export class Compiler {
 	private _modulePathResolver: ModulePathResolver | null = null;
 	get modulePathResolver(){
 		if(this._modulePathResolver === null){
-			this._modulePathResolver = new ModulePathResolver(this.config.tsconfigPath, this.tscMergedConfig.options, this);
+			this._modulePathResolver = new ModulePathResolver(this.config.tsconfigPath, this.tscConfig.options, this);
 		}
 		return this._modulePathResolver;
 	}
@@ -87,39 +88,6 @@ export class Compiler {
 	private _errorCount: number = 0;
 	get isInSuccessfulState(): boolean {
 		return this._errorCount === 0;
-	}
-
-	private isCompiling = false;
-	private filesChangedSinceLastCompile = 0;
-
-	private compileEndWaiters: (() => void)[] = [];
-	waitCompileEnd(): Promise<void>{
-		if(!this.isCompiling && this.filesChangedSinceLastCompile < 1){
-			return Promise.resolve();
-		} else {
-			return new Promise(ok => this.compileEndWaiters.push(ok));
-		}
-	}
-
-	private startCompileLog(sourcePath?: string){
-		if(this.filesChangedSinceLastCompile === 0){
-			logInfo(`Compilation starting: change detected${sourcePath !== undefined? " (in " + sourcePath + ")": ""}`);
-		}
-	}
-
-	private endCompile(){
-		let wasCompiling = this.isCompiling;
-		this.isCompiling = false;
-		if(this.filesChangedSinceLastCompile < 1){
-			if(wasCompiling){
-				logInfo(`Compilation ended (errors: ${this._errorCount})`);
-			}
-			let waiters = this.compileEndWaiters;
-			this.compileEndWaiters = [];
-			waiters.forEach(watcher => watcher());
-		} else {
-			logInfo(`Compilation ended, but soon new will start (unprocessed changes: ${this.filesChangedSinceLastCompile})`);
-		}
 	}
 
 	private createTransformers(): tsc.CustomTransformers {
@@ -134,79 +102,151 @@ export class Compiler {
 		}
 	}
 
+	// создать экземпляр tsc.System для работы в вотчмоде
+	private createSystemForWatch(onFsChange: (path: string) => void): tsc.System {
+		const watchFile = tsc.sys.watchFile;
+		const watchDir = tsc.sys.watchDirectory;
+		let watchFileCallback: ((path: string, kind: tsc.FileWatcherEventKind) => void) | null = null;
 
-	async startWatch(){
-		await this.beforeStart();
-
-		let system: tsc.System = {
+		return {
 			...tsc.sys,
 			readFile: (filePath, encoding) => {
+				// это такой способ прокидывать конфиг в tsc
+				// просто позволить прочесть tsc имеющийся конфиг нельзя, мы его меняли
+				// но и в какие-либо из используемых классов этот конфиг прокинуть нельзя
+				// поэтому перехватываем чтение здесь
 				if(path.resolve(filePath) === this.config.tsconfigPath){
-					// TODO: test for enum values; that is, "target"
-					console.log(JSON.stringify(this.config.tscParsedCommandLine.raw, null, 4));
 					return JSON.stringify(this.config.tscParsedCommandLine.raw);
 				}
 				return tsc.sys.readFile(filePath, encoding);
+			},
+			watchFile: !watchFile? undefined:
+				(path: string, callback: tsc.FileWatcherCallback, pollingInterval?: number, options?: tsc.WatchOptions) => {
+					watchFileCallback = callback;
+					return watchFile(path, (fileName, kind) => {
+						callback(fileName, kind);
+						onFsChange(fileName);
+					}, pollingInterval, options)
+			},
+			watchDirectory: !watchDir? undefined: 
+				(path: string, callback: tsc.DirectoryWatcherCallback, recursive?: boolean, options?: tsc.WatchOptions) => {
+					return watchDir(path, (fileName: string) => {
+						if(watchFileCallback){
+							// при изменении только директории рекомпиляции почему-то не происходит
+							// поэтому мы дергаем еще и за этот коллбек, чтобы она произошла
+							watchFileCallback(fileName, tsc.FileWatcherEventKind.Changed);
+						}
+						callback(fileName);
+						onFsChange(fileName);
+					}, recursive, options)
 			}
 		}
+	}
 
-		let host = tsc.createSolutionBuilderWithWatchHost(
-			system, 
+	private createWatchHost(system: tsc.System, startCompile: () => void, endCompile: (errCount: number) => void){
+		let transformers = this.createTransformers();
+
+		// зачем такие сложности, с созданием двух хостов?
+		// первый хост нужен для того, чтобы вызывать на нем createProgram
+		// смысл в том, что обычно createProgram будет чем-то вроде createEmitAndSemanticDiagnosticsBuilderProgram
+		// но я не хочу это хардкодить. поэтому я получаю её таким вот непрямым путем
+		// в худшем случае, при изменениях тул перестанет компилиться/работать
+		let defaultHost = tsc.createWatchCompilerHost(
+			this.config.tsconfigPath,
+			this.tscConfig.options,
+			system,
 			undefined,
-			diag => {
-				console.log("DIAG A");
-				processTypescriptDiagnosticEntry(diag);
-			}, 
-			diag => {
-				console.log("DIAG B");
-				processTypescriptDiagnosticEntry(diag);
-			},
-			(diagnostic: tsc.Diagnostic, newLine: string, options: tsc.CompilerOptions, errorCount?: number) =>{
-				console.log("WATCHSTATUS: ERRORS = " + errorCount);
-				void newLine;
-				void options;
+			processTypescriptDiagnosticEntry, // errors are reported through here
+			(diagnostic: tsc.Diagnostic) => {
+				logError("DEFAULT HOST EMITTED DIAG!");
 				processTypescriptDiagnosticEntry(diagnostic);
 			}
+		)
+
+		return tsc.createWatchCompilerHost(
+			this.config.tsconfigPath,
+			this.tscConfig.options,
+			system,
+			(rootNames, options, host, oldProgram, configFileParsingDiagnostics, projectReferences) => {
+				// подменять createProgram нужно для того, чтобы можно было подсовывать произвольные трансформеры в его emit
+				let result = defaultHost.createProgram(rootNames, options, host, oldProgram, configFileParsingDiagnostics, projectReferences);
+				let origEmit = result.emit;
+				this._builderProgram = result;
+				result.emit = (targetSourceFile, writeFile, cancellationToken, emitOnlyDtsFiles, customTransformers) => {
+					return origEmit.call(result, 
+						targetSourceFile,
+						writeFile,
+						cancellationToken,
+						emitOnlyDtsFiles,
+						!customTransformers? transformers: {
+							before: [ ...(customTransformers.before || []), ...(transformers.before || []) ],
+							after: [ ...(customTransformers.after || []), ...(transformers.after || [])],
+							afterDeclarations: [ ...(customTransformers.afterDeclarations || []), ...(transformers.afterDeclarations || []) ],
+						}
+					)
+				}
+				return result;
+			},
+			processTypescriptDiagnosticEntry, // errors are reported through here
+			(d, _, __, errorCount?: number) => {
+				if(d.code === 6031 || d.code === 6032){
+					startCompile();
+				} else if(d.code === 6193 || d.code === 6194){
+					endCompile(errorCount === undefined? -1: errorCount);
+				} else {
+					processTypescriptDiagnosticEntry(d);
+				}
+			}
 		);
+	}
 
-		let builder = tsc.createSolutionBuilderWithWatch(host, [path.dirname(this.tscMergedConfig.options.outDir as string)], { incremental: false }, {});
+	/** запуститься в вотчмоде */
+	async startWatch(){
+		await this.beforeStart();
 
-		void this.startCompileLog;
-		void this.endCompile;
-		void builder;
+		let filesChanged = 0;
 
-		let proj = builder.getNextInvalidatedProject();
-
-		if(!proj){
-			logErrorAndExit("Got no project for initial compilation.");
+		let startCompile = () => {			
+			filesChanged = 0;
+			logDebug("Build started.");
 		}
 
-		if(proj.kind !== tsc.InvalidatedProjectKind.Build){
-			logErrorAndExit("Wrong initial compilation project kind: " + tsc.InvalidatedProjectKind[proj.kind]);
+		let endCompile = (errorCount: number) => {
+			this._errorCount = errorCount;
+			if(filesChanged !== 0){
+				logInfo(`Build ended, errors: ${errorCount} (but soon new one will start, files changed since build start = ${filesChanged})`);
+			} else {
+				(errorCount !== 0? logWarn: logDebug)(`Build ended, errors: ${errorCount}`);
+				this.buildLock.unlock();
+				logDebug("Lock level " + this.buildLock.getLockLevel());
+			}
 		}
 
-		this._proj = proj;
-		let program = proj.getProgram();
-		if(!program){
-			throw new Error("No program get from initial project.");
-		}
-		this._host = tsc.createCompilerHost(program.getCompilerOptions());
-		let transformers = this.createTransformers();
-		console.log("EMITTING");
-		proj.emit(undefined, undefined, undefined, undefined, transformers)
-		console.log("BUILDING");
+		let system: tsc.System = this.createSystemForWatch(fsObjectChangedPath => {
+			logDebug("FS watcher change: " + fsObjectChangedPath);
+			if(filesChanged === 0){
+				this.buildLock.lock();
+				logDebug("Lock level " + this.buildLock.getLockLevel());
+			}
+			filesChanged++;
+		});
 
-		builder.build();
-		console.log("DONE");
+		let watchHost = this.createWatchHost(system, startCompile, endCompile);
+
+		this._host = tsc.createCompilerHost(this.tscConfig.options);
+		this.buildLock.lock();
+		this._watch = tsc.createWatchProgram(watchHost);
+
+		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 	}
 
 	/** Запуститься для разовой компиляции */
 	async runSingle(){
 		await this.beforeStart();
 
-		this._host = tsc.createCompilerHost(this.tscMergedConfig.options);
+		this._host = tsc.createCompilerHost(this.tscConfig.options);
 		this._program = tsc.createProgram({
-			...this.tscMergedConfig,
+			...this.tscConfig,
 			host: this._host
 		});
 		

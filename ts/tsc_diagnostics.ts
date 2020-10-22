@@ -17,7 +17,6 @@ export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 	
 	msg.push(tsc.DiagnosticCategory[d.category] + ":")
 	msg.push(tsc.flattenDiagnosticMessageText(d.messageText, '\n'));
-	// why do I need code? maybe for something very specific. will comment it out yet
 	//msg.push(d.code.toString());
 
 	let msgString = msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
