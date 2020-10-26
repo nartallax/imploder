@@ -102,14 +102,6 @@ export class Compiler {
 	private createSystemForWatch(): tsc.System {
 		const watchFile = tsc.sys.watchFile;
 		const watchDir = tsc.sys.watchDirectory;
-		/*
-		let watchFileCallback: ((path: string, kind: tsc.FileWatcherEventKind) => void) | null = null;
-
-		const triggerRebuild = () => {
-			// несколько кривое решение, но оно работает
-			watchFileCallback && watchFileCallback(path.dirname(this.config.tsconfigPath), tsc.FileWatcherEventKind.Changed);
-		}
-		*/
 
 		return {
 			...tsc.sys,
@@ -125,7 +117,6 @@ export class Compiler {
 			},
 			watchFile: !watchFile? undefined:
 				(path: string, callback: tsc.FileWatcherCallback, pollingInterval?: number, options?: tsc.WatchOptions) => {
-					//watchFileCallback = callback;
 					let watcher = watchFile(path, (fileName, kind) => {
 						let module = this.modulePathResolver.getCanonicalModuleName(fileName);
 						this.metaStorage.deleteModule(module);
@@ -140,9 +131,9 @@ export class Compiler {
 				(path: string, callback: tsc.DirectoryWatcherCallback, recursive?: boolean, options?: tsc.WatchOptions) => {
 					let watcher = watchDir(path, (fileName: string) => {
 						if(this._watch){
-							// при изменении только директории рекомпиляции почему-то не происходит
-							//triggerRebuild();
 							callback(fileName);
+							// не берем здесь лок, т.к. за изменением только директории не всегда следует компиляция
+							// если мы возьмем здесь лок из-за изменений файлов, то потом разлочимся неизвестно когда
 							//this.notifyFsObjectChange(fileName);
 						}
 					}, recursive, options);
@@ -204,7 +195,7 @@ export class Compiler {
 			},
 			diag => {
 				this.lastBuildDiag.push(diag);
-				if(!this.config.noErrorLogging){
+				if(!this.config.noBuildDiagnosticMessages){
 					processTypescriptDiagnosticEntry(diag);
 				}
 			},

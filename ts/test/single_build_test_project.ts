@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import {Compiler} from "impl/compiler";
-import {logInfo, logError} from "utils/log";
+import {logError} from "utils/log";
 import {fileExists, unlinkRecursive} from "utils/afs";
 import {getFullConfigFromCliArgs} from "impl/config";
 import {Bundler} from "impl/bundler";
@@ -106,7 +106,6 @@ export class SingleBuildTestProject {
 	}
 
 	async run(): Promise<boolean> {
-		logInfo("Running test project: " + this.name);
 		await this.rmOutDir();
 		let err: Error | null = null;
 

@@ -3,7 +3,7 @@ import {Compiler} from "impl/compiler";
 import * as path from "path";
 import {getFullConfigFromCliArgs} from "impl/config";
 import {Bundler} from "impl/bundler";
-import {logErrorAndExit, logInfo} from "utils/log";
+import {logErrorAndExit} from "utils/log";
 import {runTestBundle, testProjectDir} from "./test_project_utils";
 
 async function assertFileEquals(testedPath: string, goodPath: string): Promise<string> {
@@ -62,7 +62,7 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 
 			await copyDir(testProjectDir("watch"), projDir);
 			let config = getFullConfigFromCliArgs(["--tsconfig", path.join(projDir, "./tsconfig.json")])
-			config.noErrorLogging = true;
+			config.noBuildDiagnosticMessages = true;
 			let compiler = new Compiler(config);
 			let bundler = new Bundler(compiler);
 			await compiler.startWatch();
@@ -87,10 +87,8 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 			compiler.stopWatch();
 			await compiler.buildLock.withLock(() => {});
 
-			//FIXME: на время написания теста
-			void logInfo;
 			void logErrorAndExit;
-			logErrorAndExit("STOP " + projDir);
+			//logErrorAndExit("STOP " + projDir);
 		});
 
 		return true;

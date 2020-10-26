@@ -59,6 +59,7 @@ export async function runSingleTest(name: string){
 async function runTest(name: string): Promise<boolean> {
 	for(let tester of allKnownTesters){
 		if(tester.couldRunTest(name)){
+			logInfo("Running test: " + name);
 			try {
 				return await Promise.resolve(tester.runTest(name));
 			} catch(e){

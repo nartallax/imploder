@@ -16,7 +16,7 @@ export interface TSToolCLIArgs {
 }
 
 /** Содержимое блока tstoolConfig внутри tsconfig.json
- * обязательные поля - только entryModule, entryFunction, outFile. target рекомендуется выставить
+ * обязательные поля - только entryModule, entryFunction, outFile, target
 */
 export interface TsconfigTSToolInclusion extends TSToolProfile {
 	profiles?: { [profileName: string]: TSToolProfile }
@@ -27,6 +27,7 @@ export interface TSToolProfile {
 	entryModule: string;
 	entryFunction: string;
 	outFile: string;
+	target: keyof typeof tsc.ScriptTarget;
 	errorHandlerName?: string;
 	amdRequireName: string;
 	commonjsRequireName: string;
@@ -34,13 +35,12 @@ export interface TSToolProfile {
 	noLoaderCode: boolean;
 	minify: boolean;
 	watchMode: boolean;
-	target: keyof typeof tsc.ScriptTarget;
 	embedTslib?: boolean;
 	preserveOutDir?: boolean;
 	useStdio?: boolean;
 	httpPort?: number;
 	verbose?: boolean;
-	noErrorLogging?: boolean;
+	noBuildDiagnosticMessages?: boolean;
 }
 
 /** Конфиг всего тула в целом */
