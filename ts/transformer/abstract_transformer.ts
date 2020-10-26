@@ -76,7 +76,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 	}
 
 	protected moduleNameByNode(fileNode: tsc.SourceFile): string {
-		return stripTsExt(this.resolver.getAbsoluteModulePath(fileNode.fileName));
+		return stripTsExt(this.resolver.getCanonicalModuleName(fileNode.fileName));
 	}
 
 }

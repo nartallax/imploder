@@ -22,7 +22,10 @@ export class Queue<T>{
 		}
 
 		let oldHead = this.head;
-		this.head = oldHead.next;
+		this.head = oldHead.next
+		if(oldHead.next === null){
+			this.tail = null;
+		}
 		return oldHead.value;
 	}
 }

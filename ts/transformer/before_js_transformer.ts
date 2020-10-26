@@ -15,7 +15,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 
 	transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
 		let moduleName = this.moduleNameByNode(fileNode);
-		logDebug("Visiting " + this.resolver.getAbsoluteModulePath(fileNode.fileName) + " as module " + moduleName)
+		logDebug("Visiting " + this.resolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
 
 		let meta: ModuleMeta = {
 			dependencies: [],

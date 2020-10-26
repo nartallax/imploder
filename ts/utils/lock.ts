@@ -13,10 +13,10 @@ export class Lock {
 	}
 
 	unlock(): void{
-		this.lockLevel--;			
 		if(!this.waiters.isEmpty()){
-			this.lockLevel++;
 			this.waiters.dequeue()();
+		} else {
+			this.lockLevel--;
 		}
 	}
 

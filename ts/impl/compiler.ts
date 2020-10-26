@@ -3,7 +3,6 @@ import {TSToolConfig} from "impl/config";
 import * as path from "path";
 import {BeforeJsBundlerTransformer} from "transformer/before_js_transformer";
 import {ModuleMetadataStorage} from "impl/module_meta_storage";
-import {Bundler} from "impl/bundler";
 import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
 import {ModulePathResolver} from "impl/module_path_resolver";
 import {AfterJsBundlerTransformer} from "transformer/after_js_transformer";
@@ -26,7 +25,6 @@ export class Compiler {
 	private readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
 	private readonly transformers: tsc.CustomTransformerFactory[];
 	readonly metaStorage: ModuleMetadataStorage;
-	readonly bundler: Bundler;
 	readonly buildLock = new Lock();
 
 	constructor(config: TSToolConfig, transformers: tsc.CustomTransformerFactory[] = []){
@@ -36,7 +34,6 @@ export class Compiler {
 			rootNames: [path.resolve(path.dirname(config.tsconfigPath), config.entryModule)]
 		}
 		this.transformers = transformers;
-		this.bundler = new Bundler(this);
 		this.metaStorage = new ModuleMetadataStorage();
 	}
 
@@ -85,9 +82,8 @@ export class Compiler {
 		return this._modulePathResolver;
 	}
 
-	private _errorCount: number = 0;
 	get isInSuccessfulState(): boolean {
-		return this._errorCount === 0;
+		return this._errorCount === 0
 	}
 
 	private createTransformers(): tsc.CustomTransformers {
@@ -103,10 +99,17 @@ export class Compiler {
 	}
 
 	// создать экземпляр tsc.System для работы в вотчмоде
-	private createSystemForWatch(onFsChange: (path: string) => void): tsc.System {
+	private createSystemForWatch(): tsc.System {
 		const watchFile = tsc.sys.watchFile;
 		const watchDir = tsc.sys.watchDirectory;
+		/*
 		let watchFileCallback: ((path: string, kind: tsc.FileWatcherEventKind) => void) | null = null;
+
+		const triggerRebuild = () => {
+			// несколько кривое решение, но оно работает
+			watchFileCallback && watchFileCallback(path.dirname(this.config.tsconfigPath), tsc.FileWatcherEventKind.Changed);
+		}
+		*/
 
 		return {
 			...tsc.sys,
@@ -122,28 +125,33 @@ export class Compiler {
 			},
 			watchFile: !watchFile? undefined:
 				(path: string, callback: tsc.FileWatcherCallback, pollingInterval?: number, options?: tsc.WatchOptions) => {
-					watchFileCallback = callback;
-					return watchFile(path, (fileName, kind) => {
-						callback(fileName, kind);
-						onFsChange(fileName);
-					}, pollingInterval, options)
+					//watchFileCallback = callback;
+					let watcher = watchFile(path, (fileName, kind) => {
+						let module = this.modulePathResolver.getCanonicalModuleName(fileName);
+						this.metaStorage.deleteModule(module);
+						if(this._watch){
+							callback(fileName, kind);
+							this.notifyFsObjectChange(fileName);
+						}
+					}, pollingInterval, options);
+					return watcher;
 			},
 			watchDirectory: !watchDir? undefined: 
 				(path: string, callback: tsc.DirectoryWatcherCallback, recursive?: boolean, options?: tsc.WatchOptions) => {
-					return watchDir(path, (fileName: string) => {
-						if(watchFileCallback){
+					let watcher = watchDir(path, (fileName: string) => {
+						if(this._watch){
 							// при изменении только директории рекомпиляции почему-то не происходит
-							// поэтому мы дергаем еще и за этот коллбек, чтобы она произошла
-							watchFileCallback(fileName, tsc.FileWatcherEventKind.Changed);
+							//triggerRebuild();
+							callback(fileName);
+							//this.notifyFsObjectChange(fileName);
 						}
-						callback(fileName);
-						onFsChange(fileName);
-					}, recursive, options)
+					}, recursive, options);
+					return watcher;
 			}
 		}
 	}
 
-	private createWatchHost(system: tsc.System, startCompile: () => void, endCompile: (errCount: number) => void){
+	private createWatchHost(system: tsc.System){
 		let transformers = this.createTransformers();
 
 		// зачем такие сложности, с созданием двух хостов?
@@ -156,7 +164,7 @@ export class Compiler {
 			this.tscConfig.options,
 			system,
 			undefined,
-			processTypescriptDiagnosticEntry, // errors are reported through here
+			processTypescriptDiagnosticEntry,
 			(diagnostic: tsc.Diagnostic) => {
 				logError("DEFAULT HOST EMITTED DIAG!");
 				processTypescriptDiagnosticEntry(diagnostic);
@@ -173,26 +181,38 @@ export class Compiler {
 				let origEmit = result.emit;
 				this._builderProgram = result;
 				result.emit = (targetSourceFile, writeFile, cancellationToken, emitOnlyDtsFiles, customTransformers) => {
-					return origEmit.call(result, 
-						targetSourceFile,
-						writeFile,
-						cancellationToken,
-						emitOnlyDtsFiles,
-						!customTransformers? transformers: {
-							before: [ ...(customTransformers.before || []), ...(transformers.before || []) ],
-							after: [ ...(customTransformers.after || []), ...(transformers.after || [])],
-							afterDeclarations: [ ...(customTransformers.afterDeclarations || []), ...(transformers.afterDeclarations || []) ],
-						}
-					)
+					this.startBuild();
+					let res: tsc.EmitResult;
+					try {
+						res = origEmit.call(result, 
+							targetSourceFile,
+							writeFile,
+							cancellationToken,
+							emitOnlyDtsFiles,
+							!customTransformers? transformers: {
+								before: [ ...(customTransformers.before || []), ...(transformers.before || []) ],
+								after: [ ...(customTransformers.after || []), ...(transformers.after || [])],
+								afterDeclarations: [ ...(customTransformers.afterDeclarations || []), ...(transformers.afterDeclarations || []) ],
+							}
+						)
+					} finally {
+						this.endBuild();
+					}
+					return res;
 				}
 				return result;
 			},
-			processTypescriptDiagnosticEntry, // errors are reported through here
-			(d, _, __, errorCount?: number) => {
+			diag => {
+				this.lastBuildDiag.push(diag);
+				if(!this.config.noErrorLogging){
+					processTypescriptDiagnosticEntry(diag);
+				}
+			},
+			(d, _, __, ___) => {
 				if(d.code === 6031 || d.code === 6032){
-					startCompile();
+					// build started, skipping
 				} else if(d.code === 6193 || d.code === 6194){
-					endCompile(errorCount === undefined? -1: errorCount);
+					// build ended, skipping
 				} else {
 					processTypescriptDiagnosticEntry(d);
 				}
@@ -200,44 +220,65 @@ export class Compiler {
 		);
 	}
 
+	private hasFileChangesLock = false;
+	private filesChanged = 0;
+	private _errorCount = 0;
+	private lastBuildDiag = [] as tsc.Diagnostic[]
+	private startBuild(){
+		this.buildLock.lock();
+		this.lastBuildDiag = [];
+		this.filesChanged = 0;
+		logDebug("Build started.");
+	}
+
+	getLastBuildDiagnostics(): ReadonlyArray<tsc.Diagnostic>{
+		return this.lastBuildDiag;
+	}
+
+	private endBuild(){
+		let errorCount = this._errorCount = this.lastBuildDiag.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
+		if(this.filesChanged !== 0){
+			logInfo(`Build ended, errors: ${errorCount} (but soon new one will start, files changed since build start = ${this.filesChanged})`);
+		} else {
+			(errorCount !== 0? logWarn: logDebug)(`Build ended, errors: ${errorCount}`);
+			this.buildLock.unlock();
+			if(this.hasFileChangesLock){
+				this.hasFileChangesLock = false;
+				this.buildLock.unlock();
+			}
+			logDebug("Lock level after build end: " + this.buildLock.getLockLevel());
+		}
+	}
+
+	private notifyFsObjectChange(fsObjectChangedPath: string): void {
+		logDebug("FS object change: " + fsObjectChangedPath);
+		if(this.filesChanged === 0 && !this.hasFileChangesLock){
+			this.buildLock.lock();
+			this.hasFileChangesLock = true;
+			logDebug("Lock level on FS object change: " + this.buildLock.getLockLevel());
+		}
+		this.filesChanged++;
+	}
+
 	/** запуститься в вотчмоде */
 	async startWatch(){
 		await this.beforeStart();
 
-		let filesChanged = 0;
-
-		let startCompile = () => {			
-			filesChanged = 0;
-			logDebug("Build started.");
-		}
-
-		let endCompile = (errorCount: number) => {
-			this._errorCount = errorCount;
-			if(filesChanged !== 0){
-				logInfo(`Build ended, errors: ${errorCount} (but soon new one will start, files changed since build start = ${filesChanged})`);
-			} else {
-				(errorCount !== 0? logWarn: logDebug)(`Build ended, errors: ${errorCount}`);
-				this.buildLock.unlock();
-				logDebug("Lock level " + this.buildLock.getLockLevel());
-			}
-		}
-
-		let system: tsc.System = this.createSystemForWatch(fsObjectChangedPath => {
-			logDebug("FS watcher change: " + fsObjectChangedPath);
-			if(filesChanged === 0){
-				this.buildLock.lock();
-				logDebug("Lock level " + this.buildLock.getLockLevel());
-			}
-			filesChanged++;
-		});
-
-		let watchHost = this.createWatchHost(system, startCompile, endCompile);
-
+		let system = this.createSystemForWatch();
+		let watchHost = this.createWatchHost(system);
 		this._host = tsc.createCompilerHost(this.tscConfig.options);
-		this.buildLock.lock();
-		this._watch = tsc.createWatchProgram(watchHost);
+		let watchProgram = tsc.createWatchProgram(watchHost);
+		this._watch = watchProgram;
 
 		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
+	}
+
+	async stopWatch(){
+		if(!this._watch){
+			throw new Error("Could not stop watchmode if watchmode is not started.");
+		}
+		this._watch.close();
+		this._watch = null;
 	}
 
 	/** Запуститься для разовой компиляции */

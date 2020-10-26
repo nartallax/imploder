@@ -21,8 +21,10 @@ export class Bundler {
 
 	/** собрать бандл, положить в outFile, указанный в конфиге */
 	async produceBundle(): Promise<void>{
+		logDebug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
 		await writeTextFile(this.compiler.config.outFile, code);
+		logDebug("Bundle produced.");
 	}
 
 	/** собрать бандл, выдать в виде строки */
@@ -52,7 +54,7 @@ export class Bundler {
 
 	private getEntryModuleName(): string {
 		let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
-		let name = stripTsExt(this.compiler.modulePathResolver.getAbsoluteModulePath(absPath));
+		let name = stripTsExt(this.compiler.modulePathResolver.getCanonicalModuleName(absPath));
 		return name;
 	}
 

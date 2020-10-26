@@ -10,8 +10,6 @@ export interface TSToolCLIArgs {
 	tsconfigPath: string;
 	verbose?: boolean;
 	help?: boolean;
-	useStdio?: boolean;
-	httpPort?: number;
 	test?: boolean;
 	testSingle?: string;
 	profile?: string;
@@ -39,6 +37,10 @@ export interface TSToolProfile {
 	target: keyof typeof tsc.ScriptTarget;
 	embedTslib?: boolean;
 	preserveOutDir?: boolean;
+	useStdio?: boolean;
+	httpPort?: number;
+	verbose?: boolean;
+	noErrorLogging?: boolean;
 }
 
 /** Конфиг всего тула в целом */
@@ -52,8 +54,6 @@ export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
 		definition: {
 			tsconfigPath: CLI.str({ keys: "--tsconfig", definition: "Path to tsconfig.json.", default: ""}),
 			profile: CLI.str({ keys: "--profile", definition: "Name of tool profile to use. Profiles are defined in tsconfig.json.", default: ""}),
-			useStdio: CLI.bool({ keys: "--use-stdio", definition: "Enables communication with outside world through STDIO. Only usable in watchmode." }),
-			httpPort: CLI.int({ keys: "--port", definition: "Enables tool to listen on specified port. Any HTTP request to this port will trigger bundling, and response to this request will be bundled code. Watchmode only.", default: 0 }),
 			verbose: CLI.bool({ keys: ["-v", "--verbose"], definition: "Adds some more bundler-debug-related trash in stderr." }),
 			help: CLI.help({ keys: ["-h", "--h", "-help", "--help"], definition: "Shows list of commands." }),
 			test: CLI.bool({ keys: ["--test"], definition: "Run autotests." }),

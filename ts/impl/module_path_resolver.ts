@@ -32,7 +32,7 @@ export class ModulePathResolver {
 			if(res.resolvedModule.isExternalLibraryImport){
 				return moduleDesignator;
 			} else {
-				return this.getAbsoluteModulePath(stripTsExt(res.resolvedModule.resolvedFileName));
+				return this.getCanonicalModuleName(res.resolvedModule.resolvedFileName);
 			}
 		}
 
@@ -40,14 +40,15 @@ export class ModulePathResolver {
 		return moduleDesignator;
 	}
 
-	getAbsoluteModulePath(absPath: string): string {
-		return "/" + getRelativeModulePath(this.moduleRoot, absPath);
+	/** привести имя файла-модуля проекта к каноничному виду */
+	getCanonicalModuleName(localModuleNameOrPath: string): string {
+		return "/" + getRelativeModulePath(this.moduleRoot, localModuleNameOrPath);
 	}
 
 }
 
 function normalizeModulePath(p: string): string {
-	return p.replace(/\\/g, "/");
+	return stripTsExt(p.replace(/\\/g, "/"));
 }
 
 function getRelativeModulePath(startAt: string, relModulePath: string): string {
