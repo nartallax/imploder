@@ -1,6 +1,6 @@
 import {withTempDir, copyDir, readTextFile, writeTextFile, unlink} from "utils/afs"
 import * as path from "path";
-import {getFullConfigFromCliArgs} from "impl/config";
+import {updateCliArgsWithTsconfig} from "impl/config";
 import {BundlerImpl} from "impl/bundler";
 import {logErrorAndExit} from "utils/log";
 import {runTestBundle, testProjectDir} from "./test_project_utils";
@@ -62,7 +62,7 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 			}
 
 			await copyDir(testProjectDir("watch"), projDir);
-			let config = getFullConfigFromCliArgs(["--tsconfig", path.join(projDir, "./tsconfig.json")])
+			let config = updateCliArgsWithTsconfig({ tsconfigPath: path.join(projDir, "./tsconfig.json") })
 			config.noBuildDiagnosticMessages = true;
 			let context = new TSToolContextImpl(config);
 			let compiler = context.compiler as TSToolWatchCompiler;

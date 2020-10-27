@@ -2,7 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import {logError} from "utils/log";
 import {fileExists, unlinkRecursive} from "utils/afs";
-import {getFullConfigFromCliArgs} from "impl/config";
+import {updateCliArgsWithTsconfig} from "impl/config";
 import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
 import {testProjectDir, runTestBundle} from "./test_project_utils";
@@ -29,9 +29,9 @@ export class SingleBuildTestProject {
 
 	private _context?: TSToolContext;
 	private get context(): TSToolContext {
-		return this._context ||= new TSToolContextImpl(getFullConfigFromCliArgs([
-			"--tsconfig", path.join(testProjectDir(this.name), "./tsconfig.json")
-		]));
+		return this._context ||= new TSToolContextImpl(updateCliArgsWithTsconfig({
+			tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json")
+		}));
 	}
 
 	private _compiler: TSToolSingleRunCompiler | null = null

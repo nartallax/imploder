@@ -1,19 +1,7 @@
-type ModuleDefinitonArray = ModuleDefinitonArrayMinimal | ModuleDefinitonArrayShort | ModuleDefinitonArrayFull;
-type ModuleDefinitonArrayMinimal = [string, string];
-type ModuleDefinitonArrayShort = [string, string[], string];
-type ModuleDefinitonArrayFull = [string, string[], ModuleMetaShort, string];
-
 type AmdRequire = (names: string[], onOk: (results: any[]) => void, onError?: (error: any) => void) => void;
 type CommonjsRequire = (name: string) => any;
 
-interface ModuleMetaShort {
-	altName?: string;
-	exports?: string[];
-	exportRefs?: string[];
-	arbitraryType?: true;
-}
-
-interface ModuleDefinition extends ModuleMetaShort {
+interface ModuleDefinition extends TSToolModuleLoaderData {
 	name: string;
 	dependencies: string[];
 	code: string;
@@ -28,7 +16,7 @@ interface LauncherParams {
 	preferCommonjs?: boolean;
 }
 
-function tstoolLoader(defs: ModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
+function tstoolLoader(defs: TSToolModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
 	"use strict";
 	function handleError(e: Error, action?: string): never {
 		if(params.errorHandler){
@@ -45,7 +33,7 @@ function tstoolLoader(defs: ModuleDefinitonArray[], params: LauncherParams, evl:
 
 	for(let i = 0; i < defs.length; i++){
 		let v = defs[i];
-		let m: ModuleMetaShort | undefined = typeof(v[2]) !== "string"? v[2]: undefined;
+		let m: TSToolModuleLoaderData | undefined = typeof(v[2]) !== "string"? v[2]: undefined;
 		let def: Partial<ModuleDefinition> = m? m: {};
 		def.name = v[0];
 		def.code = v[v.length - 1] as string;

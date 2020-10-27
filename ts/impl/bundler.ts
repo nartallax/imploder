@@ -4,12 +4,12 @@ import {loaderCode} from "generated/loader_code";
 import {logDebug} from "utils/log";
 import * as path from "path";
 import {readTextFile, stat, writeTextFile} from "utils/afs";
-import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
 import {stripTsExt} from "utils/path_utils";
 import {minifyJsCode, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
 import {TSToolContext} from "./context";
 
+/** сборщик бандл-файла из кучи исходников */
 export interface Bundler {
 	/** собрать бандл, положить в outFile, указанный в конфиге */
 	produceBundle(): Promise<void>;
@@ -18,7 +18,6 @@ export interface Bundler {
 	assembleBundleCode(): Promise<string>;
 }
 
-/** сборщик бандл-файла из кучи исходников */
 export class BundlerImpl implements Bundler {
 
 	constructor(private readonly context: TSToolContext){}
@@ -60,7 +59,7 @@ export class BundlerImpl implements Bundler {
 		return name;
 	}
 
-	private async getTslibDefArr(): Promise<ModuleDefinitonArray> {
+	private async getTslibDefArr(): Promise<TSToolModuleDefinitonArray> {
 		let root = path.resolve(path.dirname(this.context.config.tsconfigPath), "./node_modules/tslib/");
 		let stats: fs.Stats;
 		try {
@@ -81,7 +80,7 @@ export class BundlerImpl implements Bundler {
 		return ["tslib", libCode];
 	}
 
-	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): ModuleDefinitonArray[] {
+	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): TSToolModuleDefinitonArray[] {
 		return modules.map(name => {
 			let meta = this.context.moduleStorage.get(name);
 			let code = meta.jsCode;
@@ -94,7 +93,7 @@ export class BundlerImpl implements Bundler {
 			let needExports = meta.exports.length > 0 && shouldIncludeFullExportInfo
 			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
 
-				let short: ModuleMetaShort = {}
+				let short: TSToolModuleLoaderData = {}
 				if(haveModuleRefs){
 					short.exportRefs = meta.exportModuleReferences;
 				}

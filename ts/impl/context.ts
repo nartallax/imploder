@@ -5,7 +5,7 @@ import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
 import {TSToolConfig} from "impl/config";
 import {ModulePathResolver, ModulePathResolverImpl} from "impl/module_path_resolver";
 import {ModuleStorage, ModuleStorageImpl} from "impl/module_storage";
-import {TransformerController, TransformerControllerImpl} from "transformer/transformer_controller";
+import {TransformerController, TransformerControllerImpl} from "impl/transformer/transformer_controller";
 
 export interface TSToolContext {
 	readonly config: TSToolConfig;

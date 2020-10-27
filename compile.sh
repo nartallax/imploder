@@ -1,5 +1,5 @@
 #!/bin/bash
-# this script compiles bundler itself.
+# this script compiles the tool itself.
 # its somehow gruesome, but lets just deal with it.
 
 cd `dirname "$0"`
@@ -9,7 +9,7 @@ mkdir ts/generated 2> /dev/null
 
 set -e
 
-./node_modules/typescript/bin/tsc --out ./parts/loader.js ./ts/loader/loader.ts --target ES5
+./node_modules/typescript/bin/tsc --out ./parts/loader.js ./ts/loader/loader.ts ./ts/loader/loader_types.d.ts --target ES5
 echo "export const loaderCode = \`" > ts/generated/loader_code.ts
 cat ./parts/loader.js | sed 's;\\;\\\\;g' >> ts/generated/loader_code.ts
 echo "\`;" >> ts/generated/loader_code.ts
