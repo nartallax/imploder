@@ -1,5 +1,5 @@
 import * as path from "path";
-import {Bundler} from "impl/bundler";
+import {BundlerImpl} from "impl/bundler";
 
 export const testProjectsRoot = path.resolve(__dirname, "./test_projects/");
 export function testProjectDir(name: string): string {
@@ -9,7 +9,7 @@ export function testProjectDir(name: string): string {
 // тут я слегка полагаютсь на то, что в коде теста не будет совсем уж полной дестроерской дичи
 // в смысле, тесты не должны никак корраптить глобальные объекты и т.д.
 // по-хорошему нужно спавнить новые процессы и ловить их вывод
-export async function runTestBundle(code: string, bundler: Bundler): Promise<string> {
+export async function runTestBundle(code: string, bundler: BundlerImpl): Promise<string> {
 	let outerConsole = console;
 	let stdout = [] as string[];
 	await (() => {

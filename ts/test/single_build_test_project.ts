@@ -1,12 +1,13 @@
 import * as path from "path";
 import * as fs from "fs";
-import {Compiler} from "impl/compiler";
 import {logError} from "utils/log";
 import {fileExists, unlinkRecursive} from "utils/afs";
 import {getFullConfigFromCliArgs} from "impl/config";
-import {Bundler} from "impl/bundler";
+import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
 import {testProjectDir, runTestBundle} from "./test_project_utils";
+import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
+import {TSToolContext, TSToolContextImpl} from "impl/context";
 
 export class SingleBuildTestProject {
 
@@ -26,21 +27,29 @@ export class SingleBuildTestProject {
 		return this._producedBundleText;
 	}
 
-	private _compiler: Compiler | null = null
-	private get compiler(): Compiler {
+	private _context?: TSToolContext;
+	private get context(): TSToolContext {
+		return this._context ||= new TSToolContextImpl(getFullConfigFromCliArgs([
+			"--tsconfig", path.join(testProjectDir(this.name), "./tsconfig.json")
+		]));
+	}
+
+	private _compiler: TSToolSingleRunCompiler | null = null
+	private get compiler(): TSToolSingleRunCompiler {
 		if(!this._compiler){
-			let config = getFullConfigFromCliArgs([
-				"--tsconfig", path.join(testProjectDir(this.name), "./tsconfig.json")
-			])
-			this._compiler = new Compiler(config);
+			let comp = this.context.compiler;
+			if(!(comp instanceof TSToolSingleRunCompiler)){
+				throw new Error("Unexpected compiler class in test.");
+			}
+			this._compiler = comp;
 		}
 		return this._compiler;
 	}
 
-	private _bundler: Bundler | null = null;
-	private get bundler(): Bundler {
+	private _bundler: BundlerImpl | null = null;
+	private get bundler(): BundlerImpl {
 		if(!this._bundler){
-			this._bundler = new Bundler(this.compiler);
+			this._bundler = new BundlerImpl(this.context);
 		}
 		return this._bundler;
 	}
@@ -110,9 +119,8 @@ export class SingleBuildTestProject {
 		let err: Error | null = null;
 
 		try {
-			await this.compiler.runSingle();
-			let bundler = new Bundler(this.compiler);
-			await bundler.produceBundle();
+			await this.compiler.run();
+			await this.bundler.produceBundle();
 		} catch(e){
 			err = e;
 		}

@@ -1,23 +1,15 @@
 import * as tsc from "typescript";
-import {ModulePathResolver} from "../impl/module_path_resolver";
 import {logDebug, logErrorAndExit, logWarn} from "utils/log";
-import {ModuleMetadataStorage, ModuleMeta} from "impl/module_meta_storage";
+import {ModuleData} from "impl/module_storage";
 import {AbstractTransformer} from "./abstract_transformer";
 
 export class BeforeJsBundlerTransformer extends AbstractTransformer {
 
-	constructor(
-		context: tsc.TransformationContext,
-		private readonly metaStorage: ModuleMetadataStorage,
-		resolver: ModulePathResolver){
-		super(context, resolver);
-	}
-
 	transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
 		let moduleName = this.moduleNameByNode(fileNode);
-		logDebug("Visiting " + this.resolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
+		logDebug("Visiting " + this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
 
-		let meta: ModuleMeta = {
+		let meta: ModuleData = {
 			dependencies: [],
 			exportModuleReferences: [],
 			exports: [],
@@ -36,7 +28,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		}
 
 		this.exploreSpecialExports(meta, fileNode);
-		this.metaStorage.set(moduleName, meta);
+		this.context.moduleStorage.set(moduleName, meta);
 
 		return fileNode;
 	}
@@ -44,7 +36,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 	/** проанализировать экспорты в файле, положить результаты анализа в moduleMeta
 	* эта функция обрабатывает только export = и export from
 	* остальные экспорты проще обрабатывать после трансформации js */
-	private exploreSpecialExports(moduleMeta: ModuleMeta, fileNode: tsc.SourceFile) {
+	private exploreSpecialExports(moduleMeta: ModuleData, fileNode: tsc.SourceFile) {
 		/*
 		технически, все экспортируемые имена могут быть получены с помощью нижеуказанного кода
 		но это не очень хорошо работает по двум причинам
@@ -106,7 +98,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		}
 
 		moduleMeta.exportModuleReferences = [... new Set(
-			moduleMeta.exportModuleReferences.map(x => this.resolver.resolveModuleDesignator(x, fileNode.fileName))
+			moduleMeta.exportModuleReferences.map(x => this.context.modulePathResolver.resolveModuleDesignator(x, fileNode.fileName))
 		)];
 	}
 

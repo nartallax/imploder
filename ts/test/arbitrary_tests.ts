@@ -1,10 +1,11 @@
 import {withTempDir, copyDir, readTextFile, writeTextFile, unlink} from "utils/afs"
-import {Compiler} from "impl/compiler";
 import * as path from "path";
 import {getFullConfigFromCliArgs} from "impl/config";
-import {Bundler} from "impl/bundler";
+import {BundlerImpl} from "impl/bundler";
 import {logErrorAndExit} from "utils/log";
 import {runTestBundle, testProjectDir} from "./test_project_utils";
+import {TSToolContextImpl} from "impl/context";
+import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
 
 async function assertFileEquals(testedPath: string, goodPath: string): Promise<string> {
 	let [testedContent, goodContent] = await Promise.all([readTextFile(testedPath), readTextFile(goodPath)]);
@@ -36,9 +37,9 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 				// файлвотчи срабатывают не мгновенно, нужно сколько-то подождать
 				await waitWatchTriggered();
 				await compiler.buildLock.withLock(async () => {
-					await bundler.produceBundle();
+					await context.bundler.produceBundle();
 					let bundle = await assertFileEquals(path.join(projDir, "./js/bundle.js"), path.join(projDir, goodBundlePath));;
-					let stdout = await runTestBundle(bundle, bundler);
+					let stdout = await runTestBundle(bundle, context.bundler as BundlerImpl);
 					await assertFileContentEquals(stdout, path.join(projDir, goodStdoutPath));
 				});
 			}
@@ -63,9 +64,12 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 			await copyDir(testProjectDir("watch"), projDir);
 			let config = getFullConfigFromCliArgs(["--tsconfig", path.join(projDir, "./tsconfig.json")])
 			config.noBuildDiagnosticMessages = true;
-			let compiler = new Compiler(config);
-			let bundler = new Bundler(compiler);
-			await compiler.startWatch();
+			let context = new TSToolContextImpl(config);
+			let compiler = context.compiler as TSToolWatchCompiler;
+			if(!(compiler instanceof TSToolWatchCompiler)){
+				throw new Error("Unexpected compiler class in test.");
+			}
+			await compiler.run();
 			await bundleAndTest("./bundle_a.js", "./stdout_a.txt");
 
 			await writeProjectFile("main.ts", "export function main(){console.log('Hello world 2!')}");

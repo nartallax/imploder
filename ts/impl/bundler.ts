@@ -1,5 +1,4 @@
 import * as tsc from "typescript";
-import {Compiler} from "impl/compiler";
 import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
 import {logDebug} from "utils/log";
@@ -9,43 +8,46 @@ import {ModuleMetaShort, ModuleDefinitonArray} from "loader/loader_types";
 import {stripTsExt} from "utils/path_utils";
 import {minifyJsCode, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
+import {TSToolContext} from "./context";
+
+export interface Bundler {
+	/** собрать бандл, положить в outFile, указанный в конфиге */
+	produceBundle(): Promise<void>;
+
+	/** собрать бандл, выдать в виде строки */
+	assembleBundleCode(): Promise<string>;
+}
 
 /** сборщик бандл-файла из кучи исходников */
-export class Bundler {
+export class BundlerImpl implements Bundler {
 
-	private readonly compiler: Compiler;
+	constructor(private readonly context: TSToolContext){}
 
-	constructor(compiler: Compiler){
-		this.compiler = compiler;
-	}
-
-	/** собрать бандл, положить в outFile, указанный в конфиге */
 	async produceBundle(): Promise<void>{
 		logDebug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
-		await writeTextFile(this.compiler.config.outFile, code);
+		await writeTextFile(this.context.config.outFile, code);
 		logDebug("Bundle produced.");
 	}
 
-	/** собрать бандл, выдать в виде строки */
 	async assembleBundleCode(): Promise<string>{
 		let result = [] as string[];
-		if(!this.compiler.config.noLoaderCode){
+		if(!this.context.config.noLoaderCode){
 			result.push(await this.getPrefixCode());
 		}
 
 		await this.loadAbsentModuleCode();
 
-		let moduleOrder = new ModuleOrderer(this.compiler.metaStorage).getModuleOrder(this.getEntryModuleName());
+		let moduleOrder = new ModuleOrderer(this.context.moduleStorage).getModuleOrder(this.getEntryModuleName());
 		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
 
 		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
-		if(this.compiler.config.embedTslib && moduleOrder.absentModules.has("tslib")){
+		if(this.context.config.embedTslib && moduleOrder.absentModules.has("tslib")){
 			defArrArr.push(await this.getTslibDefArr());
 		}
 		result.push(JSON.stringify(defArrArr));		
 		
-		if(!this.compiler.config.noLoaderCode){
+		if(!this.context.config.noLoaderCode){
 			result.push(this.getPostfixCode());
 		}
 
@@ -53,13 +55,13 @@ export class Bundler {
 	}
 
 	private getEntryModuleName(): string {
-		let absPath = path.resolve(path.dirname(this.compiler.config.tsconfigPath), this.compiler.config.entryModule);
-		let name = stripTsExt(this.compiler.modulePathResolver.getCanonicalModuleName(absPath));
+		let absPath = path.resolve(path.dirname(this.context.config.tsconfigPath), this.context.config.entryModule);
+		let name = stripTsExt(this.context.modulePathResolver.getCanonicalModuleName(absPath));
 		return name;
 	}
 
 	private async getTslibDefArr(): Promise<ModuleDefinitonArray> {
-		let root = path.resolve(path.dirname(this.compiler.config.tsconfigPath), "./node_modules/tslib/");
+		let root = path.resolve(path.dirname(this.context.config.tsconfigPath), "./node_modules/tslib/");
 		let stats: fs.Stats;
 		try {
 			stats = await stat(root);
@@ -72,7 +74,7 @@ export class Bundler {
 
 		let libPath = path.resolve(root, "./tslib.js");
 		let libCode = await readTextFile(libPath);
-		if(this.compiler.config.minify){
+		if(this.context.config.minify){
 			libCode = "function(global){var define=function(){};" + libCode + "}"
 			libCode = await this.minify(libCode, "tslib", { removeLegalComments: true });
 		}
@@ -81,7 +83,7 @@ export class Bundler {
 
 	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): ModuleDefinitonArray[] {
 		return modules.map(name => {
-			let meta = this.compiler.metaStorage.get(name);
+			let meta = this.context.moduleStorage.get(name);
 			let code = meta.jsCode;
 			if(!code){
 				throw new Error("Code for module " + name + " is not loaded at bundling time.");
@@ -116,7 +118,7 @@ export class Bundler {
 	private minifiedLoaderCode: string | null = null;
 	async getPrefixCode(): Promise<string> {
 		let resultLoaderCode = loaderCode;
-		if(this.compiler.config.minify){
+		if(this.context.config.minify){
 			if(this.minifiedLoaderCode === null){
 				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 });
 			}
@@ -129,7 +131,7 @@ export class Bundler {
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
 	getPostfixCode(thenCode?: string): string {
-		let cfg = this.compiler.config;
+		let cfg = this.context.config;
 		let params: any = {
 			entryPoint: {
 				module: this.getEntryModuleName(),
@@ -142,7 +144,7 @@ export class Bundler {
 		if(cfg.commonjsRequireName !== "require"){
 			params.commonjsRequire = cfg.commonjsRequireName;
 		}
-		if(cfg.preferCommonjs){
+		if(cfg.loadInitialExternalsWithCommonJS){
 			params.preferCommonjs = true;
 		}
 		let paramStr = JSON.stringify(params);
@@ -156,17 +158,17 @@ export class Bundler {
 	}
 
 	private async loadAbsentModuleCode(): Promise<void> {
-		let storage = this.compiler.metaStorage;
+		let storage = this.context.moduleStorage;
 		let proms = [] as Promise<void>[];
-		let names = storage.getNames();
-		let outDir = this.compiler.config.tscParsedCommandLine.options.outDir as string;
+		let names = storage.getKnownModuleNames();
+		let outDir = this.context.config.tscParsedCommandLine.options.outDir as string;
 		names.forEach(moduleName => {
 			let mod = storage.get(moduleName);
 			if(!mod.jsCode){
 				let modulePath = path.join(outDir, moduleName + ".js");
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
-					if(this.compiler.config.minify){
+					if(this.context.config.minify){
 						code = await this.minify(code, moduleName);
 					}
 					mod.jsCode = code;
@@ -180,7 +182,7 @@ export class Bundler {
 
 	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}): Promise<string> {
 		return minifyJsCode({
-			target: tsc.ScriptTarget[this.compiler.config.target],
+			target: tsc.ScriptTarget[this.context.config.target],
 			...opts,
 			code, 
 			moduleName

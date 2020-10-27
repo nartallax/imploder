@@ -1,20 +1,12 @@
 import {AbstractTransformer} from "./abstract_transformer";
 import * as tsc from "typescript";
-import {ModuleMetadataStorage, ModuleMeta} from "impl/module_meta_storage";
-import {ModulePathResolver} from "impl/module_path_resolver";
+import {ModuleData} from "impl/module_storage";
 
 export class AfterJsBundlerTransformer extends AbstractTransformer {
 
-	constructor(
-		context: tsc.TransformationContext,
-		private readonly metaStorage: ModuleMetadataStorage,
-		resolver: ModulePathResolver){
-		super(context, resolver);
-	}
-
 	transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
 		let moduleName = this.moduleNameByNode(fileNode);
-		let moduleMeta = this.metaStorage.get(moduleName);
+		let moduleMeta = this.context.moduleStorage.get(moduleName);
 		
 		let definingFunction: tsc.Node | null = null
 		//this.traverseDumpFileAst(fileNode);
@@ -47,12 +39,10 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 
 		this.setImportExportFlag(moduleMeta);
 
-		let result = tsc.getMutableClone(fileNode);
-		result.statements = tsc.createNodeArray([definingFunction]);
-		return result;
+		return tsc.factory.updateSourceFile(fileNode, tsc.createNodeArray([definingFunction]));
 	}
 
-	private setImportExportFlag(moduleMeta: ModuleMeta){
+	private setImportExportFlag(moduleMeta: ModuleData){
 		moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
 			|| moduleMeta.exports.length > 0
 			|| moduleMeta.hasOmniousExport
@@ -60,7 +50,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 			|| moduleMeta.exportModuleReferences.length > 0;
 	}
 
-	private processDefineCall(moduleMeta: ModuleMeta, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {
+	private processDefineCall(moduleMeta: ModuleData, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {
 		let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2];
 		if(!tsc.isArrayLiteralExpression(depArrNode)){
 			throw new Error("Second-from-end argument of define() is not array literal.");
@@ -73,7 +63,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 			return el.text;
 		}).filter(x => x !== "exports" && x !== "require")
 
-		moduleMeta.dependencies = rawDependencies.map(x => this.resolver.resolveModuleDesignator(x, fileNode.fileName))
+		moduleMeta.dependencies = rawDependencies.map(x => this.context.modulePathResolver.resolveModuleDesignator(x, fileNode.fileName))
 
 		let defFuncArg = defineCallNode.arguments[defineCallNode.arguments.length - 1];
 		if(!tsc.isFunctionExpression(defFuncArg)){
@@ -149,23 +139,26 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 		}
 
 		moduleMeta.exports = [...new Set(moduleMeta.exports)];
-		let resultBodyStatements = moduleBodyStatements.slice(startWith);
-		let result = tsc.getMutableClone(defFuncArg);
-		let resultBody = result.body = tsc.getMutableClone(result.body);
-		resultBody.statements = tsc.createNodeArray(resultBodyStatements);
 		
 		// переставляем exports и require в самое начало списка параметров
 		// нужно, чтобы не перечислять их в списке зависимостей и просто знать, что они всегда идут сначала
-		let params = [...result.parameters];
+		let params = [...defFuncArg.parameters];
 		params = params.filter(x => !tsc.isIdentifier(x.name) || (x.name.text !== "exports" && x.name.text !== "require"))
 		params = [
 			tsc.createParameter(undefined, undefined, undefined, "exports"),
 			tsc.createParameter(undefined, undefined, undefined, "require"),
 			...params
 		]
-		result.parameters = tsc.createNodeArray(params);
-		
-		return result;
+
+		let resultBodyStatements = moduleBodyStatements.slice(startWith);
+
+		return tsc.factory.updateFunctionExpression(
+			defFuncArg,
+			undefined, undefined, undefined, undefined,
+			tsc.createNodeArray(params),
+			undefined,
+			tsc.factory.updateBlock(defFuncArg.body, tsc.createNodeArray(resultBodyStatements))
+		);
 	}
 
 	// узнать, является ли это выражение присвоением вида exports.value = void 0;

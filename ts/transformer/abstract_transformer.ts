@@ -1,6 +1,6 @@
 import * as tsc from "typescript";
-import {ModulePathResolver} from "impl/module_path_resolver";
 import {stripTsExt} from "utils/path_utils";
+import {TSToolContext} from "impl/context";
 
 export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.Node[]}
 
@@ -8,8 +8,8 @@ export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.N
 export abstract class AbstractTransformer implements tsc.CustomTransformer {
 
 	constructor(
-		protected readonly context: tsc.TransformationContext,
-		protected readonly resolver: ModulePathResolver
+		protected readonly transformContext: tsc.TransformationContext,
+		protected readonly context: TSToolContext
 	){}
 
 	public transformBundle(node: tsc.Bundle): tsc.Bundle {
@@ -31,7 +31,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 					arr[i] = tsc.visitEachChild(
 						arr[i], 
 						child => this.transformVisitRecursive(child, mapper, currentDepth + 1), 
-						this.context
+						this.transformContext
 					);
 				}
 				return arr;
@@ -39,7 +39,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 				return tsc.visitEachChild(
 					mapped.result, 
 					child => this.transformVisitRecursive(child, mapper, currentDepth + 1), 
-					this.context
+					this.transformContext
 				);
 			}
 		}
@@ -76,7 +76,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 	}
 
 	protected moduleNameByNode(fileNode: tsc.SourceFile): string {
-		return stripTsExt(this.resolver.getCanonicalModuleName(fileNode.fileName));
+		return stripTsExt(this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName));
 	}
 
 }

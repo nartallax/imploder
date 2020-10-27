@@ -1,21 +1,28 @@
 import * as path from "path";
 import * as tsc from "typescript";
 import {stripTsExt} from "utils/path_utils";
-import {Compiler} from "impl/compiler";
+import {TSToolContext} from "./context";
+
+export interface ModulePathResolver {
+	/** если moduleDesignator указывает на модуль-файл - получить правильное имя модуля; иначе оставить его как есть */ 
+	resolveModuleDesignator(moduleDesignator: string, sourceFile: string): string;
+
+	/** привести имя файла-модуля проекта к каноничному виду */
+	getCanonicalModuleName(localModuleNameOrPath: string): string;
+}
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
-export class ModulePathResolver {
+export class ModulePathResolverImpl implements ModulePathResolver {
 
 	private readonly moduleRoot: string;
 	private readonly ambientModules: Set<string>;
 
-	constructor(tsconfigPath: string, compilerOpts: tsc.CompilerOptions, private readonly compiler: Compiler){
-		this.moduleRoot = path.resolve(path.dirname(tsconfigPath), compilerOpts.rootDir || ".");
-		let ambientMods = this.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
+	constructor(private readonly context: TSToolContext){
+		this.moduleRoot = path.resolve(path.dirname(context.config.tsconfigPath), context.config.tscParsedCommandLine.options.rootDir || ".");
+		let ambientMods = context.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
 		this.ambientModules = new Set(ambientMods);
 	}
 
-	/** если moduleDesignator указывает на модуль-файл - получить правильное имя модуля; иначе оставить его как есть */ 
 	resolveModuleDesignator(moduleDesignator: string, sourceFile: string): string {
 		if(this.ambientModules.has(moduleDesignator)){
 			return moduleDesignator;
@@ -24,8 +31,8 @@ export class ModulePathResolver {
 		let res = tsc.resolveModuleName(
 			moduleDesignator, 
 			sourceFile, 
-			this.compiler.program.getCompilerOptions(), 
-			this.compiler.compilerHost
+			this.context.compiler.program.getCompilerOptions(), 
+			this.context.compiler.compilerHost
 		);
 		
 		if(res.resolvedModule){
@@ -40,7 +47,6 @@ export class ModulePathResolver {
 		return moduleDesignator;
 	}
 
-	/** привести имя файла-модуля проекта к каноничному виду */
 	getCanonicalModuleName(localModuleNameOrPath: string): string {
 		return "/" + getRelativeModulePath(this.moduleRoot, localModuleNameOrPath);
 	}

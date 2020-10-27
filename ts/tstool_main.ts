@@ -1,9 +1,8 @@
 import {runAllTests, runSingleTest} from "test/test";
 import {logErrorAndExit, setLogVerbosityLevel} from "utils/log";
-import {Compiler} from "impl/compiler";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
 import {CLI} from "utils/cli";
-import {Bundler} from "impl/bundler";
+import {TSToolContextImpl} from "impl/context";
 
 export async function tstoolMain(){
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
@@ -26,15 +25,14 @@ export async function tstoolMain(){
 		logErrorAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
 	}
 
-	let config = updateCliArgsWithTsconfig(cliArgs);
-	let compiler = new Compiler(config);
-	let bundler = new Bundler(compiler);
 
+	let config = updateCliArgsWithTsconfig(cliArgs);
+	let context = new TSToolContextImpl(config);
 	if(!config.watchMode){
-		await compiler.runSingle();
-		await bundler.produceBundle();
+		await context.compiler.run();
+		await context.bundler.produceBundle();
 	} else {
-		await compiler.startWatch();
+		await context.compiler.run();
 		if(config.useStdio){
 			// TODO: stdio interface
 		}

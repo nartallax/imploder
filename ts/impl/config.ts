@@ -1,9 +1,72 @@
 import {CLI} from "utils/cli";
 import * as path from "path";
 import * as tsc from "typescript";
-import {logErrorAndExit, logError} from "utils/log";
+import {logErrorAndExit, logError, logWarn} from "utils/log";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 import {isPathNested} from "utils/path_utils";
+
+/** Описание профиля тула в tsconfig.json */
+export interface TSToolProfile {
+	// обязательные основные параметры
+	/** Путь к модулю-точке входа относительно корня проекта */
+	entryModule: string;
+	/** Имя функции, экспортируемой из модуля-точки входа, которая будет вызвана на старте бандла */
+	entryFunction: string;
+	/** Путь к файлу, в который будет помещен бандл после сборки */
+	outFile: string;
+
+	// прочие параметры
+	/** Версия ECMAScript, которой будет соответствовать полученный бандл. 
+	 * Значение по умолчанию - ES5. Версии ниже ES5 не поддерживаются */
+	target: keyof typeof tsc.ScriptTarget;
+	/** Имя функции-обработчика ошибок запуска. Должна быть доступна в том месте, где запускается бандл */
+	errorHandlerName?: string;
+	/** Имя функции require для AMD, умолчание = "require" */
+	amdRequireName: string;
+	/** Имя функции require для CommonJS, умолчание = "require" */
+	commonjsRequireName: string;
+	/** Использовать CommonJS для подгрузки исходных внешних зависимостей, или AMD?
+	 * По умолчанию true.
+	 * Следует выставлять в true при сборке бандла, который будет запускаться в NodeJS, например
+	 * Не влияет на подгрузку модулей, включенных в бандл. Не влияет на асинхронную подгрузку модулей. */
+	loadInitialExternalsWithCommonJS: boolean;
+	/** Минифицировать ли код */
+	minify: boolean;
+	/** Включить ли tslib в бандл, если он требуется каким-либо модулем
+	 * По умолчанию true.*/
+	embedTslib?: boolean;
+	/** Не удалять директорию с выходными js-файлами.
+	 * По умолчанию, при запуске тул удаляет эту директорию ради консистентности билдов. */
+	preserveOutDir?: boolean;
+
+	/** Список путей к проектам с трансформаторами.
+	 * Пути могут быть относительными, от корня проекта, в котором указаны. */
+	transformerProjects?: string[];
+
+	// watchmode
+	/** Запуститься в watch-моде. Отслеживать изменения в файлах и перекомпилировать сразу же. */
+	watchMode: boolean;
+	/** Будет ли тул ожидать каких-либо команд в stdin, и будет ли выдавать какие-либо структурированные ответы в stdout
+	 * Удобно при встраивании куда-либо. Работает только в watch-моде */
+	useStdio?: boolean;
+	/** Если указан этот порт - то тул запустит локальный http-сервер, который будет ожидать команд, на указанном порту.
+	 * Удобно при разработке. Работает только в watch-моде. */
+	httpPort?: number;
+
+	// отладочные опции
+	/** Выдавать ли больше логов в stderr */
+	verbose?: boolean;
+	/** Не выдавать логи про ошибки и прочие диагностические сообщения процесса компиляции */
+	noBuildDiagnosticMessages?: boolean;
+	/** Не включать код загрузчика в бандл, и сопутствующие ему обертки.
+	 * Если включено, бандл будет состоять только из кода модулей. */
+	noLoaderCode: boolean;
+}
+
+/** Конфиг всего тула в целом */
+export interface TSToolConfig extends TSToolCLIArgs, TSToolProfile { 
+	tscParsedCommandLine: tsc.ParsedCommandLine;
+};
 
 /** Опции, которые можно передать тулу через командную строку */
 export interface TSToolCLIArgs {
@@ -15,38 +78,10 @@ export interface TSToolCLIArgs {
 	profile?: string;
 }
 
-/** Содержимое блока tstoolConfig внутри tsconfig.json
- * обязательные поля - только entryModule, entryFunction, outFile, target
-*/
+/** Содержимое блока tstoolConfig внутри tsconfig.json */
 export interface TsconfigTSToolInclusion extends TSToolProfile {
 	profiles?: { [profileName: string]: TSToolProfile }
 }
-
-/** Описание профиля тула в tsconfig.json */
-export interface TSToolProfile {
-	entryModule: string;
-	entryFunction: string;
-	outFile: string;
-	target: keyof typeof tsc.ScriptTarget;
-	errorHandlerName?: string;
-	amdRequireName: string;
-	commonjsRequireName: string;
-	preferCommonjs: boolean;
-	noLoaderCode: boolean;
-	minify: boolean;
-	watchMode: boolean;
-	embedTslib?: boolean;
-	preserveOutDir?: boolean;
-	useStdio?: boolean;
-	httpPort?: number;
-	verbose?: boolean;
-	noBuildDiagnosticMessages?: boolean;
-}
-
-/** Конфиг всего тула в целом */
-export interface TSToolConfig extends TSToolCLIArgs, TSToolProfile { 
-	tscParsedCommandLine: tsc.ParsedCommandLine;
-};
 
 export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
 	let res = new CLI({
@@ -186,12 +221,25 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 }
 
 function fixProfile(profile: TSToolProfile, tsconfigPath: string){
+	if(!profile.entryModule){
+		logErrorAndExit(`Option "entryModule" is required, but absent.`);
+	}
+	if(!profile.entryFunction){
+		logErrorAndExit(`Option "entryFunction" is required, but absent.`);
+	}
+	if(!profile.outFile){
+		logErrorAndExit(`Option "outFile" is required, but absent.`);
+	}
 	profile.outFile = path.resolve(path.dirname(tsconfigPath), profile.outFile);
-	profile.preferCommonjs = profile.preferCommonjs === false? false: true;
+	profile.loadInitialExternalsWithCommonJS = profile.loadInitialExternalsWithCommonJS === false? false: true;
 	profile.amdRequireName = profile.amdRequireName || "require";
 	profile.commonjsRequireName = profile.commonjsRequireName || "require";
 	profile.noLoaderCode = !!profile.noLoaderCode;
 	profile.minify = !!profile.minify;
 	profile.watchMode = !!profile.watchMode;
 	profile.target = profile.target || "ES5"
+	if(tsc.ScriptTarget[profile.target] < tsc.ScriptTarget.ES5){
+		logWarn("Selected script target is " + profile.target + ", but it's not really supported as it is too old. Proceed at your own risk.");
+	}
+	profile.embedTslib = profile.embedTslib === false? false: true;
 }

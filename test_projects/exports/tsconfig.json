@@ -5,6 +5,7 @@
         "outFile": "js/bundle.js",
         "noLoaderCode": true,
         "minify": true,
+        "embedTslib": false,
         "target": "ES2018"
     },
     
