@@ -4,86 +4,14 @@ import * as tsc from "typescript";
 import {logErrorAndExit, logError, logWarn} from "utils/log";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 import {isPathNested} from "utils/path_utils";
-
-/** Описание профиля тула в tsconfig.json */
-export interface TSToolProfile {
-	// обязательные основные параметры
-	/** Путь к модулю-точке входа относительно корня проекта */
-	entryModule: string;
-	/** Имя функции, экспортируемой из модуля-точки входа, которая будет вызвана на старте бандла */
-	entryFunction: string;
-	/** Путь к файлу, в который будет помещен бандл после сборки */
-	outFile: string;
-
-	// прочие параметры
-	/** Версия ECMAScript, которой будет соответствовать полученный бандл. 
-	 * Значение по умолчанию - ES5. Версии ниже ES5 не поддерживаются */
-	target: keyof typeof tsc.ScriptTarget;
-	/** Имя функции-обработчика ошибок запуска. Должна быть доступна в том месте, где запускается бандл */
-	errorHandlerName?: string;
-	/** Имя функции require для AMD, умолчание = "require" */
-	amdRequireName: string;
-	/** Имя функции require для CommonJS, умолчание = "require" */
-	commonjsRequireName: string;
-	/** Использовать CommonJS для подгрузки исходных внешних зависимостей, или AMD?
-	 * По умолчанию true.
-	 * Следует выставлять в true при сборке бандла, который будет запускаться в NodeJS, например
-	 * Не влияет на подгрузку модулей, включенных в бандл. Не влияет на асинхронную подгрузку модулей. */
-	loadInitialExternalsWithCommonJS: boolean;
-	/** Минифицировать ли код */
-	minify: boolean;
-	/** Включить ли tslib в бандл, если он требуется каким-либо модулем
-	 * По умолчанию true.*/
-	embedTslib?: boolean;
-	/** Не удалять директорию с выходными js-файлами.
-	 * По умолчанию, при запуске тул удаляет эту директорию ради консистентности билдов. */
-	preserveOutDir?: boolean;
-
-	/** Список путей к проектам с трансформаторами.
-	 * Пути могут быть относительными, от корня проекта, в котором указаны. */
-	transformerProjects?: string[];
-
-	// watchmode
-	/** Запуститься в watch-моде. Отслеживать изменения в файлах и перекомпилировать сразу же. */
-	watchMode: boolean;
-	/** Будет ли тул ожидать каких-либо команд в stdin, и будет ли выдавать какие-либо структурированные ответы в stdout
-	 * Удобно при встраивании куда-либо. Работает только в watch-моде */
-	useStdio?: boolean;
-	/** Если указан этот порт - то тул запустит локальный http-сервер, который будет ожидать команд, на указанном порту.
-	 * Удобно при разработке. Работает только в watch-моде. */
-	httpPort?: number;
-
-	// отладочные опции
-	/** Выдавать ли больше логов в stderr */
-	verbose?: boolean;
-	/** Не выдавать логи про ошибки и прочие диагностические сообщения процесса компиляции */
-	noBuildDiagnosticMessages?: boolean;
-	/** Не включать код загрузчика в бандл, и сопутствующие ему обертки.
-	 * Если включено, бандл будет состоять только из кода модулей. */
-	noLoaderCode: boolean;
-}
-
-/** Конфиг всего тула в целом */
-export interface TSToolConfig extends TSToolCLIArgs, TSToolProfile { 
-	tscParsedCommandLine: tsc.ParsedCommandLine;
-};
-
-/** Опции, которые можно передать тулу через командную строку */
-export interface TSToolCLIArgs {
-	tsconfigPath: string;
-	verbose?: boolean;
-	help?: boolean;
-	test?: boolean;
-	testSingle?: string;
-	profile?: string;
-}
+import * as TSTool from "tstool";
 
 /** Содержимое блока tstoolConfig внутри tsconfig.json */
-export interface TsconfigTSToolInclusion extends TSToolProfile {
-	profiles?: { [profileName: string]: TSToolProfile }
+export interface TsconfigTSToolInclusion extends TSTool.Profile {
+	profiles?: { [profileName: string]: TSTool.Profile }
 }
 
-export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
+export function parseToolCliArgs(args: readonly string[]): TSTool.CLIArgs {
 	let res = new CLI({
 		helpHeader: "A helper tool to assemble Javascript bundles out of Typescript projects.",
 		definition: {
@@ -103,10 +31,10 @@ export function parseToolCliArgs(args: readonly string[]): TSToolCLIArgs {
 	return res;
 }
 
-export function updateCliArgsWithTsconfig(cliArgs: TSToolCLIArgs): TSToolConfig {
+export function updateCliArgsWithTsconfig(cliArgs: TSTool.CLIArgs): TSTool.Config {
 	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(cliArgs.tsconfigPath);
 	
-	let profile: TSToolProfile = inclusionConfig;
+	let profile: TSTool.Profile = inclusionConfig;
 	if(cliArgs.profile){
 		if(!inclusionConfig.profiles || !(cliArgs.profile in inclusionConfig.profiles)){
 			logErrorAndExit(`Profile name is passed in command-line arguments ("${cliArgs.profile}"), but there is no such profile defined.`);
@@ -120,7 +48,7 @@ export function updateCliArgsWithTsconfig(cliArgs: TSToolCLIArgs): TSToolConfig 
 
 	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
 
-	let config: TSToolConfig = {
+	let config: TSTool.Config = {
 		...cliArgs,
 		...profile,
 		tscParsedCommandLine: tscParsedCommandLine
@@ -128,7 +56,7 @@ export function updateCliArgsWithTsconfig(cliArgs: TSToolCLIArgs): TSToolConfig 
 	return config;
 }
 
-export function getFullConfigFromCliArgs(args: readonly string[]): TSToolConfig {
+export function getFullConfigFromCliArgs(args: readonly string[]): TSTool.Config {
 	let cliArgs = parseToolCliArgs(args);
 	return updateCliArgsWithTsconfig(cliArgs);
 }
@@ -149,11 +77,14 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TsconfigT
 	let rawJson = JSON.parse(fileContentStr);
 	let projectRoot = path.dirname(tsconfigPath);
 	let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
-	processTypescriptDiagnostics(result.errors)
+	let haveErrors = processTypescriptDiagnostics(result.errors);
+	if(haveErrors){
+		process.exit(1);
+	}
 	return [result, rawJson.tstoolConfig];
 }
 
-function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: TSToolProfile): void{
+function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: TSTool.Profile): void{
 	if(config.fileNames.length < 1){
 		logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
@@ -220,7 +151,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 
 }
 
-function fixProfile(profile: TSToolProfile, tsconfigPath: string){
+function fixProfile(profile: TSTool.Profile, tsconfigPath: string){
 	if(!profile.entryModule){
 		logErrorAndExit(`Option "entryModule" is required, but absent.`);
 	}

@@ -1,6 +1,6 @@
 import * as tsc from "typescript";
+import * as TSTool from "tstool";
 import {logDebug, logErrorAndExit, logWarn} from "utils/log";
-import {ModuleData} from "impl/module_storage";
 import {AbstractTransformer} from "./abstract_transformer";
 
 export class BeforeJsBundlerTransformer extends AbstractTransformer {
@@ -9,7 +9,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		let moduleName = this.moduleNameByNode(fileNode);
 		logDebug("Visiting " + this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
 
-		let meta: ModuleData = {
+		let meta: TSTool.ModuleData = {
 			dependencies: [],
 			exportModuleReferences: [],
 			exports: [],
@@ -36,7 +36,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 	/** проанализировать экспорты в файле, положить результаты анализа в moduleMeta
 	* эта функция обрабатывает только export = и export from
 	* остальные экспорты проще обрабатывать после трансформации js */
-	private exploreSpecialExports(moduleMeta: ModuleData, fileNode: tsc.SourceFile) {
+	private exploreSpecialExports(moduleMeta: TSTool.ModuleData, fileNode: tsc.SourceFile) {
 		/*
 		технически, все экспортируемые имена могут быть получены с помощью нижеуказанного кода
 		но это не очень хорошо работает по двум причинам

@@ -1,44 +1,47 @@
-import {Bundler, BundlerImpl} from "impl/bundler";
-import {TSToolCompiler} from "impl/compilers/compiler";
-import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
-import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
-import {TSToolConfig} from "impl/config";
-import {ModulePathResolver, ModulePathResolverImpl} from "impl/module_path_resolver";
-import {ModuleStorage, ModuleStorageImpl} from "impl/module_storage";
-import {TransformerController, TransformerControllerImpl} from "impl/transformer/transformer_controller";
+import {updateCliArgsWithTsconfig} from "impl/config";
+import {ModuleStorageImpl} from "impl/module_storage";
+import * as TSTool from "tstool";
 
-export interface TSToolContext {
-	readonly config: TSToolConfig;
-	readonly bundler: Bundler;
-	readonly compiler: TSToolCompiler;
-	readonly moduleStorage: ModuleStorage;
-	readonly modulePathResolver: ModulePathResolver;
-	readonly transformerController: TransformerController;
-}
+export class TSToolContextImpl implements TSTool.Context {
+	static createBundler?: (context: TSTool.Context) => TSTool.Bundler;
+	static createCompiler?: (context: TSTool.Context) => TSTool.Compiler;
+	static createPathResolver?: (context: TSTool.Context) => TSTool.ModulePathResolver;
+	static createTransformerController?: (context: TSTool.Context) => TSTool.TransformerController;
 
-export class TSToolContextImpl implements TSToolContext {
 	readonly moduleStorage = new ModuleStorageImpl();
 
-	constructor(readonly config: TSToolConfig){}
-
-	private _bundler?: Bundler;
-	get bundler(): Bundler {
-		return this._bundler ||= new BundlerImpl(this);
+	private createOrThrow<T>(fn?: (context: TSTool.Context) => T): T {
+		if(!fn){
+			throw new Error("Creation function is not supplied.");
+		}
+		return fn(this);
 	}
 
-	private _compiler?: TSToolCompiler;
-	get compiler(): TSToolCompiler {
-		return this._compiler ||= this.config.watchMode? new TSToolWatchCompiler(this): new TSToolSingleRunCompiler(this);
+	static fromTsconfigPath(tsconfigPath: string): TSTool.Context {
+		let config = updateCliArgsWithTsconfig({ tsconfigPath })
+		return new TSToolContextImpl(config);
 	}
 
-	private _modulePathResolver?: ModulePathResolver;
-	get modulePathResolver(): ModulePathResolver {
-		return this._modulePathResolver ||= new ModulePathResolverImpl(this);
+	constructor(readonly config: TSTool.Config){}
+
+	private _bundler?: TSTool.Bundler;
+	get bundler(): TSTool.Bundler {
+		return this._bundler ||= this.createOrThrow(TSToolContextImpl.createBundler);
 	}
 
-	private _transformerController?: TransformerController;
-	get transformerController(): TransformerController {
-		return this._transformerController ||= new TransformerControllerImpl(this);
+	private _compiler?: TSTool.Compiler;
+	get compiler(): TSTool.Compiler {
+		return this._compiler ||= this.createOrThrow(TSToolContextImpl.createCompiler);
+	}
+
+	private _modulePathResolver?: TSTool.ModulePathResolver;
+	get modulePathResolver(): TSTool.ModulePathResolver {
+		return this._modulePathResolver ||= this.createOrThrow(TSToolContextImpl.createPathResolver);
+	}
+
+	private _transformerController?: TSTool.TransformerController;
+	get transformerController(): TSTool.TransformerController {
+		return this._transformerController ||= this.createOrThrow(TSToolContextImpl.createTransformerController);
 	}
 
 }

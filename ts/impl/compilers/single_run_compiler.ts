@@ -1,8 +1,10 @@
-import {TSToolAbstractCompiler, TSToolCompiler} from "impl/compilers/compiler";
+import * as TSTool from "tstool";
+import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
+/*
 import * as tsc from "typescript";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 
-export class TSToolSingleRunCompiler extends TSToolAbstractCompiler implements TSToolCompiler {
+export class TSToolSingleRunCompiler extends TSToolAbstractCompiler implements TSTool.Compiler {
 	private _program: tsc.Program | null = null;
 	get program(): tsc.Program {
 		if(this._program){
@@ -13,17 +15,50 @@ export class TSToolSingleRunCompiler extends TSToolAbstractCompiler implements T
 
 	async run(){
 		await this.beforeStart();
+		this.clearLastBuildDiagnostics();
 
 		this._host = tsc.createCompilerHost(this.tscConfig.options);
 		this._program = tsc.createProgram({
 			...this.tscConfig,
 			host: this._host
 		});
-		
-		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 
-		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, this.context.transformerController.getTransformers());
-		processTypescriptDiagnostics(emitResult.diagnostics);
+		let preEmitDiag = tsc.getPreEmitDiagnostics(this.program);
+		this.lastBuildDiag.push(...preEmitDiag);
+		if(!this.context.config.noBuildDiagnosticMessages){
+			processTypescriptDiagnostics(preEmitDiag);
+		}
+
+		let transformers = await this.context.transformerController.getTransformers();
+		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, transformers);
+
+		this.lastBuildDiag.push(...emitResult.diagnostics);
+		if(!this.context.config.noBuildDiagnosticMessages){
+			processTypescriptDiagnostics(emitResult.diagnostics);
+		}
+		this.updateErrorCount();
+	}
+
+}*/
+
+
+export class TSToolSingleRunCompiler extends TSToolWatchCompiler implements TSTool.Compiler {
+	protected shouldInstallFsWatchers(): boolean {
+		return false;
+	}
+
+	async run(){
+		// да, в итоге оказалось проще имплементировать одиночную компиляцию через watch-компиляцию
+		// это дает более консистентные результаты
+		do {
+			// зачем в цикле?
+			// это позволяет поддерживать трансформеры, которые генерируют код
+			// т.о. в первый цикл трансформер генерирует файл и дергает за notifyFsObjectChange
+			// мы это видим по тому, что buildLock не снят
+			// и запускаем сборку по новой
+			await super.run();
+			this.stopWatch();
+		} while(this.buildLock.isLocked());
 	}
 
 }

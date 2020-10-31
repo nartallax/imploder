@@ -1,9 +1,9 @@
-import {ModuleStorage} from "impl/module_storage";
 import {SeqSet} from "utils/seq_set";
+import * as TSTool from "tstool";
 
 /** упорядочиватель файлов-результатов компиляции. определяет порядок их размещения в бандле */
 export class ModuleOrderer {
-	constructor(private readonly storage: ModuleStorage){}
+	constructor(private readonly storage: TSTool.ModuleStorage){}
 
 	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>}{
 		let circularDependentRelatedModules = new Set<string>();

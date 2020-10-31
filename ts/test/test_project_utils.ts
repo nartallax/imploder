@@ -47,11 +47,7 @@ export async function runTestBundle(code: string, bundler: BundlerImpl): Promise
 				void console;
 				void nop;
 				void mainThen;
-				let allCode = [
-					await bundler.getPrefixCode(), 
-					code, 
-					bundler.getPostfixCode("mainThen")
-				].join("\n");
+				let allCode = await bundler.wrapBundleCode(code, {afterEntryPointExecuted: "mainThen"});
 				try {
 					eval(allCode);
 				} catch(e){

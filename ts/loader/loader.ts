@@ -9,6 +9,7 @@ interface ModuleDefinition extends TSToolModuleLoaderData {
 
 interface LauncherParams {
 	entryPoint: { module: string, function: string }
+	entryPointArgs?: string[];
 	afterEntryPointExecuted?: (error: Error | null, entryPointExecutionResult: any) => void;
 	errorHandler?: (e: Error, action?: string) => void;
 	amdRequire?: (name: string | string[], onOk: (...moduleData: any) => void, onError?: (error: any) => void) => void;
@@ -253,7 +254,7 @@ function tstoolLoader(defs: TSToolModuleDefinitonArray[], params: LauncherParams
 			let res: any = null;
 			let err: Error | null = null;
 			try {
-				res = mainProduct[params.entryPoint.function].call(null);
+				res = mainProduct[params.entryPoint.function].apply(null, params.entryPointArgs || []);
 			} catch(e){
 				err = e;
 			}

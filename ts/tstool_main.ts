@@ -3,8 +3,21 @@ import {logErrorAndExit, setLogVerbosityLevel} from "utils/log";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
 import {CLI} from "utils/cli";
 import {TSToolContextImpl} from "impl/context";
+import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
+import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
+import {TransformerControllerImpl} from "impl/transformer/transformer_controller";
+import {BundlerImpl} from "impl/bundler";
+import {ModulePathResolverImpl} from "impl/module_path_resolver";
 
 export async function tstoolMain(){
+	TSToolContextImpl.createCompiler = context => context.config.watchMode
+		? new TSToolWatchCompiler(context)
+		: new TSToolSingleRunCompiler(context)
+
+	TSToolContextImpl.createTransformerController = context => new TransformerControllerImpl(context);
+	TSToolContextImpl.createBundler = context => new BundlerImpl(context);
+	TSToolContextImpl.createPathResolver = context => new ModulePathResolverImpl(context);
+
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
 	if(cliArgs.verbose){

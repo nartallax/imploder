@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as path from "path";
 import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
-import {TSToolContext} from "impl/context";
+import * as TSTool from "tstool";
 
 /*
 Полезные доки и примеры: 
@@ -11,20 +11,13 @@ https://www.typescriptlang.org/docs/handbook/module-resolution.html
 https://stackoverflow.com/questions/62026189/typescript-custom-transformers-with-ts-createwatchprogram
 */
 
-/** обертка над компилятором tsc */
-export interface TSToolCompiler {
-	readonly program: tsc.Program;
-	readonly compilerHost: tsc.CompilerHost;
-	run(): Promise<void>;
-}
-
 export abstract class TSToolAbstractCompiler {
 	protected readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
 
-	constructor(protected readonly context: TSToolContext){
+	constructor(protected readonly context: TSTool.Context){
 		this.tscConfig = {
 			...this.context.config.tscParsedCommandLine,
-			rootNames: [path.resolve(path.dirname(this.context.config.tsconfigPath), this.context.config.entryModule)]
+			rootNames: [path.dirname(this.context.config.tsconfigPath) + "/"]
 		}
 	}
 
@@ -47,6 +40,25 @@ export abstract class TSToolAbstractCompiler {
 			throw new Error("Compiler not started, no compiler host available.");
 		}
 		return this._host;
+	}
+
+	protected errorCount = 0;
+	protected lastBuildDiag = [] as tsc.Diagnostic[]
+	get lastBuildDiagnostics(): ReadonlyArray<tsc.Diagnostic>{
+		return this.lastBuildDiag;
+	}
+
+	protected clearLastBuildDiagnostics(){
+		this.errorCount = 0;
+		this.lastBuildDiag = [];
+	}
+
+	protected updateErrorCount(){
+		this.errorCount = this.lastBuildDiag.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
+	}
+
+	get lastBuildWasSuccessful(): boolean {
+		return this.errorCount === 0
 	}
 
 }

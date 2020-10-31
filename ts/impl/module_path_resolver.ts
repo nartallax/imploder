@@ -1,23 +1,15 @@
 import * as path from "path";
 import * as tsc from "typescript";
 import {stripTsExt} from "utils/path_utils";
-import {TSToolContext} from "./context";
-
-export interface ModulePathResolver {
-	/** если moduleDesignator указывает на модуль-файл - получить правильное имя модуля; иначе оставить его как есть */ 
-	resolveModuleDesignator(moduleDesignator: string, sourceFile: string): string;
-
-	/** привести имя файла-модуля проекта к каноничному виду */
-	getCanonicalModuleName(localModuleNameOrPath: string): string;
-}
+import * as TSTool from "tstool";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
-export class ModulePathResolverImpl implements ModulePathResolver {
+export class ModulePathResolverImpl implements TSTool.ModulePathResolver {
 
 	private readonly moduleRoot: string;
 	private readonly ambientModules: Set<string>;
 
-	constructor(private readonly context: TSToolContext){
+	constructor(private readonly context: TSTool.Context){
 		this.moduleRoot = path.resolve(path.dirname(context.config.tsconfigPath), context.config.tscParsedCommandLine.options.rootDir || ".");
 		let ambientMods = context.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
 		this.ambientModules = new Set(ambientMods);

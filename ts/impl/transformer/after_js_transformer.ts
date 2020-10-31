@@ -1,6 +1,6 @@
 import {AbstractTransformer} from "./abstract_transformer";
 import * as tsc from "typescript";
-import {ModuleData} from "impl/module_storage";
+import * as TSTool from "tstool";
 
 export class AfterJsBundlerTransformer extends AbstractTransformer {
 
@@ -42,7 +42,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 		return tsc.factory.updateSourceFile(fileNode, tsc.createNodeArray([definingFunction]));
 	}
 
-	private setImportExportFlag(moduleMeta: ModuleData){
+	private setImportExportFlag(moduleMeta: TSTool.ModuleData){
 		moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
 			|| moduleMeta.exports.length > 0
 			|| moduleMeta.hasOmniousExport
@@ -50,7 +50,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 			|| moduleMeta.exportModuleReferences.length > 0;
 	}
 
-	private processDefineCall(moduleMeta: ModuleData, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {
+	private processDefineCall(moduleMeta: TSTool.ModuleData, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {
 		let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2];
 		if(!tsc.isArrayLiteralExpression(depArrNode)){
 			throw new Error("Second-from-end argument of define() is not array literal.");

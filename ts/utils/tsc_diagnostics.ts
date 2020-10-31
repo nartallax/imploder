@@ -32,13 +32,10 @@ export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 	return false;
 }
 
-export function processTypescriptDiagnostics(diagnostics?: Iterable<tsc.Diagnostic> | null){
+export function processTypescriptDiagnostics(diagnostics?: Iterable<tsc.Diagnostic> | null): boolean {
 	let haveErrors = false;
     for(let d of diagnostics || []) {
 		haveErrors = haveErrors || processTypescriptDiagnosticEntry(d);
 	}
-	
-	if(haveErrors){
-		process.exit(1)
-	}
+	return haveErrors;
 }

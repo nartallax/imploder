@@ -1,11 +1,12 @@
 import * as tsc from "typescript";
-import {processTypescriptDiagnosticEntry, processTypescriptDiagnostics} from "utils/tsc_diagnostics";
+import * as TSTool from "tstool";
+import {processTypescriptDiagnosticEntry} from "utils/tsc_diagnostics";
 import {logInfo, logError, logDebug, logWarn} from "utils/log";
 import {Lock} from "utils/lock";
-import {TSToolAbstractCompiler, TSToolCompiler} from "impl/compilers/compiler";
+import {TSToolAbstractCompiler} from "impl/compilers/compiler";
 
 
-export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToolCompiler {
+export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSTool.Compiler {
 	readonly buildLock = new Lock();
 
 	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
@@ -20,8 +21,8 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 		throw new Error("Compiler not started yet.");
 	}
 
-	get isInSuccessfulState(): boolean {
-		return this.errorCount === 0
+	protected shouldInstallFsWatchers(): boolean {
+		return true;
 	}
 
 	// создать экземпляр tsc.System для работы в вотчмоде
@@ -31,16 +32,17 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 
 		return {
 			...tsc.sys,
-			watchFile: !watchFile? undefined:
+			watchFile: !watchFile || !this.shouldInstallFsWatchers()? undefined:
 				(path, callback, pollingInterval, options) => watchFile.call(tsc.sys, path, (fileName, kind) => {
 					let module = this.context.modulePathResolver.getCanonicalModuleName(fileName);
 					this.context.moduleStorage.delete(module);
+					this.context.transformerController.onModuleDelete(module);
 					if(this._watch){
 						callback(fileName, kind);
 						this.notifyFsObjectChange(fileName);
 					}
 				}, pollingInterval, options),
-			watchDirectory: !watchDir? undefined: 
+			watchDirectory: !watchDir || !this.shouldInstallFsWatchers()? undefined: 
 				(path, callback, recursive, options) => watchDir.call(tsc.sys, path, (fileName: string) => {
 					if(this._watch){
 						callback(fileName);
@@ -52,8 +54,8 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 		}
 	}
 
-	private createWatchHost(system: tsc.System){
-		let transformers = this.context.transformerController.getTransformers();
+	private async createWatchHost(system: tsc.System){
+		let transformers = await this.context.transformerController.getTransformers();
 
 		// зачем такие сложности, с созданием двух хостов?
 		// первый хост нужен для того, чтобы вызывать на нем createProgram
@@ -62,7 +64,7 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 		// в худшем случае, при изменениях тул перестанет компилиться/работать
 		let defaultHost = tsc.createWatchCompilerHost(
 			this.context.config.tsconfigPath,
-			this.tscConfig.options,
+			this.context.config.tscParsedCommandLine.options,
 			system,
 			undefined,
 			processTypescriptDiagnosticEntry,
@@ -74,18 +76,25 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 
 		return tsc.createWatchCompilerHost(
 			this.context.config.tsconfigPath,
-			this.tscConfig.options,
+			this.context.config.tscParsedCommandLine.options,
 			system,
 			(rootNames, options, host, oldProgram, configFileParsingDiagnostics, projectReferences) => {
 				// подменять createProgram нужно для того, чтобы можно было подсовывать произвольные трансформеры в его emit
 				let result = defaultHost.createProgram(rootNames, options, host, oldProgram, configFileParsingDiagnostics, projectReferences);
 				let origEmit = result.emit;
+				
 				this._builderProgram = result;
+
 				result.emit = (targetSourceFile, writeFile, cancellationToken, emitOnlyDtsFiles, customTransformers) => {
 					this.startBuild();
-					let res: tsc.EmitResult;
+
+					// возможно, это избыточно?
+					for(let diag of tsc.getPreEmitDiagnostics(result.getProgram())){
+						this.onDiag(diag);
+					}
+
 					try {
-						res = origEmit.call(result, 
+						return origEmit.call(result, 
 							targetSourceFile,
 							writeFile,
 							cancellationToken,
@@ -99,16 +108,10 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 					} finally {
 						this.endBuild();
 					}
-					return res;
 				}
 				return result;
 			},
-			diag => {
-				this.lastBuildDiag.push(diag);
-				if(!this.context.config.noBuildDiagnosticMessages){
-					processTypescriptDiagnosticEntry(diag);
-				}
-			},
+			diag => this.onDiag(diag),
 			diag => {
 				if(diag.code === 6031 || diag.code === 6032){
 					// build started, skipping
@@ -121,37 +124,40 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 		);
 	}
 
+	private onDiag(diag: tsc.Diagnostic){
+		this.lastBuildDiag.push(diag);
+		if(!this.context.config.noBuildDiagnosticMessages){
+			processTypescriptDiagnosticEntry(diag);
+		}
+	}
+
 	private hasFileChangesLock = false;
 	private filesChanged = 0;
-	private errorCount = 0;
-	private lastBuildDiag = [] as tsc.Diagnostic[]
 	private startBuild(){
 		this.buildLock.lock();
-		this.lastBuildDiag = [];
+		this.clearLastBuildDiagnostics();
 		this.filesChanged = 0;
 		logDebug("Build started.");
 	}
 
-	getLastBuildDiagnostics(): ReadonlyArray<tsc.Diagnostic>{
-		return this.lastBuildDiag;
-	}
-
 	private endBuild(){
-		let errorCount = this.errorCount = this.lastBuildDiag.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
+		this.updateErrorCount();
 		if(this.filesChanged !== 0){
-			logInfo(`Build ended, errors: ${errorCount} (but soon new one will start, files changed since build start = ${this.filesChanged})`);
+			let logger = this.context.config.noBuildDiagnosticMessages? logDebug: logInfo;
+			logger(`Build ended, errors: ${this.errorCount} (but soon new one will start, files changed since build start = ${this.filesChanged})`);
 		} else {
-			(errorCount !== 0? logWarn: logDebug)(`Build ended, errors: ${errorCount}`);
-			this.buildLock.unlock();
+			let logger = this.errorCount === 0 || this.context.config.noBuildDiagnosticMessages? logDebug: logWarn;
+			logger(`Build ended, errors: ${this.errorCount}`);
 			if(this.hasFileChangesLock){
 				this.hasFileChangesLock = false;
 				this.buildLock.unlock();
 			}
 			logDebug("Lock level after build end: " + this.buildLock.getLockLevel());
 		}
+		this.buildLock.unlock();
 	}
 
-	private notifyFsObjectChange(fsObjectChangedPath: string): void {
+	notifyFsObjectChange(fsObjectChangedPath: string): void {
 		logDebug("FS object change: " + fsObjectChangedPath);
 		if(this.filesChanged === 0 && !this.hasFileChangesLock){
 			this.buildLock.lock();
@@ -166,19 +172,21 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 		await this.beforeStart();
 
 		let system = this.createSystemForWatch();
-		let watchHost = this.createWatchHost(system);
-		this._host = tsc.createCompilerHost(this.tscConfig.options);
+		let watchHost = await this.createWatchHost(system);
+		this._host = tsc.createCompilerHost(this.context.config.tscParsedCommandLine.options);
 		let watchProgram = tsc.createWatchProgram(watchHost);
 		this._watch = watchProgram;
-
-		processTypescriptDiagnostics(tsc.getPreEmitDiagnostics(this.program));
 	}
 
-	async stopWatch(){
+	stopWatch(){
 		if(!this._watch){
 			throw new Error("Could not stop watchmode if watchmode is not started.");
 		}
 		this._watch.close();
 		this._watch = null;
+	}
+
+	waitBuildEnd(): Promise<void>{
+		return new Promise(ok => this.buildLock.withLock(ok));
 	}
 }

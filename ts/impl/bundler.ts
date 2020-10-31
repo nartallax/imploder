@@ -7,34 +7,26 @@ import {readTextFile, stat, writeTextFile} from "utils/afs";
 import {stripTsExt} from "utils/path_utils";
 import {minifyJsCode, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
-import {TSToolContext} from "./context";
+import * as TSTool from "tstool";
 
-/** сборщик бандл-файла из кучи исходников */
-export interface Bundler {
-	/** собрать бандл, положить в outFile, указанный в конфиге */
-	produceBundle(): Promise<void>;
+export class BundlerImpl implements TSTool.Bundler {
 
-	/** собрать бандл, выдать в виде строки */
-	assembleBundleCode(): Promise<string>;
-}
-
-export class BundlerImpl implements Bundler {
-
-	constructor(private readonly context: TSToolContext){}
+	constructor(private readonly context: TSTool.Context){}
 
 	async produceBundle(): Promise<void>{
 		logDebug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
 		await writeTextFile(this.context.config.outFile, code);
-		logDebug("Bundle produced.");
+		logDebug("Bundle produced (" + this.context.config.outFile + ")");
 	}
 
 	async assembleBundleCode(): Promise<string>{
-		let result = [] as string[];
-		if(!this.context.config.noLoaderCode){
-			result.push(await this.getPrefixCode());
+		if(!this.context.compiler.lastBuildWasSuccessful){
+			throw new Error("Last build was not successful! Could not produce bundle.");
 		}
 
+		let result = [] as string[];
+		
 		await this.loadAbsentModuleCode();
 
 		let moduleOrder = new ModuleOrderer(this.context.moduleStorage).getModuleOrder(this.getEntryModuleName());
@@ -46,11 +38,20 @@ export class BundlerImpl implements Bundler {
 		}
 		result.push(JSON.stringify(defArrArr));		
 		
+		let code = result.join("\n");
 		if(!this.context.config.noLoaderCode){
-			result.push(this.getPostfixCode());
+			code = await this.wrapBundleCode(code)
 		}
 
-		return result.join("\n");
+		return code;
+	}
+
+	async wrapBundleCode(bareCode: string, otherParams: TSTool.BundlerWrapperParameters = {}): Promise<string>{
+		return [
+			await this.getPrefixCode(), 
+			bareCode, 
+			this.getPostfixCode(otherParams)
+		].join("\n");
 	}
 
 	private getEntryModuleName(): string {
@@ -115,7 +116,7 @@ export class BundlerImpl implements Bundler {
 	}
 
 	private minifiedLoaderCode: string | null = null;
-	async getPrefixCode(): Promise<string> {
+	private async getPrefixCode(): Promise<string> {
 		let resultLoaderCode = loaderCode;
 		if(this.context.config.minify){
 			if(this.minifiedLoaderCode === null){
@@ -129,7 +130,7 @@ export class BundlerImpl implements Bundler {
 
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
-	getPostfixCode(thenCode?: string): string {
+	private getPostfixCode(wrapParams: TSTool.BundlerWrapperParameters): string {
 		let cfg = this.context.config;
 		let params: any = {
 			entryPoint: {
@@ -147,11 +148,17 @@ export class BundlerImpl implements Bundler {
 			params.preferCommonjs = true;
 		}
 		let paramStr = JSON.stringify(params);
-		if(thenCode){
-			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("afterEntryPointExecuted")}:${thenCode}}`;
+		if(wrapParams.afterEntryPointExecuted){
+			paramStr = paramStr.substr(0, paramStr.length - 1) + 
+				`,${JSON.stringify("afterEntryPointExecuted")}:${wrapParams.afterEntryPointExecuted}}`;
+		}
+		if(wrapParams.entryPointArgCode){
+			paramStr = paramStr.substr(0, paramStr.length - 1) + 
+				`,${JSON.stringify("entryPointArgs")}:[${wrapParams.entryPointArgCode.join(",")}]}`;
 		}
 		if(cfg.errorHandlerName){
-			paramStr = paramStr.substr(0, paramStr.length - 1) + `,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
+			paramStr = paramStr.substr(0, paramStr.length - 1) + 
+				`,${JSON.stringify("errorHandler")}:${cfg.errorHandlerName}}`;
 		}
 		return ",\n" + paramStr + ",eval);"
 	}

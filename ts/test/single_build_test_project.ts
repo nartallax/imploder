@@ -1,13 +1,14 @@
 import * as path from "path";
 import * as fs from "fs";
+import * as TSTool from "tstool";
 import {logError} from "utils/log";
-import {fileExists, unlinkRecursive} from "utils/afs";
-import {updateCliArgsWithTsconfig} from "impl/config";
+import {fileExists, unlink, unlinkRecursive} from "utils/afs";
 import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
 import {testProjectDir, runTestBundle} from "./test_project_utils";
 import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
-import {TSToolContext, TSToolContextImpl} from "impl/context";
+import {TSToolContextImpl} from "impl/context";
+import {updateCliArgsWithTsconfig} from "impl/config";
 
 export class SingleBuildTestProject {
 
@@ -27,11 +28,11 @@ export class SingleBuildTestProject {
 		return this._producedBundleText;
 	}
 
-	private _context?: TSToolContext;
-	private get context(): TSToolContext {
-		return this._context ||= new TSToolContextImpl(updateCliArgsWithTsconfig({
-			tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json")
-		}));
+	private _context?: TSTool.Context;
+	private get context(): TSTool.Context {
+		let config = updateCliArgsWithTsconfig({ tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json") });
+		config.noBuildDiagnosticMessages = true;
+		return this._context ||= new TSToolContextImpl(config);
 	}
 
 	private _compiler: TSToolSingleRunCompiler | null = null
@@ -107,15 +108,20 @@ export class SingleBuildTestProject {
 		return true;
 	}
 
-	private async rmOutDir(){
+	private async rmBuildProducts(){
 		let outDirPath = path.join(testProjectDir(this.name), "./js");
 		if(await fileExists(outDirPath)){
 			await unlinkRecursive(outDirPath);
 		}
+
+		let generatedFilePath = path.join(testProjectDir(this.name), "./generated.ts");
+		if(await fileExists(generatedFilePath)){
+			await unlink(generatedFilePath);
+		}
 	}
 
 	async run(): Promise<boolean> {
-		await this.rmOutDir();
+		await this.rmBuildProducts();
 		let err: Error | null = null;
 
 		try {
@@ -153,7 +159,7 @@ export class SingleBuildTestProject {
 	static readonly availableProjects: ReadonlyArray<string> = testListStr
 		.split("\n")
 		.map(_ => _.trim())
-		.filter(_ => !!_ && _ !== "watch")
+		.filter(_ => !!_ && _ !== "watch" && _ !== "transformer_list_all_classes" && _ !== "transformer_change_ts")
 
 	static couldRunTest(name: string): boolean {
 		return this.availableProjects.includes(name);
