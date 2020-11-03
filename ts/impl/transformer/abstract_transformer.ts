@@ -45,10 +45,12 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 		}
 	}
 
-	protected visitRecursive(node: tsc.Node, visitor: (node: tsc.Node, depth: number) => boolean | void, shouldFallThrough: ((node: tsc.Node) => boolean) | null = null, currentDepth: number = 0): boolean {
+	protected visitRecursive(node: tsc.Node, visitor: (node: tsc.Node, depth: number, index: number) => boolean | void, shouldFallThrough: ((node: tsc.Node) => boolean) | null = null, currentDepth: number = 0): boolean {
 		let stopped = false;
+		let index = -1;
 		node.forEachChild(child => {
-			if(stopped || visitor(child, currentDepth) === false){
+			index++;
+			if(stopped || visitor(child, currentDepth, index) === false){
 				stopped = true;
 				return;
 			}
@@ -70,8 +72,19 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 		if(prefix.length > 30){
 			prefix = "..." + prefix.substr(prefix.length - 30);
 		}
-		this.visitRecursive(fileNode, (node, depth) => {
-			console.log(prefix + new Array(depth + 2).join("    ") + tsc.SyntaxKind[node.kind]);
+		this.visitRecursive(fileNode, (node, depth, index) => {
+			let text = "<unknown>";
+			try {
+				text = node.getText() || "";
+			} catch(e: unknown){
+				text = "<err: " + (e as Error).message + ">"
+			}
+
+			text = text.replace(/[\n\r\s\t]/g, " ");
+			if(text.length > 30){
+				text = text.substr(0, 30) + "...";
+			}
+			console.log(prefix + " " + index + " " + new Array(depth + 2).join("  ") + tsc.SyntaxKind[node.kind] + ": " + text);
 		}, () => true)
 	}
 

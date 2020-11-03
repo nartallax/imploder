@@ -5,9 +5,16 @@ import * as TSTool from "../../ts/tstool";
 
 let haveDiffsInSets = <T>(oldValues: Set<T> | undefined, newValues: Set<T>): boolean => {
 	if(!oldValues){
-		return newValues.size !== 0;
+		return newValues.size !== 0
 	}
 
+	if(!newValues){
+		if(!oldValues || oldValues.size === 0){
+			return false;
+		}
+		return true;
+	}
+	
 	if(oldValues.size !== newValues.size){
 		return true;
 	}
@@ -37,10 +44,10 @@ class ClassEnumeratorTransformer implements TSTool.CustomTransformerDefinition {
 	}
 
 	onModuleDelete(moduleName: string) {
-		console.error("Module deletion handled: " + moduleName);
+		this.updateClasses(moduleName, null);
 	}
 
-	createForBefore(transformContext: tsc.TransformationContext): tsc.CustomTransformer {
+	createForBefore(): tsc.CustomTransformer {
 
 		let visitRecursive = (node: tsc.Node, handler: (node: tsc.Node) => void | undefined | boolean, depth: number = 0): void => {
 			//console.error(new Array(depth + 1).join("  ") + tsc.SyntaxKind[node.kind]);
@@ -139,9 +146,9 @@ class ClassEnumeratorTransformer implements TSTool.CustomTransformerDefinition {
 		return false;
 	}
 
-	private updateClasses(moduleName: string, classNames: string[]): void {
+	private updateClasses(moduleName: string, classNames: string[] | null): void {
 		let oldClassNames = this.knownClasses.get(moduleName);
-		let newClassNames = new Set(classNames);
+		let newClassNames = new Set(classNames || []);
 
 		if(haveDiffsInSets(oldClassNames, newClassNames)){
 			//console.error("Have diffs in " + moduleName + ": ", oldClassNames, newClassNames);

@@ -7,7 +7,8 @@
         "minify": true,
         "target": "ES2018",
         "transformerProjects": [
-            "../transformer_list_all_classes/tsconfig.json"
+            "../transformer_list_all_classes/tsconfig.json",
+            "../transformer_change_ts/tsconfig.json"
         ]
     },
     

@@ -96,10 +96,10 @@ export class BundlerImpl implements TSTool.Bundler {
 
 				let short: TSToolModuleLoaderData = {}
 				if(haveModuleRefs){
-					short.exportRefs = meta.exportModuleReferences;
+					short.exportRefs = meta.exportModuleReferences.sort();
 				}
 				if(needExports){
-					short.exports = meta.exports;
+					short.exports = meta.exports.sort();
 				}
 				if(meta.hasOmniousExport){
 					short.arbitraryType = true;

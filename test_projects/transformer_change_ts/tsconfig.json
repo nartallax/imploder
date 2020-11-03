@@ -5,15 +5,15 @@
         "outFile": "js/bundle.js",
         "noLoaderCode": true,
         "minify": true,
-        "target": "ES2018",
-        "embedTslib": false
+        "target": "ES2018"
     },
     
     "compilerOptions": {
         "baseUrl": ".",
         "outDir": "js",
         "paths": {
-            "*": ["*"]
-        }
+            "*": ["./*"]
+        },
+        "downlevelIteration": true
     }
 }

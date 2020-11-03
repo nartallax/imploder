@@ -55,10 +55,22 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		}
 		*/
 
-		let children = fileNode.getChildren();
-		if(children.length === 2 && children[0].kind === tsc.SyntaxKind.SyntaxList && children[1].kind === tsc.SyntaxKind.EndOfFileToken){
-			children = children[0].getChildren();
+		let getNodeChildren = (n: tsc.Node): tsc.Node[] => {
+			let res = [] as tsc.Node[];
+			n.forEachChild(x => { 
+				res.push(x);
+				// не возвращать ничего из этой функции - важно
+				// иначе итерация forEachChild почему-то прекращается
+			});
+			return res;
 		}
+
+		let children = getNodeChildren(fileNode);
+		if(children.length === 2 && children[0].kind === tsc.SyntaxKind.SyntaxList && children[1].kind === tsc.SyntaxKind.EndOfFileToken){
+			children = getNodeChildren(children[0]);
+		}
+
+
 		for(let node of children){
 			if(tsc.isExportDeclaration(node)){
 				if(!node.exportClause){
@@ -96,7 +108,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		
 			}
 		}
-
+	
 		moduleMeta.exportModuleReferences = [... new Set(
 			moduleMeta.exportModuleReferences.map(x => this.context.modulePathResolver.resolveModuleDesignator(x, fileNode.fileName))
 		)];

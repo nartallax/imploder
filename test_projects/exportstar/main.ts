@@ -3,7 +3,5 @@ import * as eee from "exporter";
 
 export function main(){
 	console.log(aval + bval + cval);
-	for(let key in eee){
-		console.log(key);
-	}
+	console.log(Object.keys(eee).sort().join("\n"));
 }
