@@ -1,0 +1,1 @@
+[["/main",["/my_file.ts"],"(t,n,s)=>{t.main=function main(){console.log('tsts: '+s.tststs())}}"],["/my_file.ts","t=>{t.tststs=function tststs(){return'tststs'}}"]]

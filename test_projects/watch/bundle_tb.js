@@ -1,0 +1,1 @@
+[["/generated",["/impl"],"(m,n,r)=>{m.myClassEnumeration=[r.ImplA]}"],["/impl","e=>{e.ImplA=class ImplA{getText(){return'impla!'}}}"],["/main",["/utils","/generated"],"(n,e,t,a)=>{n.main=function main(){t.logText(a.myClassEnumeration.map(n=>(new n).getText()).join('; '))}}"],["/utils","o=>{o.logText=function logText(o){console.log('LOGTEXT: '+o)}}"]]

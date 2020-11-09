@@ -134,7 +134,7 @@ class ClassEnumeratorTransformer implements TSTool.CustomTransformerDefinition {
 							}
 						}
 					}
-				} else if(t.symbol.valueDeclaration && tsc.isClassDeclaration(t.symbol.valueDeclaration)){
+				} else if(t.symbol && t.symbol.valueDeclaration && tsc.isClassDeclaration(t.symbol.valueDeclaration)){
 					// почему классы идут сюда, а не выше? понятия не имею
 					if(this.classOrInterfaceImplementsInterface(t.symbol.valueDeclaration, interfaceName, typeChecker)){
 						return true;

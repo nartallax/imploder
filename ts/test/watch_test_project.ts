@@ -1,4 +1,4 @@
-import {readTextFile, withTempDir, writeTextFile, copyDir } from "utils/afs";
+import {readTextFile, withTempDir, writeTextFile, copyDir, unlink } from "utils/afs";
 import * as path from "path";
 import * as TSTool from "tstool";
 import {runTestBundle, testProjectDir} from "test/test_project_utils";
@@ -14,20 +14,24 @@ export class WatchTestProject {
 		return withTempDir("watchtest_" + this.name + "_", async projDir => {
 			this.projDir = projDir;
 			try {
-				let projSourceDir = testProjectDir(this.name) 
-				await copyDir(projSourceDir, this.projDir);
-				await this.compiler.run();
+				await copyDir(testProjectDir(this.name) , this.projDir);
 				return await Promise.resolve(action());
 			} finally {
-				if(this._compiler){ // возможно, компилятор не успел инициализироваться
-					this.compiler.stopWatch();
-					await this.compiler.buildLock.withLock(() => {});
-				}
 				this.projDir = null;
-				this._context = null;
-				this._compiler = null;
 			}
 		})
+	}
+
+	protected async withCompilerRunning<T>(action: () => T | Promise<T>): Promise<T> {
+		try {
+			await this.compiler.run();
+			return await Promise.resolve(action());
+		} finally {
+			this.compiler.stopWatch();
+			await this.compiler.buildLock.withLock(() => {});
+			this._compiler = null;
+			this._context = null;
+		}
 	}
 
 	private _context: TSTool.Context | null = null;
@@ -81,23 +85,26 @@ export class WatchTestProject {
 		return writeTextFile(this.resolveProjectFilePath(filePath), content);
 	}
 
+	protected deleteProjectFile(filePath: string): Promise<void>{
+		return unlink(this.resolveProjectFilePath(filePath));
+	}
+
 	protected readProjectFile(filePath: string): Promise<string> {
 		return readTextFile(this.resolveProjectFilePath(filePath));
 	}
 	
-	protected waitWatchTriggered(): Promise<void>{
-		return new Promise(ok => setTimeout(ok, 1000));
+	protected async waitWatchTriggered(): Promise<void>{
+		await new Promise(ok => setTimeout(ok, 1000));
+		await this.compiler.waitBuildEnd();
 	}
 
 	protected async bundleAndTest(goodBundlePath: string, goodStdoutPath: string): Promise<void>{
 		// файлвотчи срабатывают не мгновенно, нужно сколько-то подождать
 		await this.waitWatchTriggered();
-		await this.compiler.buildLock.withLock(async () => {
-			await this.context.bundler.produceBundle();
-			let bundle = await this.assertFileEquals("js/bundle.js", goodBundlePath);
-			let stdout = await runTestBundle(bundle, this.context.bundler as BundlerImpl);
-			await this.assertFileContentEquals(stdout, goodStdoutPath);
-		});
+		await this.context.bundler.produceBundle();
+		let bundle = await this.assertFileEquals("js/bundle.js", goodBundlePath);
+		let stdout = await runTestBundle(bundle, this.context.bundler as BundlerImpl);
+		await this.assertFileContentEquals(stdout, goodStdoutPath);
 	}
 
 	protected async checkErrors(codes: number[]): Promise<void> {
@@ -116,5 +123,5 @@ export class WatchTestProject {
 		});
 	}
 
-	constructor(private readonly name: string){}
+	constructor(protected readonly name: string){}
 }

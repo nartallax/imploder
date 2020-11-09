@@ -4,7 +4,6 @@ import {loaderCode} from "generated/loader_code";
 import {logDebug} from "utils/log";
 import * as path from "path";
 import {readTextFile, stat, writeTextFile} from "utils/afs";
-import {stripTsExt} from "utils/path_utils";
 import {minifyJsCode, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
 import * as TSTool from "tstool";
@@ -56,7 +55,7 @@ export class BundlerImpl implements TSTool.Bundler {
 
 	private getEntryModuleName(): string {
 		let absPath = path.resolve(path.dirname(this.context.config.tsconfigPath), this.context.config.entryModule);
-		let name = stripTsExt(this.context.modulePathResolver.getCanonicalModuleName(absPath));
+		let name = this.context.modulePathResolver.getCanonicalModuleName(absPath);
 		return name;
 	}
 
@@ -194,5 +193,9 @@ export class BundlerImpl implements TSTool.Bundler {
 			moduleName
 		});
 	}
+/*
+	private checkNoBlacklistedModules(mod: ){
+	}
+	*/
 
 }

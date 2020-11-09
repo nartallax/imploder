@@ -1,6 +1,5 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import {stripTsExt} from "utils/path_utils";
 import * as TSTool from "tstool";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
@@ -43,6 +42,20 @@ export class ModulePathResolverImpl implements TSTool.ModulePathResolver {
 		return "/" + getRelativeModulePath(this.moduleRoot, localModuleNameOrPath);
 	}
 
+}
+
+const tsFileExtensions: ReadonlySet<string> = new Set([".ts", ".tsx"]);
+
+function isTsExt(path: string): boolean {
+	let extMatch = path.match(/\.[^\.]+$/);
+	if(!extMatch)
+		return false;
+	let ext = extMatch[0].toLowerCase();
+	return tsFileExtensions.has(ext);
+}
+
+function stripTsExt(path: string): string {
+	return isTsExt(path)? path.replace(/\.[^\.]+$/, ""): path;
 }
 
 function normalizeModulePath(p: string): string {

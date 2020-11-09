@@ -5,8 +5,7 @@
         "outFile": "js/bundle.js",
         "noLoaderCode": true,
         "minify": true,
-		"target": "ES2018",
-		"watchMode": true
+        "target": "ES2018"
     },
     
     "compilerOptions": {

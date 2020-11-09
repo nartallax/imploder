@@ -1,6 +1,5 @@
 import * as tsc from "typescript";
 import * as TSTool from "tstool";
-import {stripTsExt} from "utils/path_utils";
 
 export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.Node[]}
 
@@ -89,7 +88,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 	}
 
 	protected moduleNameByNode(fileNode: tsc.SourceFile): string {
-		return stripTsExt(this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName));
+		return this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName);
 	}
 
 }

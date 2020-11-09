@@ -36,7 +36,9 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 				(path, callback, pollingInterval, options) => watchFile.call(tsc.sys, path, (fileName, kind) => {
 					let module = this.context.modulePathResolver.getCanonicalModuleName(fileName);
 					this.context.moduleStorage.delete(module);
-					this.context.transformerController.onModuleDelete(module);
+					if(kind === tsc.FileWatcherEventKind.Deleted){
+						this.context.transformerController.onModuleDelete(module);
+					}
 					if(this._watch){
 						callback(fileName, kind);
 						this.notifyFsObjectChange(fileName);

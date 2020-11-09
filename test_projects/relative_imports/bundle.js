@@ -1,0 +1,1 @@
+[["/dir_a/dir_b/in_b",["/dir_a/in_a","/main"],{"exports":["funB"]},"(n,u,f,r)=>{n.funB=function funB(){return r.glue(f.funA(),f.funA())}}"],["/dir_a/in_a","n=>{n.funA=function funA(){return'a!'}}"],["/main",["/dir_a/dir_b/in_b"],{"exports":["glue","main"]},"(n,u,e)=>{n.glue=function glue(n,u){return n+'|'+u},n.main=function main(){console.log(e.funB())}}"]]
