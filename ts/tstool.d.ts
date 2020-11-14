@@ -1,4 +1,6 @@
 import * as tsc from "typescript";
+import * as terser from "terser";
+import {BundlerImpl} from "impl/bundler";
 
 declare namespace TSTool {
 	/** Объект, содержащий в себе различные части тула */
@@ -31,8 +33,8 @@ declare namespace TSTool {
 	
 	/** сборщик бандл-файла из кучи исходников */
 	export interface Bundler {
-		/** собрать бандл, положить в outFile, указанный в конфиге */
-		produceBundle(): Promise<void>;
+		/** собрать бандл, положить в outFile, указанный в конфиге, и выдать */
+		produceBundle(): Promise<string>;
 
 		/** собрать бандл, выдать в виде строки */
 		assembleBundleCode(): Promise<string>;
@@ -87,19 +89,23 @@ declare namespace TSTool {
 		 * Если он задан и не пуст - имя каждого модуля, включаемого в бандл, обязано подходить хотя бы под один из них */
 		moduleWhitelistRegexp?: string[];
 
+		/** Опции-переопределения для минификации
+		 * Передача некоторых из них, возможно, сломает тул */
+		minificationOverrides?: Partial<terser.CompressOptions>;
+
 		/** Список путей к проектам с трансформаторами.
 		 * Пути могут быть относительными, от корня проекта, в котором указаны. */
 		transformerProjects?: string[];
 
 		// watchmode
 		/** Запуститься в watch-моде. Отслеживать изменения в файлах и перекомпилировать сразу же. */
-		watchMode: boolean;
-		/** Будет ли тул ожидать каких-либо команд в stdin, и будет ли выдавать какие-либо структурированные ответы в stdout
-		 * Удобно при встраивании куда-либо. Работает только в watch-моде */
-		useStdio?: boolean;
+		watchMode?: boolean;
 		/** Если указан этот порт - то тул запустит локальный http-сервер, который будет ожидать команд, на указанном порту.
 		 * Удобно при разработке. Работает только в watch-моде. */
 		httpPort?: number;
+		/** Показывать ли ошибки при провале сборки, если сборка запущена через HTTP?
+		 * По умолчанию показ ошибок через HTTP отключен из соображений безопасности */
+		showErrorsOverHttp?: boolean;
 
 		// отладочные опции
 		/** Выдавать ли больше логов в stderr */
@@ -108,7 +114,7 @@ declare namespace TSTool {
 		noBuildDiagnosticMessages?: boolean;
 		/** Не включать код загрузчика в бандл, и сопутствующие ему обертки.
 		 * Если включено, бандл будет состоять только из кода модулей. */
-		noLoaderCode: boolean;
+		noLoaderCode?: boolean;
 	}
 
 	/** Конфиг всего тула в целом */

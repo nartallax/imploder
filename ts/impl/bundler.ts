@@ -4,7 +4,7 @@ import {loaderCode} from "generated/loader_code";
 import {logDebug} from "utils/log";
 import * as path from "path";
 import {readTextFile, stat, writeTextFile} from "utils/afs";
-import {minifyJsCode, MinifierOptions} from "impl/minification";
+import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
 import * as TSTool from "tstool";
 
@@ -12,11 +12,12 @@ export class BundlerImpl implements TSTool.Bundler {
 
 	constructor(private readonly context: TSTool.Context){}
 
-	async produceBundle(): Promise<void>{
+	async produceBundle(): Promise<string>{
 		logDebug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
 		await writeTextFile(this.context.config.outFile, code);
 		logDebug("Bundle produced (" + this.context.config.outFile + ")");
+		return code;
 	}
 
 	async assembleBundleCode(): Promise<string>{
@@ -188,11 +189,12 @@ export class BundlerImpl implements TSTool.Bundler {
 	}
 
 	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}): Promise<string> {
-		return minifyJsCode({
+		return minifyJsFunctionExpression({
 			target: tsc.ScriptTarget[this.context.config.target],
 			...opts,
 			code, 
-			moduleName
+			moduleName,
+			overrides: this.context.config.minificationOverrides
 		});
 	}
 

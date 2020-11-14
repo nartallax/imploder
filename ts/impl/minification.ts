@@ -7,9 +7,10 @@ export interface MinifierOptions {
 	target: tsc.ScriptTarget;
 	code: string;
 	moduleName: string;	
+	overrides?: Partial<terser.CompressOptions>;
 }
 
-export async function minifyJsCode(opts: MinifierOptions): Promise<string> {
+export async function minifyJsFunctionExpression(opts: MinifierOptions): Promise<string> {
 	let ecma = tscEcmaToTerserEcma(opts.target);
 	try {
 		let res = await terser.minify("return " + opts.code.replace(/^[\n\r\s]+/, ""), {
@@ -57,7 +58,8 @@ export async function minifyJsCode(opts: MinifierOptions): Promise<string> {
 				unsafe_methods: false,
 				unsafe_proto: false,
 				unsafe_regexp: false, // ???
-				unused: true
+				unused: true,
+				...opts.overrides
 			},
 			mangle: {
 				eval: false,

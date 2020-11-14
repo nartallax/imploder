@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import {logError, logWarn, logInfo} from "utils/log";
 
-export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
+export function typescriptDiagnosticEntryToString(d: tsc.Diagnostic): string {
 	let msg: (string | null)[] = [];
 
 	if(d.file) {
@@ -19,7 +19,11 @@ export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
 	msg.push(tsc.flattenDiagnosticMessageText(d.messageText, '\n'));
 	//msg.push(d.code.toString());
 
-	let msgString = msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
+	return msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
+}
+
+export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
+	let msgString = typescriptDiagnosticEntryToString(d);
 	if(d.category == tsc.DiagnosticCategory.Error){
 		logError(msgString)
 		return true;

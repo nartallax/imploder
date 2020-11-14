@@ -189,6 +189,13 @@ export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSToo
 	}
 
 	waitBuildEnd(): Promise<void>{
-		return new Promise(ok => this.buildLock.withLock(ok));
+		return new Promise(ok => {
+			// таймаут здесь нужен потому, что вотчеры файловой системы могут сработать не мгновенно
+			// и поэтому нужно хотя бы немного подождать, пока они отработают и запустят процесс билда
+			// это ненадежно, но более надежного способа у меня нет
+			setTimeout(() => {
+				this.buildLock.withLock(ok);
+			}, 500);
+		});
 	}
 }

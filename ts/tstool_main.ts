@@ -1,5 +1,5 @@
 import {runAllTests, runSingleTest} from "test/test";
-import {logErrorAndExit, setLogVerbosityLevel} from "utils/log";
+import {logErrorAndExit, logInfo, setLogVerbosityLevel} from "utils/log";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
 import {CLI} from "utils/cli";
 import {TSToolContextImpl} from "impl/context";
@@ -8,6 +8,7 @@ import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
 import {TransformerControllerImpl} from "impl/transformer/transformer_controller";
 import {BundlerImpl} from "impl/bundler";
 import {ModulePathResolverImpl} from "impl/module_path_resolver";
+import {HttpApi} from "impl/http_api";
 
 export async function tstoolMain(){
 	TSToolContextImpl.createCompiler = context => context.config.watchMode
@@ -46,12 +47,10 @@ export async function tstoolMain(){
 		await context.bundler.produceBundle();
 	} else {
 		await context.compiler.run();
-		if(config.useStdio){
-			// TODO: stdio interface
-		}
 		if(typeof(config.httpPort) === "number"){
-			// TODO: http interface
+			await new HttpApi(context).start();
 		}
+		logInfo("Up and running.");
 	}
 
 }
