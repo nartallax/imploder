@@ -29,7 +29,9 @@ export class BundlerImpl implements TSTool.Bundler {
 		await this.loadAbsentModuleCode();
 
 		let moduleOrder = new ModuleOrderer(this.context.moduleStorage).getModuleOrder(this.getEntryModuleName());
-		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder))
+		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
+
+		this.checkModuleNames(moduleOrder.modules);
 
 		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules);
 		if(this.context.config.embedTslib && moduleOrder.absentModules.has("tslib")){
@@ -193,9 +195,46 @@ export class BundlerImpl implements TSTool.Bundler {
 			moduleName
 		});
 	}
-/*
-	private checkNoBlacklistedModules(mod: ){
+
+	private blacklistRegexps: RegExp[] | null = null;
+	private whitelistRegexps: RegExp[] | null = null;
+	private checkModuleNames(names: string[]): void {
+		let blacklistedModules = [] as string[];
+		if(this.context.config.moduleBlacklistRegexp){
+			let regexps = (this.blacklistRegexps ||= this.context.config.moduleBlacklistRegexp.map(x => new RegExp(x)));
+			names.forEach(name => {
+				for(let regexp of regexps){
+					if(regexp.test(name)){
+						blacklistedModules.push(name);
+						return;
+					}
+				}
+			});
+		}
+
+		let nonWhitelistedModules = [] as string[];
+		if(this.context.config.moduleWhitelistRegexp){
+			let regexps = (this.whitelistRegexps ||= this.context.config.moduleWhitelistRegexp.map(x => new RegExp(x)));
+			names.forEach(name => {
+				for(let regexp of regexps){
+					if(regexp.test(name)){
+						return;
+					}
+				}
+				nonWhitelistedModules.push(name);
+			});
+		}
+
+		if(blacklistedModules.length > 0 || nonWhitelistedModules.length > 0){
+			let message = "Bundle includes some modules that must not be included:";
+			if(blacklistedModules.length > 0){
+				message += " " + blacklistedModules.join(", ") + " (excluded by blacklist);"
+			}
+			if(nonWhitelistedModules.length > 0){
+				message += " " + nonWhitelistedModules.join(", ") + " (not included in whitelist);"
+			}
+			throw new Error(message);
+		}
 	}
-	*/
 
 }

@@ -1,0 +1,26 @@
+{ 
+    "tstoolConfig": {
+        "entryModule": "maincode/main.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "noLoaderCode": true,
+        "minify": true,
+        "target": "ES2018",
+        "embedTslib": false,
+        "moduleBlacklistRegexp": [
+            "^/forbidden_knowledge/.*$"
+        ],
+        "moduleWhitelistRegexp": [
+            "^/maincode/.*?$",
+            "^/utils/.*?$"
+        ]
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["*"]
+        }
+    }
+}
