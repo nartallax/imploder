@@ -19,6 +19,7 @@ Versions of Typescript below 4 are not supported.
 
 To get started, you need to modify your tsconfig.json.  
 Add block tstoolConfig to your tsconfig.json like this:  
+
 	{
 		"tstoolConfig": {
 			"entryModule": "my_main_file.ts",
@@ -29,13 +30,16 @@ Add block tstoolConfig to your tsconfig.json like this:
 		
 		"compilerOptions": { ... }
 	}
+
 In this block you can see that tool is pointed to .ts file (my_main_file.ts), which is exporting function myEntryPoint. This is how entry point is defined. When the tool produces bundle, this function will be invoked.  
 There is also outFile defined. This file will contain the bundle.  
 Defining target is not required, but strongly recommended. Default target is ES5. ES3 is not supported. Target constants are the same as in compilerOptions.  
-There is possibility that some of compilerOptions won't be compatible with the tool. In this case, you will see error messages during tool launch.  
+Some of compilerOptions won't be compatible with the tool. In this case, you will see error messages during tool launch.  
 
 After configuration block is added, it's time to build. Launch build:  
+
 	node ./node_modules/.bin/tstool --tsconfig ./tsconfig.json
+
 After build is finished, you should end up with either bundle in desired location, or with bunch of errors in tool output.  
 
 ## Watch mode
