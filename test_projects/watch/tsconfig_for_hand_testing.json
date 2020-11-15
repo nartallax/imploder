@@ -7,7 +7,13 @@
 		"target": "ES2018",
         "watchMode": true,
         "httpPort": 7570,
-        "showErrorsOverHttp": true
+        "showErrorsOverHttp": true,
+
+        "profiles": {
+            "onetime": {
+                "watchMode": false
+            }
+        }
     },
     
     "compilerOptions": {

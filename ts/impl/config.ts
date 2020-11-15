@@ -6,11 +6,6 @@ import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 import {isPathNested} from "utils/path_utils";
 import * as TSTool from "tstool";
 
-/** Содержимое блока tstoolConfig внутри tsconfig.json */
-export interface TsconfigTSToolInclusion extends TSTool.Profile {
-	profiles?: { [profileName: string]: TSTool.Profile }
-}
-
 export function parseToolCliArgs(args: readonly string[]): TSTool.CLIArgs {
 	let res = new CLI({
 		helpHeader: "A helper tool to assemble Javascript bundles out of Typescript projects.",
@@ -61,7 +56,7 @@ export function getFullConfigFromCliArgs(args: readonly string[]): TSTool.Config
 	return updateCliArgsWithTsconfig(cliArgs);
 }
 
-function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TsconfigTSToolInclusion] {
+function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TSTool.TsconfigInclusion] {
 	let parseConfigHost: tsc.ParseConfigHost = {
 		useCaseSensitiveFileNames: false,
 		readDirectory: tsc.sys.readDirectory,

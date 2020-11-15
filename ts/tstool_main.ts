@@ -1,5 +1,5 @@
 import {runAllTests, runSingleTest} from "test/test";
-import {logErrorAndExit, logInfo, setLogVerbosityLevel} from "utils/log";
+import {logError, logErrorAndExit, logInfo, setLogVerbosityLevel} from "utils/log";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
 import {CLI} from "utils/cli";
 import {TSToolContextImpl} from "impl/context";
@@ -43,9 +43,16 @@ export async function tstoolMain(){
 	let config = updateCliArgsWithTsconfig(cliArgs);
 	let context = new TSToolContextImpl(config);
 	if(!config.watchMode){
+		logInfo("Starting to build project.");
 		await context.compiler.run();
-		await context.bundler.produceBundle();
+		if(context.compiler.lastBuildWasSuccessful){
+			await context.bundler.produceBundle();
+			logInfo("Done.");
+		} else {
+			logError("Done; bundle was not produced as build was not successful.");
+		}
 	} else {
+		logInfo("Starting initial build.");
 		await context.compiler.run();
 		if(typeof(config.httpPort) === "number"){
 			await new HttpApi(context).start();

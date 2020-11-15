@@ -116,6 +116,11 @@ declare namespace TSTool {
 		noLoaderCode?: boolean;
 	}
 
+	/** Содержимое блока tstoolConfig внутри tsconfig.json */
+	export interface TsconfigInclusion extends Profile {
+		profiles?: { [profileName: string]: TSTool.Profile }
+	}
+
 	/** Конфиг всего тула в целом */
 	export interface Config extends CLIArgs, Profile { 
 		tscParsedCommandLine: tsc.ParsedCommandLine;
