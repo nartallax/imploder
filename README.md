@@ -46,18 +46,23 @@ After build is finished, you should end up with either bundle in desired locatio
 
 Watch mode is special mode supported by Typescript compiler. It allows to watch .ts files for changes and recompile them after changes immediately.  
 This mode is supported by the tool. To activate it, add following option to tstoolConfig block:  
+
 	"watchMode": true
+
 Next time tool is launched, it will not stop after first build; instead, it will run indefinitely.  
 Note that not each build results in bundle file update. To actually update the bundle, you will need to trigger the bundling; it is done through http service. To make tool create HTTP service, you can pass following options:  
+
 	"httpPort": 7570,
-	showErrorsOverHttp: true
+	"showErrorsOverHttp": true
+
 Port number is arbitrary.  
 Now, after tool is restarted, when HTTP request is sent to <http://localhost:7570/assemble_bundle> , a bundle is assembled and put into designated file, as well as sent over HTTP as response. Build errors are also sent over HTTP, if any. In case of errors, bundle is not produced.  
 
 ## Profiles
 
 Now you may want to separate production and development options. The tool offers means to do this: profiles.  
-You may define profile like this (within tstoolConfig block):
+You may define profile like this (within tstoolConfig block):  
+
 	"profiles": {
 		"development": {
 			"watchMode": true,
@@ -69,6 +74,7 @@ You may define profile like this (within tstoolConfig block):
 	}
 
 After these changes are made, you may pass profile name on tool launch:  
+
 	--profile development
 
 Values from profile definition will override values from "base" profile, which is options in tstoolConfig block. Note that if no profile name passed, just the values of the tstoolConfig block will be used.  
@@ -76,22 +82,26 @@ Values from profile definition will override values from "base" profile, which i
 ## Minification
 
 The tool is able to minify modules before putting it into bundle. To do this, add option to config:  
+
 	"minify": true
+
 Terser minifier is used.  
 If you need, you may pass overrides to terser:  
+
 	"minificationOverrides": {
 		"collapse_vars": false
 	}
+
 Some overrides could break the tool.
 
 ## Transformers
 
-	TBD
+TBD
 	"transformerProjects": ["../my_transformer/tsconfig.json"]
 
 ## Other options
 
-	TBD
+TBD
 	"moduleBlacklistRegexp": ["^/bad_modules/.*?$"]
 	"moduleWhitelistRegexp": ["^/good_modules/.*?$"]
 	"preserveOutDir": true
