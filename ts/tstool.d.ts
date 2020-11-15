@@ -1,6 +1,5 @@
 import * as tsc from "typescript";
 import * as terser from "terser";
-import {BundlerImpl} from "impl/bundler";
 
 declare namespace TSTool {
 	/** Объект, содержащий в себе различные части тула */

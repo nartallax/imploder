@@ -14,6 +14,7 @@ export class SingleBuildTestProject {
 
 	private readonly compileErrorText: string | null = this.fileContentOrNull("./compile_error.txt");
 	private readonly runtimeErrorText: string | null = this.fileContentOrNull("./runtime_error.txt");
+	private readonly runtimeErrorRegexp: string | null = this.fileContentOrNull("./runtime_error_regexp.txt");
 	private readonly bundleText: string | null = this.fileContentOrNull("./bundle.js");
 	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt");
 
@@ -72,14 +73,20 @@ export class SingleBuildTestProject {
 		return false;
 	}
 
-	private checkError(err: Error | null, errType: string, errString: string | null): boolean {
-		if(errString){
+	private checkError(err: Error | null, errType: string, errString: string | null, regexpString: string | null): boolean {
+		if(errString || regexpString){
 			if(!err){
 				return this.outputError("expected " + errType + " error to be thrown, but it was not.");
 			}
 			let trimmedMessage = err.message.trim();
-			if(trimmedMessage !== errString){
+			if(errString && trimmedMessage !== errString){
 				return this.outputError("expected " + errType + " error text to be \"" + errString + "\", but it's \"" + trimmedMessage + "\".");
+			}
+			if(regexpString){
+				let regexp = new RegExp(regexpString);
+				if(!regexp.test(trimmedMessage)){
+					return this.outputError("expected " + errType + " error text to match \"" + regexpString + "\", but it's \"" + trimmedMessage + "\".")
+				}
 			}
 		} else if(err){
 			return this.outputError((err.stack || err.message || err) + "");
@@ -131,7 +138,7 @@ export class SingleBuildTestProject {
 			err = e;
 		}
 
-		if(!this.checkError(err, "compile-time", this.compileErrorText)){
+		if(!this.checkError(err, "compile-time", this.compileErrorText, null)){
 			return false;
 		}
 		if(err){
@@ -146,7 +153,7 @@ export class SingleBuildTestProject {
 			err = e;
 		}
 		
-		if(!this.checkError(err, "runtime", this.runtimeErrorText)){
+		if(!this.checkError(err, "runtime", this.runtimeErrorText, this.runtimeErrorRegexp)){
 			return false;
 		}
 		if(err){
