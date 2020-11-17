@@ -215,7 +215,7 @@ export class BundlerImpl implements TSTool.Bundler {
 		}
 
 		let nonWhitelistedModules = [] as string[];
-		if(this.context.config.moduleWhitelistRegexp){
+		if(this.context.config.moduleWhitelistRegexp && this.context.config.moduleWhitelistRegexp.length > 0){
 			let regexps = (this.whitelistRegexps ||= this.context.config.moduleWhitelistRegexp.map(x => new RegExp(x)));
 			names.forEach(name => {
 				for(let regexp of regexps){
