@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as path from "path";
 import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
 /*
 Полезные доки и примеры: 
@@ -11,10 +11,10 @@ https://www.typescriptlang.org/docs/handbook/module-resolution.html
 https://stackoverflow.com/questions/62026189/typescript-custom-transformers-with-ts-createwatchprogram
 */
 
-export abstract class TSToolAbstractCompiler {
+export abstract class ImploderAbstractCompiler {
 	protected readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
 
-	constructor(protected readonly context: TSTool.Context){
+	constructor(protected readonly context: Imploder.Context){
 		this.tscConfig = {
 			...this.context.config.tscParsedCommandLine,
 			rootNames: [path.dirname(this.context.config.tsconfigPath) + "/"]

@@ -41,7 +41,7 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 
 					let configText = await this.readProjectFile("tsconfig.json");
 					let conf = JSON.parse(configText);
-					conf.tstoolConfig.transformerProjects = [
+					conf.imploderConfig.transformerProjects = [
 						path.resolve(testProjectDir(this.name), "../transformer_list_all_classes/tsconfig.json"),
 						path.resolve(testProjectDir(this.name), "../transformer_change_ts/tsconfig.json")
 					];

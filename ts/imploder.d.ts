@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as terser from "terser";
 
-declare namespace TSTool {
+declare namespace Imploder {
 	/** Объект, содержащий в себе различные части тула */
 	export interface Context {
 		readonly config: Config;
@@ -116,9 +116,9 @@ declare namespace TSTool {
 		noLoaderCode?: boolean;
 	}
 
-	/** Содержимое блока tstoolConfig внутри tsconfig.json */
+	/** Содержимое блока imploderConfig внутри tsconfig.json */
 	export interface TsconfigInclusion extends Profile {
-		profiles?: { [profileName: string]: TSTool.Profile }
+		profiles?: { [profileName: string]: Imploder.Profile }
 	}
 
 	/** Конфиг всего тула в целом */
@@ -217,4 +217,4 @@ declare namespace TSTool {
 
 }
 
-export = TSTool;
+export = Imploder;

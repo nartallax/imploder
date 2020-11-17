@@ -1,9 +1,9 @@
-type TSToolModuleDefinitonArray = TSToolModuleDefinitonArrayMinimal | TSToolModuleDefinitonArrayShort | TSToolModuleDefinitonArrayFull;
-type TSToolModuleDefinitonArrayMinimal = [string, string];
-type TSToolModuleDefinitonArrayShort = [string, string[], string];
-type TSToolModuleDefinitonArrayFull = [string, string[], TSToolModuleLoaderData, string];
+type ImploderModuleDefinitonArray = ImploderModuleDefinitonArrayMinimal | ImploderModuleDefinitonArrayShort | ImploderModuleDefinitonArrayFull;
+type ImploderModuleDefinitonArrayMinimal = [string, string];
+type ImploderModuleDefinitonArrayShort = [string, string[], string];
+type ImploderModuleDefinitonArrayFull = [string, string[], ImploderModuleLoaderData, string];
 
-interface TSToolModuleLoaderData {
+interface ImploderModuleLoaderData {
 	altName?: string;
 	exports?: string[];
 	exportRefs?: string[];

@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as fs from "fs";
 import * as path from "path";
-import * as TSTool from "../../ts/tstool";
+import * as Imploder from "../../ts/imploder";
 
 let haveDiffsInSets = <T>(oldValues: Set<T> | undefined, newValues: Set<T>): boolean => {
 	if(!oldValues){
@@ -33,13 +33,13 @@ let haveDiffsInSets = <T>(oldValues: Set<T> | undefined, newValues: Set<T>): boo
 	return false;
 }
 
-class ClassEnumeratorTransformer implements TSTool.CustomTransformerDefinition {
+class ClassEnumeratorTransformer implements Imploder.CustomTransformerDefinition {
 	readonly transformerName = "list_all_classes_transformer";
 
 	private readonly knownClasses = new Map<string, Set<string>>(); // module name -> class names
 	private readonly generatedFilePath: string;
 
-	constructor(private readonly toolContext: TSTool.Context){
+	constructor(private readonly toolContext: Imploder.Context){
 		this.generatedFilePath = path.resolve(path.dirname(this.toolContext.config.tsconfigPath), "generated.ts");
 	}
 
@@ -187,6 +187,6 @@ class ClassEnumeratorTransformer implements TSTool.CustomTransformerDefinition {
 
 }
 
-export function main(toolContext: TSTool.Context): TSTool.TransformerProjectEntryPointReturnType {
+export function main(toolContext: Imploder.Context): Imploder.TransformerProjectEntryPointReturnType {
 	return new ClassEnumeratorTransformer(toolContext);
 }

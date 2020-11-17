@@ -2,22 +2,22 @@ import {runAllTests, runSingleTest} from "test/test";
 import {logError, logErrorAndExit, logInfo, setLogVerbosityLevel} from "utils/log";
 import {updateCliArgsWithTsconfig, parseToolCliArgs} from "impl/config";
 import {CLI} from "utils/cli";
-import {TSToolContextImpl} from "impl/context";
-import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
-import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
+import {ImploderContextImpl} from "impl/context";
+import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
+import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler";
 import {TransformerControllerImpl} from "impl/transformer/transformer_controller";
 import {BundlerImpl} from "impl/bundler";
 import {ModulePathResolverImpl} from "impl/module_path_resolver";
 import {HttpApi} from "impl/http_api";
 
-export async function tstoolMain(){
-	TSToolContextImpl.createCompiler = context => context.config.watchMode
-		? new TSToolWatchCompiler(context)
-		: new TSToolSingleRunCompiler(context)
+export async function imploderMain(){
+	ImploderContextImpl.createCompiler = context => context.config.watchMode
+		? new ImploderWatchCompiler(context)
+		: new ImploderSingleRunCompiler(context)
 
-	TSToolContextImpl.createTransformerController = context => new TransformerControllerImpl(context);
-	TSToolContextImpl.createBundler = context => new BundlerImpl(context);
-	TSToolContextImpl.createPathResolver = context => new ModulePathResolverImpl(context);
+	ImploderContextImpl.createTransformerController = context => new TransformerControllerImpl(context);
+	ImploderContextImpl.createBundler = context => new BundlerImpl(context);
+	ImploderContextImpl.createPathResolver = context => new ModulePathResolverImpl(context);
 
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
@@ -41,7 +41,7 @@ export async function tstoolMain(){
 
 
 	let config = updateCliArgsWithTsconfig(cliArgs);
-	let context = new TSToolContextImpl(config);
+	let context = new ImploderContextImpl(config);
 	if(!config.watchMode){
 		logInfo("Starting to build project.");
 		await context.compiler.run();

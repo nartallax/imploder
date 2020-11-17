@@ -4,9 +4,9 @@ import * as tsc from "typescript";
 import {logErrorAndExit, logError, logWarn} from "utils/log";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 import {isPathNested} from "utils/path_utils";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
-export function parseToolCliArgs(args: readonly string[]): TSTool.CLIArgs {
+export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 	let res = new CLI({
 		helpHeader: "A helper tool to assemble Javascript bundles out of Typescript projects.",
 		definition: {
@@ -26,10 +26,10 @@ export function parseToolCliArgs(args: readonly string[]): TSTool.CLIArgs {
 	return res;
 }
 
-export function updateCliArgsWithTsconfig(cliArgs: TSTool.CLIArgs): TSTool.Config {
+export function updateCliArgsWithTsconfig(cliArgs: Imploder.CLIArgs): Imploder.Config {
 	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(cliArgs.tsconfigPath);
 	
-	let profile: TSTool.Profile = inclusionConfig;
+	let profile: Imploder.Profile = inclusionConfig;
 	if(cliArgs.profile){
 		if(!inclusionConfig.profiles || !(cliArgs.profile in inclusionConfig.profiles)){
 			logErrorAndExit(`Profile name is passed in command-line arguments ("${cliArgs.profile}"), but there is no such profile defined.`);
@@ -43,7 +43,7 @@ export function updateCliArgsWithTsconfig(cliArgs: TSTool.CLIArgs): TSTool.Confi
 
 	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
 
-	let config: TSTool.Config = {
+	let config: Imploder.Config = {
 		...cliArgs,
 		...profile,
 		tscParsedCommandLine: tscParsedCommandLine
@@ -51,12 +51,12 @@ export function updateCliArgsWithTsconfig(cliArgs: TSTool.CLIArgs): TSTool.Confi
 	return config;
 }
 
-export function getFullConfigFromCliArgs(args: readonly string[]): TSTool.Config {
+export function getFullConfigFromCliArgs(args: readonly string[]): Imploder.Config {
 	let cliArgs = parseToolCliArgs(args);
 	return updateCliArgsWithTsconfig(cliArgs);
 }
 
-function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TSTool.TsconfigInclusion] {
+function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.TsconfigInclusion] {
 	let parseConfigHost: tsc.ParseConfigHost = {
 		useCaseSensitiveFileNames: false,
 		readDirectory: tsc.sys.readDirectory,
@@ -76,10 +76,10 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, TSTool.Ts
 	if(haveErrors){
 		process.exit(1);
 	}
-	return [result, rawJson.tstoolConfig];
+	return [result, rawJson.imploderConfig];
 }
 
-function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: TSTool.Profile): void{
+function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: Imploder.Profile): void{
 	if(config.fileNames.length < 1){
 		logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
@@ -99,7 +99,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	}
 
 	if(config.options.outFile){
-		logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to tstoolConfig).");
+		logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to imploderConfig).");
 	}
 
 	if(config.options.incremental){
@@ -146,7 +146,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 
 }
 
-function fixProfile(profile: TSTool.Profile, tsconfigPath: string){
+function fixProfile(profile: Imploder.Profile, tsconfigPath: string){
 	if(!profile.entryModule){
 		logErrorAndExit(`Option "entryModule" is required, but absent.`);
 	}

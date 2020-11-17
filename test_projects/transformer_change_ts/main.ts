@@ -1,4 +1,4 @@
-import * as TSTool from "../../ts/tstool";
+import * as Imploder from "../../ts/imploder";
 import * as tsc from "typescript";
 
 type VisitResult = false | void | undefined | tsc.Node | tsc.Node[];
@@ -21,10 +21,10 @@ let transformVisitRecursive = <T extends tsc.Node>(node: T, context: tsc.Transfo
 	return tsc.visitEachChild(node, wrappedVisitor, context);
 }
 
-class LogChangerTransformer implements TSTool.CustomTransformerDefinition {
+class LogChangerTransformer implements Imploder.CustomTransformerDefinition {
 	readonly transformerName = "log_changer_transformer";
 
-	constructor(private readonly toolContext: TSTool.Context){}
+	constructor(private readonly toolContext: Imploder.Context){}
 
 	createForBefore(transformContext: tsc.TransformationContext): tsc.CustomTransformer {
 		return {
@@ -81,6 +81,6 @@ class LogChangerTransformer implements TSTool.CustomTransformerDefinition {
 	}
 }
 
-export function main(toolContext: TSTool.Context): TSTool.TransformerProjectEntryPointReturnType {
+export function main(toolContext: Imploder.Context): Imploder.TransformerProjectEntryPointReturnType {
 	return new LogChangerTransformer(toolContext);
 }

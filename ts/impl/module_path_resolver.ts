@@ -1,14 +1,14 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
-export class ModulePathResolverImpl implements TSTool.ModulePathResolver {
+export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 
 	private readonly moduleRoot: string;
 	private readonly ambientModules: Set<string>;
 
-	constructor(private readonly context: TSTool.Context){
+	constructor(private readonly context: Imploder.Context){
 		this.moduleRoot = path.resolve(path.dirname(context.config.tsconfigPath), context.config.tscParsedCommandLine.options.rootDir || ".");
 		let ambientMods = context.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
 		this.ambientModules = new Set(ambientMods);

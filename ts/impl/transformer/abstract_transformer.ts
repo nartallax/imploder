@@ -1,5 +1,5 @@
 import * as tsc from "typescript";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
 export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.Node[]}
 
@@ -8,7 +8,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 
 	constructor(
 		protected readonly transformContext: tsc.TransformationContext,
-		protected readonly context: TSTool.Context
+		protected readonly context: Imploder.Context
 	){}
 
 	public transformBundle(node: tsc.Bundle): tsc.Bundle {

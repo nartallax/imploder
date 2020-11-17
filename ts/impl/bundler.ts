@@ -6,11 +6,11 @@ import * as path from "path";
 import {readTextFile, stat, writeTextFile} from "utils/afs";
 import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
-export class BundlerImpl implements TSTool.Bundler {
+export class BundlerImpl implements Imploder.Bundler {
 
-	constructor(private readonly context: TSTool.Context){}
+	constructor(private readonly context: Imploder.Context){}
 
 	async produceBundle(): Promise<string>{
 		logDebug("Starting to produce bundle.");
@@ -48,7 +48,7 @@ export class BundlerImpl implements TSTool.Bundler {
 		return code;
 	}
 
-	async wrapBundleCode(bareCode: string, otherParams: TSTool.BundlerWrapperParameters = {}): Promise<string>{
+	async wrapBundleCode(bareCode: string, otherParams: Imploder.BundlerWrapperParameters = {}): Promise<string>{
 		return [
 			await this.getPrefixCode(), 
 			bareCode, 
@@ -62,7 +62,7 @@ export class BundlerImpl implements TSTool.Bundler {
 		return name;
 	}
 
-	private async getTslibDefArr(): Promise<TSToolModuleDefinitonArray> {
+	private async getTslibDefArr(): Promise<ImploderModuleDefinitonArray> {
 		let root = path.resolve(path.dirname(this.context.config.tsconfigPath), "./node_modules/tslib/");
 		let stats: fs.Stats;
 		try {
@@ -83,7 +83,7 @@ export class BundlerImpl implements TSTool.Bundler {
 		return ["tslib", libCode];
 	}
 
-	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): TSToolModuleDefinitonArray[] {
+	private buildModuleDefinitionArrayArray(modules: string[], circularDependentRelatedModules: Set<string>): ImploderModuleDefinitonArray[] {
 		return modules.map(name => {
 			let meta = this.context.moduleStorage.get(name);
 			let code = meta.jsCode;
@@ -96,7 +96,7 @@ export class BundlerImpl implements TSTool.Bundler {
 			let needExports = meta.exports.length > 0 && shouldIncludeFullExportInfo
 			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
 
-				let short: TSToolModuleLoaderData = {}
+				let short: ImploderModuleLoaderData = {}
 				if(haveModuleRefs){
 					short.exportRefs = meta.exportModuleReferences.sort();
 				}
@@ -132,7 +132,7 @@ export class BundlerImpl implements TSTool.Bundler {
 
 	/* получить код, который должен стоять в бандле после перечисления определения модулей
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
-	private getPostfixCode(wrapParams: TSTool.BundlerWrapperParameters): string {
+	private getPostfixCode(wrapParams: Imploder.BundlerWrapperParameters): string {
 		let cfg = this.context.config;
 		let params: any = {
 			entryPoint: {

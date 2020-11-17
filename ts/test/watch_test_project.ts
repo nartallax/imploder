@@ -1,10 +1,10 @@
 import {readTextFile, withTempDir, writeTextFile, copyDir, unlink } from "utils/afs";
 import * as path from "path";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 import {runTestBundle, testProjectDir} from "test/test_project_utils";
-import {TSToolContextImpl} from "impl/context";
+import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
-import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
+import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
 import {BundlerImpl} from "impl/bundler";
 
 export class WatchTestProject {
@@ -34,21 +34,21 @@ export class WatchTestProject {
 		}
 	}
 
-	private _context: TSTool.Context | null = null;
-	protected get context(): TSTool.Context {
+	private _context: Imploder.Context | null = null;
+	protected get context(): Imploder.Context {
 		if(!this._context){
 			let config = updateCliArgsWithTsconfig({ tsconfigPath: this.resolveProjectFilePath("tsconfig.json") })
 			config.noBuildDiagnosticMessages = true;
-			this._context = new TSToolContextImpl(config);
+			this._context = new ImploderContextImpl(config);
 		}
 		return this._context
 	}
 
-	private _compiler: TSToolWatchCompiler | null = null;
-	protected get compiler(): TSToolWatchCompiler {
+	private _compiler: ImploderWatchCompiler | null = null;
+	protected get compiler(): ImploderWatchCompiler {
 		if(!this._compiler){
 			let compiler = this.context.compiler;
-			if(!(compiler instanceof TSToolWatchCompiler)){
+			if(!(compiler instanceof ImploderWatchCompiler)){
 				throw new Error("Unexpected compiler class in test.");
 			}
 			this._compiler = compiler;

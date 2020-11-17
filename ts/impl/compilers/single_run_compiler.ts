@@ -1,10 +1,10 @@
-import * as TSTool from "tstool";
-import {TSToolWatchCompiler} from "impl/compilers/watch_compiler";
+import * as Imploder from "imploder";
+import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
 /*
 import * as tsc from "typescript";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 
-export class TSToolSingleRunCompiler extends TSToolAbstractCompiler implements TSTool.Compiler {
+export class ImploderSingleRunCompiler extends ImploderAbstractCompiler implements Imploder.Compiler {
 	private _program: tsc.Program | null = null;
 	get program(): tsc.Program {
 		if(this._program){
@@ -42,7 +42,7 @@ export class TSToolSingleRunCompiler extends TSToolAbstractCompiler implements T
 }*/
 
 
-export class TSToolSingleRunCompiler extends TSToolWatchCompiler implements TSTool.Compiler {
+export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements Imploder.Compiler {
 	protected shouldInstallFsWatchers(): boolean {
 		return false;
 	}

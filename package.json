@@ -1,5 +1,5 @@
 {
-  "name": "tstool",
+  "name": "imploder",
   "version": "0.0.1",
   "description": "A tool to work with Typescript projects.",
   "main": "main.js",
@@ -18,6 +18,6 @@
     "tslib": "^2.0.3"
   },
   "bin": {
-    "tstool": "./bin/tstool.js"
+    "imploder": "./bin/imploder.js"
   }
 }

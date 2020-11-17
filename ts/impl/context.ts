@@ -1,47 +1,47 @@
 import {updateCliArgsWithTsconfig} from "impl/config";
 import {ModuleStorageImpl} from "impl/module_storage";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
-export class TSToolContextImpl implements TSTool.Context {
-	static createBundler?: (context: TSTool.Context) => TSTool.Bundler;
-	static createCompiler?: (context: TSTool.Context) => TSTool.Compiler;
-	static createPathResolver?: (context: TSTool.Context) => TSTool.ModulePathResolver;
-	static createTransformerController?: (context: TSTool.Context) => TSTool.TransformerController;
+export class ImploderContextImpl implements Imploder.Context {
+	static createBundler?: (context: Imploder.Context) => Imploder.Bundler;
+	static createCompiler?: (context: Imploder.Context) => Imploder.Compiler;
+	static createPathResolver?: (context: Imploder.Context) => Imploder.ModulePathResolver;
+	static createTransformerController?: (context: Imploder.Context) => Imploder.TransformerController;
 
 	readonly moduleStorage = new ModuleStorageImpl();
 
-	private createOrThrow<T>(fn?: (context: TSTool.Context) => T): T {
+	private createOrThrow<T>(fn?: (context: Imploder.Context) => T): T {
 		if(!fn){
 			throw new Error("Creation function is not supplied.");
 		}
 		return fn(this);
 	}
 
-	static fromTsconfigPath(tsconfigPath: string): TSTool.Context {
+	static fromTsconfigPath(tsconfigPath: string): Imploder.Context {
 		let config = updateCliArgsWithTsconfig({ tsconfigPath })
-		return new TSToolContextImpl(config);
+		return new ImploderContextImpl(config);
 	}
 
-	constructor(readonly config: TSTool.Config){}
+	constructor(readonly config: Imploder.Config){}
 
-	private _bundler?: TSTool.Bundler;
-	get bundler(): TSTool.Bundler {
-		return this._bundler ||= this.createOrThrow(TSToolContextImpl.createBundler);
+	private _bundler?: Imploder.Bundler;
+	get bundler(): Imploder.Bundler {
+		return this._bundler ||= this.createOrThrow(ImploderContextImpl.createBundler);
 	}
 
-	private _compiler?: TSTool.Compiler;
-	get compiler(): TSTool.Compiler {
-		return this._compiler ||= this.createOrThrow(TSToolContextImpl.createCompiler);
+	private _compiler?: Imploder.Compiler;
+	get compiler(): Imploder.Compiler {
+		return this._compiler ||= this.createOrThrow(ImploderContextImpl.createCompiler);
 	}
 
-	private _modulePathResolver?: TSTool.ModulePathResolver;
-	get modulePathResolver(): TSTool.ModulePathResolver {
-		return this._modulePathResolver ||= this.createOrThrow(TSToolContextImpl.createPathResolver);
+	private _modulePathResolver?: Imploder.ModulePathResolver;
+	get modulePathResolver(): Imploder.ModulePathResolver {
+		return this._modulePathResolver ||= this.createOrThrow(ImploderContextImpl.createPathResolver);
 	}
 
-	private _transformerController?: TSTool.TransformerController;
-	get transformerController(): TSTool.TransformerController {
-		return this._transformerController ||= this.createOrThrow(TSToolContextImpl.createTransformerController);
+	private _transformerController?: Imploder.TransformerController;
+	get transformerController(): Imploder.TransformerController {
+		return this._transformerController ||= this.createOrThrow(ImploderContextImpl.createTransformerController);
 	}
 
 }

@@ -1,7 +1,7 @@
 type AmdRequire = (names: string[], onOk: (results: any[]) => void, onError?: (error: any) => void) => void;
 type CommonjsRequire = (name: string) => any;
 
-interface ModuleDefinition extends TSToolModuleLoaderData {
+interface ModuleDefinition extends ImploderModuleLoaderData {
 	name: string;
 	dependencies: string[];
 	code: string;
@@ -17,7 +17,7 @@ interface LauncherParams {
 	preferCommonjs?: boolean;
 }
 
-function tstoolLoader(defs: TSToolModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
+function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
 	"use strict";
 	function handleError(e: Error, action?: string): never {
 		if(params.errorHandler){
@@ -34,7 +34,7 @@ function tstoolLoader(defs: TSToolModuleDefinitonArray[], params: LauncherParams
 
 	for(let i = 0; i < defs.length; i++){
 		let v = defs[i];
-		let m: TSToolModuleLoaderData | undefined = typeof(v[2]) !== "string"? v[2]: undefined;
+		let m: ImploderModuleLoaderData | undefined = typeof(v[2]) !== "string"? v[2]: undefined;
 		let def: Partial<ModuleDefinition> = m? m: {};
 		def.name = v[0];
 		def.code = v[v.length - 1] as string;

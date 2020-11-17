@@ -1,12 +1,12 @@
 import * as tsc from "typescript";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 import {processTypescriptDiagnosticEntry} from "utils/tsc_diagnostics";
 import {logInfo, logError, logDebug, logWarn} from "utils/log";
 import {Lock} from "utils/lock";
-import {TSToolAbstractCompiler} from "impl/compilers/compiler";
+import {ImploderAbstractCompiler} from "impl/compilers/compiler";
 
 
-export class TSToolWatchCompiler extends TSToolAbstractCompiler implements TSTool.Compiler {
+export class ImploderWatchCompiler extends ImploderAbstractCompiler implements Imploder.Compiler {
 	readonly buildLock = new Lock();
 
 	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;

@@ -1,5 +1,5 @@
 
-# TS Tool
+# Imploder
 
 This tool allows you to pack Typescript projects into launchable single-js-file bundles.  
 
@@ -9,7 +9,7 @@ Disclaimer: this tool does not support, and is not aiming to support all possibl
 
 ## Install
 
-	npm install --save-dev @nartallax/tstool
+	npm install --save-dev @nartallax/imploder
 
 The tool will use any Typescript version it could find. The tool will use tslib that is installed in the project.  
 Versions of Typescript below 4 are not supported.  
@@ -21,10 +21,10 @@ That is, you should also install Typescript and tslib, though it not always requ
 ## Basic usage: Bundling
 
 To get started, you need to modify your tsconfig.json.  
-Add block tstoolConfig to your tsconfig.json like this:  
+Add block imploderConfig to your tsconfig.json like this:  
 
 	{
-		"tstoolConfig": {
+		"imploderConfig": {
 			"entryModule": "my_main_file.ts",
 			"entryFunction": "myEntryPoint",
 			"outFile": "js/bundle.js",
@@ -41,14 +41,14 @@ Some of compilerOptions won't be compatible with the tool. In this case, you wil
 
 After configuration block is added, it's time to build. Launch build:  
 
-	node ./node_modules/.bin/tstool --tsconfig ./tsconfig.json
+	node ./node_modules/.bin/imploder --tsconfig ./tsconfig.json
 
 After build is finished, you should end up with either bundle in desired location, or with bunch of errors in tool output.  
 
 ## Watch mode
 
 Watch mode is special mode supported by Typescript compiler. It allows to watch .ts files for changes and recompile them after changes immediately.  
-This mode is supported by the tool. To activate it, add following option to tstoolConfig block:  
+This mode is supported by the tool. To activate it, add following option to imploderConfig block:  
 
 	"watchMode": true
 
@@ -64,7 +64,7 @@ Now, after tool is restarted, when HTTP request is sent to <http://localhost:757
 ## Profiles
 
 Now you may want to separate production and development options. The tool offers means to do this: profiles.  
-You may define profile like this (within tstoolConfig block):  
+You may define profile like this (within imploderConfig block):  
 
 	"profiles": {
 		"development": {
@@ -80,7 +80,7 @@ After these changes are made, you may pass profile name on tool launch:
 
 	--profile development
 
-Values from profile definition will override values from "base" profile, which is options in tstoolConfig block. Note that if no profile name passed, just the values of the tstoolConfig block will be used.  
+Values from profile definition will override values from "base" profile, which is options in imploderConfig block. Note that if no profile name passed, just the values of the imploderConfig block will be used.  
 
 ## Minification
 

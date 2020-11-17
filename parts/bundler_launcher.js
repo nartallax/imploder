@@ -1,8 +1,8 @@
 let define = (() => {
 	setTimeout(async () => {
 		try {
-			let mainPackageName = "tstool_main";
-			let mainFunctionName = "tstoolMain";
+			let mainPackageName = "imploder_main";
+			let mainFunctionName = "imploderMain";
 			let pkg = resolve(mainPackageName);
 			await Promise.resolve(pkg[mainFunctionName].call(null));
 		} catch(e){

@@ -1,4 +1,4 @@
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 import * as http from "http";
 import * as URL from "url";
 import {logDebug, logError} from "utils/log";
@@ -7,7 +7,7 @@ import {typescriptDiagnosticEntryToString} from "utils/tsc_diagnostics";
 export class HttpApi {
 	private readonly server: http.Server; 
 
-	constructor(private readonly context: TSTool.Context){
+	constructor(private readonly context: Imploder.Context){
 		this.server = http.createServer((req, res) => this.handle(req, res));
 	}
 

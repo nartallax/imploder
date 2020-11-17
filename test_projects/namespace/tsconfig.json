@@ -1,5 +1,5 @@
 { 
-    "tstoolConfig": {
+    "imploderConfig": {
         "entryModule": "main.ts",
         "entryFunction": "main",
         "outFile": "js/bundle.js",

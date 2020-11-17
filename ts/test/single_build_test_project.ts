@@ -1,13 +1,13 @@
 import * as path from "path";
 import * as fs from "fs";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 import {logError} from "utils/log";
 import {fileExists, unlink, unlinkRecursive} from "utils/afs";
 import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
 import {testProjectDir, runTestBundle} from "./test_project_utils";
-import {TSToolSingleRunCompiler} from "impl/compilers/single_run_compiler";
-import {TSToolContextImpl} from "impl/context";
+import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler";
+import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
 
 export class SingleBuildTestProject {
@@ -29,18 +29,18 @@ export class SingleBuildTestProject {
 		return this._producedBundleText;
 	}
 
-	private _context?: TSTool.Context;
-	private get context(): TSTool.Context {
+	private _context?: Imploder.Context;
+	private get context(): Imploder.Context {
 		let config = updateCliArgsWithTsconfig({ tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json") });
 		config.noBuildDiagnosticMessages = true;
-		return this._context ||= new TSToolContextImpl(config);
+		return this._context ||= new ImploderContextImpl(config);
 	}
 
-	private _compiler: TSToolSingleRunCompiler | null = null
-	private get compiler(): TSToolSingleRunCompiler {
+	private _compiler: ImploderSingleRunCompiler | null = null
+	private get compiler(): ImploderSingleRunCompiler {
 		if(!this._compiler){
 			let comp = this.context.compiler;
-			if(!(comp instanceof TSToolSingleRunCompiler)){
+			if(!(comp instanceof ImploderSingleRunCompiler)){
 				throw new Error("Unexpected compiler class in test.");
 			}
 			this._compiler = comp;

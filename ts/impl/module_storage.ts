@@ -1,16 +1,16 @@
 import {logDebug} from "utils/log";
-import * as TSTool from "tstool";
+import * as Imploder from "imploder";
 
-export class ModuleStorageImpl implements TSTool.ModuleStorage {
+export class ModuleStorageImpl implements Imploder.ModuleStorage {
 
-	private readonly data: { [k: string]: TSTool.ModuleData } = {};
+	private readonly data: { [k: string]: Imploder.ModuleData } = {};
 
-	set(name: string, data: TSTool.ModuleData){
+	set(name: string, data: Imploder.ModuleData){
 		logDebug("Got info on " + name + " module: " + JSON.stringify(data));
 		this.data[name] = data;
 	}
 
-	get(name: string): TSTool.ModuleData {
+	get(name: string): Imploder.ModuleData {
 		let res = this.data[name];
 		if(!res)
 			throw new Error("Module not found: " + name);
