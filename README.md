@@ -34,8 +34,8 @@ Add block imploderConfig to your tsconfig.json like this:
 		"compilerOptions": { ... }
 	}
 
-In this block you can see that tool is pointed to .ts file (my_main_file.ts), which is exporting function myEntryPoint. This is how entry point is defined. When the tool produces bundle, this function will be invoked. Function should not expect any arguments and should not return any value.  
-There is also outFile defined. This file will contain the bundle.  
+In this block you can see that tool is pointed to .ts file (my_main_file.ts), which is exporting function myEntryPoint. This is how entry point is defined. When the tool produces bundle, this function will be invoked. The function should not expect any arguments (they won't be passed) and should not return any value (it will be ignored).  
+There is also outFile defined. This file will contain the bundle. A bundle contains code of modules of project you bundling as well as loader. A bundle could be launched as any javascript file, and will execute entrypoint of project it contains.  
 Defining target is not required, but strongly recommended. Default target is ES5. ES3 is not supported. Target constants are the same as in compilerOptions.  
 Some of compilerOptions won't be compatible with the tool. In this case, you will see error messages during tool launch.  
 
@@ -84,11 +84,11 @@ Values from profile definition will override values from "base" profile, which i
 
 ## Minification
 
-The tool is able to minify modules before putting it into bundle. To do this, add option to config:  
+The tool is able to minify modules before putting them into bundle. To do this, add following option to config:  
 
 	"minify": true
 
-Terser minifier is used.  
+[Terser minifier](https://github.com/terser/terser "Terser") is used.  
 If you need, you may pass overrides to terser:  
 
 	"minificationOverrides": {
@@ -104,7 +104,7 @@ To define custom transformer, you should create separate project and link this p
 
 	"transformerProjects": ["../my_transformer/tsconfig.json"]
 
-Entrypoint of transformer project should not be just any function; it should be TransformerCreationFunction (see .d.ts). For example of transformer projects, see test projects transformer_change_ts and/or transformer_list_all_classes.  
+Entrypoint of transformer project should not be just any function; it should be TransformerCreationFunction (see imploder.d.ts). For example of transformer projects, see test projects transformer_change_ts and/or transformer_list_all_classes.  
 
 ## Other options
 
@@ -148,6 +148,7 @@ As a user of the tool you will probably never need this, but I'll write this jus
 	npm run test
 
 Running tests is optional, but you definitely should do this.  
+To run compile script, you will need bash shell and bunch of utilities. It runs successfully on Debian 9, probably will run fine on most Linux distributions, and maybe will run on bash on Windows (like gitbash) - not tested and not explicitly supported.  
 
 ## TODO
 

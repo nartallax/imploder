@@ -1,14 +1,19 @@
 {
-  "name": "imploder",
-  "version": "0.0.1",
+  "name": "@nartallax/imploder",
+  "version": "1.0.0",
   "description": "A tool to work with Typescript projects.",
-  "main": "main.js",
+  "main": "bin/imploder.js",
+  "types": "ts/imploder.d.ts",
+  "author": "Nartallax",
+  "license": "0BSD",
+  "bin": { "imploder": "bin/imploder.js" },
+  "files": [ "ts/imploder.d.ts" ],
+  "bugs": "https://github.com/nartallax/imploder/issues",
+  "repository": "github:nartallax/imploder",
   "scripts": {
     "compile": "./compile.sh",
-    "test": "./install_tests.sh && node main.js --test"
+    "test": "./install_tests.sh && ./bin/imploder.js --test"
   },
-  "author": "Nartallax",
-  "license": "ISC",
   "dependencies": {
     "terser": "^5.3.2",
     "typescript": "^4.0.0"
@@ -16,8 +21,5 @@
   "devDependencies": {
     "@types/node": "^14.14.5",
     "tslib": "^2.0.3"
-  },
-  "bin": {
-    "imploder": "./bin/imploder.js"
   }
 }
