@@ -12,7 +12,8 @@
   "repository": "github:nartallax/imploder",
   "scripts": {
     "compile": "./compile.sh",
-    "test": "./install_tests.sh && ./bin/imploder.js --test"
+    "test": "./install_tests.sh && ./bin/imploder.js --test",
+    "pub": "npm run compile && npm run test && npm publish --access public"
   },
   "dependencies": {
     "terser": "^5.3.2",
