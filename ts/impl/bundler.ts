@@ -76,8 +76,10 @@ export class BundlerImpl implements Imploder.Bundler {
 
 		let libPath = path.resolve(root, "./tslib.js");
 		let libCode = await readTextFile(libPath);
+		// оборачиваем код tslib в функцию типа определение модуля
+		// чтобы с ним можно было обращаться так же, как с любым другим модулем
+		libCode = "function(global){var define=function(){};" + libCode + "}"
 		if(this.context.config.minify){
-			libCode = "function(global){var define=function(){};" + libCode + "}"
 			libCode = await this.minify(libCode, "tslib", { removeLegalComments: true });
 		}
 		return ["tslib", libCode];
