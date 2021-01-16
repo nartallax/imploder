@@ -1,10 +1,10 @@
 import {CLI} from "utils/cli";
 import * as path from "path";
 import * as tsc from "typescript";
-import {logErrorAndExit, logError, logWarn} from "utils/log";
 import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
 import {isPathNested} from "utils/path_utils";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
+import {LoggerImpl} from "impl/logger";
 
 export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 	let res = new CLI({
@@ -26,21 +26,46 @@ export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 	return res;
 }
 
-export function updateCliArgsWithTsconfig(cliArgs: Imploder.CLIArgs): Imploder.Config {
-	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(cliArgs.tsconfigPath);
+function parseTsconfigToProfile(tsconfigPath: string, profileName?: string): [tsc.ParsedCommandLine, Imploder.Profile] {
+	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(tsconfigPath);
 	
 	let profile: Imploder.Profile = inclusionConfig;
-	if(cliArgs.profile){
-		if(!inclusionConfig.profiles || !(cliArgs.profile in inclusionConfig.profiles)){
-			logErrorAndExit(`Profile name is passed in command-line arguments ("${cliArgs.profile}"), but there is no such profile defined.`);
+	if(profileName){
+		if(!inclusionConfig.profiles || !(profileName in inclusionConfig.profiles)){
+			LoggerImpl.writeDefaultAndExit(`Profile name is passed in command-line arguments ("${profileName}"), but there is no such profile defined.`);
 		}
 		profile = {
 			...profile,
-			...inclusionConfig.profiles[cliArgs.profile]
+			...inclusionConfig.profiles[profileName]
 		};
 	}
-	fixProfile(profile, cliArgs.tsconfigPath);
 
+	return [tscParsedCommandLine, profile]
+}
+
+export function updatePartialConfigWithTsconfig(tsconfigPath: string, partConfig: Partial<Imploder.Config>): Imploder.Config {
+	tsconfigPath = path.resolve(tsconfigPath);
+	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(tsconfigPath, partConfig.profile);
+	profile = {
+		...profile,
+		...partConfig
+	};
+
+	fixProfile(profile, tsconfigPath);
+	validateFixConfig(tsconfigPath, tscParsedCommandLine, profile);
+
+	return {
+		...profile,
+		tsconfigPath,
+		tscParsedCommandLine
+	}
+
+
+}
+
+export function updateCliArgsWithTsconfig(cliArgs: Imploder.CLIArgs): Imploder.Config {
+	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(cliArgs.tsconfigPath);
+	fixProfile(profile, cliArgs.tsconfigPath);
 	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
 
 	let config: Imploder.Config = {
@@ -66,7 +91,7 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.
 
 	let fileContentStr = tsc.sys.readFile(tsconfigPath);
 	if(!fileContentStr){
-		logErrorAndExit(`Failed to read tsconfig path "${tsconfigPath}"`);
+		LoggerImpl.writeDefaultAndExit(`Failed to read tsconfig path "${tsconfigPath}"`);
 	}
 	let fileContentParsed = tsc.parseJsonText(tsconfigPath, fileContentStr)
 	let rawJson = JSON.parse(fileContentStr);
@@ -81,7 +106,7 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.
 
 function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: Imploder.Profile): void{
 	if(config.fileNames.length < 1){
-		logErrorAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
+		LoggerImpl.writeDefaultAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
 
 	let rawOptions: any;
@@ -95,19 +120,19 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		config.options.module = tsc.ModuleKind.AMD;
 		rawOptions.module = "amd";
 	} else if(config.options.module !== tsc.ModuleKind.AMD){
-		logErrorAndExit("This tool is only able to work with AMD modules. Adjust compiler options in tsconfig.json.");
+		LoggerImpl.writeDefaultAndExit("This tool is only able to work with AMD modules. Adjust compiler options in tsconfig.json.");
 	}
 
 	if(config.options.outFile){
-		logErrorAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to imploderConfig).");
+		LoggerImpl.writeDefaultAndExit("This tool is not able to work with outFile passed in compilerOptions. Remove it (and/or move to imploderConfig).");
 	}
 
 	if(config.options.incremental){
-		logErrorAndExit("This tool is not able to work with incremental passed in compilerOptions.");
+		LoggerImpl.writeDefaultAndExit("This tool is not able to work with incremental passed in compilerOptions.");
 	}
 
 	if(!config.options.outDir){
-		logErrorAndExit("You must explicitly pass outDir within compilerOptions.");
+		LoggerImpl.writeDefaultAndExit("You must explicitly pass outDir within compilerOptions.");
 	}
 
 	if(!config.options.rootDir){
@@ -120,7 +145,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		for(let i = 0; i < dirs.length; i++){
 			for(let j = i + 1; j < dirs.length; j++){
 				if(isPathNested(dirs[i], dirs[j])){
-					logError("Values of rootDirs must not be nested within one another, but there are \"" + dirs[i] + "\" and \"" + dirs[j] + "\" which are nested.");
+					LoggerImpl.writeDefault("Values of rootDirs must not be nested within one another, but there are \"" + dirs[i] + "\" and \"" + dirs[j] + "\" which are nested.");
 					haveNestedDirs = true;
 				}
 			}
@@ -141,20 +166,20 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		config.options.moduleResolution = tsc.ModuleResolutionKind.NodeJs;
 		rawOptions.moduleResolution = "node";
 	} else if(config.options.moduleResolution !== tsc.ModuleResolutionKind.NodeJs){
-		logErrorAndExit("Module resolution types other than node are not supported.");
+		LoggerImpl.writeDefaultAndExit("Module resolution types other than \"node\" are not supported.");
 	}
 
 }
 
 function fixProfile(profile: Imploder.Profile, tsconfigPath: string){
 	if(!profile.entryModule){
-		logErrorAndExit(`Option "entryModule" is required, but absent.`);
+		LoggerImpl.writeDefaultAndExit(`Option "entryModule" is required, but absent.`);
 	}
 	if(!profile.entryFunction){
-		logErrorAndExit(`Option "entryFunction" is required, but absent.`);
+		LoggerImpl.writeDefaultAndExit(`Option "entryFunction" is required, but absent.`);
 	}
 	if(!profile.outFile){
-		logErrorAndExit(`Option "outFile" is required, but absent.`);
+		LoggerImpl.writeDefaultAndExit(`Option "outFile" is required, but absent.`);
 	}
 	profile.outFile = path.resolve(path.dirname(tsconfigPath), profile.outFile);
 	profile.loadInitialExternalsWithCommonJS = profile.loadInitialExternalsWithCommonJS === false? false: true;
@@ -165,7 +190,7 @@ function fixProfile(profile: Imploder.Profile, tsconfigPath: string){
 	profile.watchMode = !!profile.watchMode;
 	profile.target = profile.target || "ES5"
 	if(tsc.ScriptTarget[profile.target] < tsc.ScriptTarget.ES5){
-		logWarn("Selected script target is " + profile.target + ", but it's not really supported as it is too old. Proceed at your own risk.");
+		LoggerImpl.writeDefault("Selected script target is " + profile.target + ", but it's not really supported as it is too old. Proceed at your own risk.");
 	}
 	profile.embedTslib = profile.embedTslib === false? false: true;
 }

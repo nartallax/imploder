@@ -1,4 +1,4 @@
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
 /*
 import * as tsc from "typescript";

@@ -1,7 +1,6 @@
 import * as path from "path";
 import * as fs from "fs";
-import * as Imploder from "imploder";
-import {logError} from "utils/log";
+import {Imploder} from "imploder";
 import {fileExists, unlink, unlinkRecursive} from "utils/afs";
 import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
@@ -9,6 +8,7 @@ import {testProjectDir, runTestBundle} from "./test_project_utils";
 import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler";
 import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
+import {LoggerImpl} from "impl/logger";
 
 export class SingleBuildTestProject {
 
@@ -31,9 +31,15 @@ export class SingleBuildTestProject {
 
 	private _context?: Imploder.Context;
 	private get context(): Imploder.Context {
-		let config = updateCliArgsWithTsconfig({ tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json") });
-		config.noBuildDiagnosticMessages = true;
-		return this._context ||= new ImploderContextImpl(config);
+		if(!this._context){
+			let config = updateCliArgsWithTsconfig({ 
+				...this.cliArgsBase,
+				tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json") 
+			});
+			config.noBuildDiagnosticMessages = true;
+			this._context = new ImploderContextImpl(config);
+		}
+		return this._context;
 	}
 
 	private _compiler: ImploderSingleRunCompiler | null = null
@@ -56,7 +62,10 @@ export class SingleBuildTestProject {
 		return this._bundler;
 	}
 
-	constructor(private readonly name: string){}
+	constructor(
+		private readonly name: string,
+		private readonly cliArgsBase: Imploder.CLIArgs
+	){}
 
 	private fileContentOrNull(subpath: string): string | null {
 		let p = path.join(testProjectDir(this.name), subpath)
@@ -69,7 +78,7 @@ export class SingleBuildTestProject {
 	}
 
 	private outputError(error: string): false {
-		logError("Test " + this.name + " failed: " + error);
+		LoggerImpl.writeDefault("Test " + this.name + " failed: " + error);
 		return false;
 	}
 
@@ -172,8 +181,8 @@ export class SingleBuildTestProject {
 		return this.availableProjects.includes(name);
 	}
 	
-	static runTest(name: string): Promise<boolean> {
-		return new SingleBuildTestProject(name).run();
+	static runTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<boolean> {
+		return new SingleBuildTestProject(name, cliArgsBase).run();
 	}
 
 }

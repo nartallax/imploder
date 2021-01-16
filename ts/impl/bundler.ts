@@ -1,22 +1,21 @@
 import * as tsc from "typescript";
 import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
-import {logDebug} from "utils/log";
 import * as path from "path";
 import {readTextFile, stat, writeTextFile} from "utils/afs";
 import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
 import * as fs from "fs";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 export class BundlerImpl implements Imploder.Bundler {
 
 	constructor(private readonly context: Imploder.Context){}
 
 	async produceBundle(): Promise<string>{
-		logDebug("Starting to produce bundle.");
+		this.context.logger.debug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
 		await writeTextFile(this.context.config.outFile, code);
-		logDebug("Bundle produced (" + this.context.config.outFile + ")");
+		this.context.logger.debug("Bundle produced (" + this.context.config.outFile + ")");
 		return code;
 	}
 
@@ -30,7 +29,7 @@ export class BundlerImpl implements Imploder.Bundler {
 		await this.loadAbsentModuleCode();
 
 		let moduleOrder = new ModuleOrderer(this.context.moduleStorage).getModuleOrder(this.getEntryModuleName());
-		logDebug("Bundle related modules: " + JSON.stringify(moduleOrder));
+		this.context.logger.debug("Bundle related modules: " + JSON.stringify(moduleOrder));
 
 		this.checkModuleNames(moduleOrder.modules);
 
@@ -197,7 +196,7 @@ export class BundlerImpl implements Imploder.Bundler {
 			code, 
 			moduleName,
 			overrides: this.context.config.minificationOverrides
-		});
+		}, this.context);
 	}
 
 	private blacklistRegexps: RegExp[] | null = null;

@@ -1,12 +1,13 @@
-import {logDebug} from "utils/log";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 export class ModuleStorageImpl implements Imploder.ModuleStorage {
 
 	private readonly data: { [k: string]: Imploder.ModuleData } = {};
 
+	constructor(private readonly context: Imploder.Context){}
+
 	set(name: string, data: Imploder.ModuleData){
-		logDebug("Got info on " + name + " module: " + JSON.stringify(data));
+		this.context.logger.debug("Got info on " + name + " module: " + JSON.stringify(data));
 		this.data[name] = data;
 	}
 

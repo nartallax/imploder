@@ -1,6 +1,6 @@
+import {Imploder} from "imploder";
 import * as terser from "terser";
 import * as tsc from "typescript";
-import {logErrorAndExit} from "utils/log";
 
 export interface MinifierOptions {
 	removeLegalComments?: boolean;
@@ -10,8 +10,8 @@ export interface MinifierOptions {
 	overrides?: Partial<terser.CompressOptions>;
 }
 
-export async function minifyJsFunctionExpression(opts: MinifierOptions): Promise<string> {
-	let ecma = tscEcmaToTerserEcma(opts.target);
+export async function minifyJsFunctionExpression(opts: MinifierOptions, context: Imploder.Context): Promise<string> {
+	let ecma = tscEcmaToTerserEcma(opts.target, context);
 	try {
 		let res = await terser.minify("return " + opts.code.replace(/^[\n\r\s]+/, ""), {
 			compress: {
@@ -83,18 +83,18 @@ export async function minifyJsFunctionExpression(opts: MinifierOptions): Promise
 		});
 		
 		if(!res.code){
-			logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}`);
+			context.logger.errorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}`);
 		}
 
 		let resultCode = res.code.replace(/^return\s*/, "").replace(/;\s*$/, "");
 		return resultCode;
 
 	} catch(e){
-		logErrorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}\n${e}`);
+		context.logger.errorAndExit(`Minifier failed on JS code of module ${opts.moduleName}: \n${opts.code}\n${e}`);
 	}
 }
 
-function tscEcmaToTerserEcma(tscEcma: tsc.ScriptTarget): terser.ECMA {
+function tscEcmaToTerserEcma(tscEcma: tsc.ScriptTarget, context: Imploder.Context): terser.ECMA {
 	if(tscEcma === tsc.ScriptTarget.ES5){
 		return 5;
 	}
@@ -105,5 +105,5 @@ function tscEcmaToTerserEcma(tscEcma: tsc.ScriptTarget): terser.ECMA {
 		return (2013 + tscEcma) as terser.ECMA;
 	}
 
-	logErrorAndExit(`Could not minify code with this target (${tscEcma}): no conversion to minifier ECMA version exists.`);
+	context.logger.errorAndExit(`Could not minify code with this target (${tscEcma}): no conversion to minifier ECMA version exists.`);
 }

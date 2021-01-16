@@ -1,6 +1,6 @@
 import {readTextFile, withTempDir, writeTextFile, copyDir, unlink } from "utils/afs";
 import * as path from "path";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 import {runTestBundle, testProjectDir} from "test/test_project_utils";
 import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
@@ -11,10 +11,10 @@ export class WatchTestProject {
 	
 	protected projDir: string | null = null;
 	protected inTempDir<T>(action: () => T | Promise<T>): Promise<T> {
-		return withTempDir("watchtest_" + this.name + "_", async projDir => {
+		return withTempDir("watchtest_" + this.projectName + "_", async projDir => {
 			this.projDir = projDir;
 			try {
-				await copyDir(testProjectDir(this.name) , this.projDir);
+				await copyDir(testProjectDir(this.projectName) , this.projDir);
 				return await Promise.resolve(action());
 			} finally {
 				this.projDir = null;
@@ -37,7 +37,10 @@ export class WatchTestProject {
 	private _context: Imploder.Context | null = null;
 	protected get context(): Imploder.Context {
 		if(!this._context){
-			let config = updateCliArgsWithTsconfig({ tsconfigPath: this.resolveProjectFilePath("tsconfig.json") })
+			let config = updateCliArgsWithTsconfig({ 
+				...this.cliArgsBase,
+				tsconfigPath: this.resolveProjectFilePath("tsconfig.json")
+			})
 			config.noBuildDiagnosticMessages = true;
 			this._context = new ImploderContextImpl(config);
 		}
@@ -123,5 +126,8 @@ export class WatchTestProject {
 		});
 	}
 
-	constructor(protected readonly name: string){}
+	constructor(
+		protected readonly projectName: string,
+		protected cliArgsBase: Imploder.CLIArgs
+	){}
 }

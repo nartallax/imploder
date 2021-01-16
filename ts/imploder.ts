@@ -1,7 +1,18 @@
 import * as tsc from "typescript";
 import * as terser from "terser";
+import * as main from "imploder_main";
 
-declare namespace Imploder {
+/** Imploder - инструмент сборки Typescript-проектов */
+export namespace Imploder {
+
+	/** Запустить тул на аргументах из командной строки */
+	export const runAsCli: () => Promise<void> = main.runAsCli;
+	
+	/** Запустить тул, передав в него путь к tsconfig.json и какие-либо еще опции
+	 * Переданные дополнительные опции имеют приоритет перед опциями в tsconfig.json
+	 * Это - предпочтительный способ для запуска тула из какого-либо js/ts-кода */
+	export const runFromTsconfig: (tsconfigPath: string, overrides?: Partial<Imploder.Config>) => Promise<void> = main.runFromTsconfig;
+
 	/** Объект, содержащий в себе различные части тула */
 	export interface Context {
 		readonly config: Config;
@@ -10,9 +21,10 @@ declare namespace Imploder {
 		readonly moduleStorage: ModuleStorage;
 		readonly modulePathResolver: ModulePathResolver;
 		readonly transformerController: TransformerController;
+		readonly logger: Logger;
 	}
 
-	/** обертка над компилятором tsc */
+	/** Обертка над компилятором tsc */
 	export interface Compiler {
 		readonly program: tsc.Program;
 		readonly compilerHost: tsc.CompilerHost;
@@ -24,13 +36,13 @@ declare namespace Imploder {
 		waitBuildEnd(): Promise<void>;
 	}
 
-	/** класс, управляющий трансформерами */
+	/** Класс, управляющий трансформерами */
 	export interface TransformerController {
 		getTransformers(): Promise<tsc.CustomTransformers>;
 		onModuleDelete(moduleName: string): void;
 	}
 	
-	/** сборщик бандл-файла из кучи исходников */
+	/** Сборщик бандл-файла из кучи исходников */
 	export interface Bundler {
 		/** собрать бандл, положить в outFile, указанный в конфиге, и выдать */
 		produceBundle(): Promise<string>;
@@ -124,6 +136,9 @@ declare namespace Imploder {
 	/** Конфиг всего тула в целом */
 	export interface Config extends CLIArgs, Profile { 
 		tscParsedCommandLine: tsc.ParsedCommandLine;
+		/** Эта опция здесь для того, чтобы её можно было переопределить при запуске из js-кода (т.е. не как CLI-тул)
+		 * Возможности передать значение этой опции через конфиг/CLI нет */
+		writeLogLine?: (logLine: string) => void;
 	}
 
 	/** Опции, которые можно передать тулу через командную строку */
@@ -212,9 +227,16 @@ declare namespace Imploder {
 	type ArrayOrSingleValue<T> = T | T[];
 	export type TransformerProjectEntryPointReturnType = PromiseOrValue<ArrayOrSingleValue<CustomTransformerDefinition>>
 
-	/** под такую сигнатуру должен подходить энтрипоинт проекта, указанного как проект трансформера */
+	/** Под эту сигнатуру должен подходить энтрипоинт проекта, указанного как проект трансформера */
 	export type TransformerCreationFunction = (context: Context) => TransformerProjectEntryPointReturnType
 
-}
+	/** Объект, который управляет логами */
+	export interface Logger {
+		errorAndExit(msg: string): never;
+		error(msg: string): void;
+		warn(msg: string): void;
+		info(msg: string): void;
+		debug(msg: string): void;
+	}
 
-export = Imploder;
+}

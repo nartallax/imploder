@@ -1,10 +1,9 @@
 import * as tsc from "typescript";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 import * as path from "path";
 import {AfterJsBundlerTransformer} from "./after_js_transformer";
 import {BeforeJsBundlerTransformer} from "./before_js_transformer";
 import {updateCliArgsWithTsconfig} from "impl/config";
-import {logDebug, logErrorAndExit} from "utils/log";
 import {readTextFile} from "utils/afs";
 import {SeqSet} from "utils/seq_set";
 import {ImploderContextImpl} from "impl/context";
@@ -61,18 +60,18 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 			config.noLoaderCode = true;
 			config.embedTslib = false;
 			let context = new ImploderContextImpl(config)
-			logDebug("Building transformer project: " + configPath);
+			this.context.logger.debug("Building transformer project: " + configPath);
 			await context.compiler.run();
 			await context.bundler.produceBundle();
 			if(!context.compiler.lastBuildWasSuccessful){
-				logErrorAndExit("Transformer project " + configPath + " build failed.");
+				this.context.logger.errorAndExit("Transformer project " + configPath + " build failed.");
 			}
 
 			let transformers: Imploder.CustomTransformerDefinition[];
 			try {
 				transformers = await this.getTransformersFromBareBundle(context);
 			} catch(e: unknown){
-				logErrorAndExit("Failed to run transformer project " + context.config.tsconfigPath + ": " + ((e as Error).stack || (e + "")));
+				this.context.logger.errorAndExit("Failed to run transformer project " + context.config.tsconfigPath + ": " + ((e as Error).stack || (e + "")));
 			}
 			transformers.forEach(t => this.validateTransformer(t, context));
 			allTransformers.push(...transformers);
@@ -118,13 +117,13 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 
 	private validateTransformer(trans: Imploder.CustomTransformerDefinition, context: Imploder.Context){
 		if(typeof(trans) !== "object" || trans === null){
-			logErrorAndExit("Transformer from " + context.config.tsconfigPath + " is not object (or is null): " + trans);
+			this.context.logger.errorAndExit("Transformer from " + context.config.tsconfigPath + " is not object (or is null): " + trans);
 		}
 		if(!trans.transformerName){
-			logErrorAndExit("Transformer from " + context.config.tsconfigPath + " has no name. This is not allowed.");
+			this.context.logger.errorAndExit("Transformer from " + context.config.tsconfigPath + " has no name. This is not allowed.");
 		}
 		if(!trans.createForAfter && !trans.createForBefore){
-			logErrorAndExit("Transformer " + trans.transformerName + " has neither of instance creation functions. This is not allowed.");
+			this.context.logger.errorAndExit("Transformer " + trans.transformerName + " has neither of instance creation functions. This is not allowed.");
 		}
 	}
 
@@ -132,7 +131,7 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 		let map = {} as {[k: string]: Imploder.CustomTransformerDefinition};
 		transformers.forEach(t => {
 			if(map[t.transformerName]){
-				logErrorAndExit("There is transformers with duplicate name: " + t.transformerName + ". This is not allowed.");
+				this.context.logger.errorAndExit("There is transformers with duplicate name: " + t.transformerName + ". This is not allowed.");
 			}
 			map[t.transformerName] = t;
 		});
@@ -142,7 +141,7 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 
 		let visit = (transformer: Imploder.CustomTransformerDefinition): number => {
 			if(currentlyVisiting.has(transformer.transformerName)){
-				logErrorAndExit("Recursive transformer dependency: " + currentlyVisiting.seq.join(" -> "));
+				this.context.logger.errorAndExit("Recursive transformer dependency: " + currentlyVisiting.seq.join(" -> "));
 			}
 			currentlyVisiting.push(transformer.transformerName);
 			try {
@@ -167,7 +166,7 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 					transformer.launchAfterRequired.forEach(name => {
 						let t = map[name];
 						if(!t){
-							logErrorAndExit("Transformer " + transformer.transformerName + " requires other transformer " + name + " to be present, but it's not.");
+							this.context.logger.errorAndExit("Transformer " + transformer.transformerName + " requires other transformer " + name + " to be present, but it's not.");
 						}
 						doWithOther(t);
 					});

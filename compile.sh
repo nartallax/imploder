@@ -3,7 +3,6 @@
 # its somehow gruesome, but lets just deal with it.
 
 cd `dirname "$0"`
-rm -rf ./bin 2> /dev/null
 rm ./parts/loader.js 2> /dev/null
 mkdir ts/generated 2> /dev/null
 
@@ -19,8 +18,12 @@ ls ./test_projects >> ts/generated/test_list_str.ts
 echo "\`;" >> ts/generated/test_list_str.ts
 
 ./node_modules/typescript/bin/tsc --project tsconfig.json --outFile /tmp/imploder_main_outfile.js
-cat ./parts/bundler_launcher.js > /tmp/bundler.compiled.js.partial
+cat ./parts/packed_imploder_exporter_start.js > /tmp/bundler.compiled.js.partial
 cat /tmp/imploder_main_outfile.js >> /tmp/bundler.compiled.js.partial
-mkdir -p bin
-mv /tmp/bundler.compiled.js.partial ./bin/imploder.js
-chmod u+x ./bin/imploder.js
+cat ./parts/packed_imploder_exporter_end.js >> /tmp/bundler.compiled.js.partial
+mv /tmp/bundler.compiled.js.partial ./main.js
+
+./node_modules/typescript/bin/tsc --project tsconfig.json --emitDeclarationOnly --declaration --outDir dts --removeComments false
+mv ./dts/imploder.d.ts imploder.d.ts
+
+chmod u+x ./bin/imploder.cli.js

@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as fs from "fs";
 import * as path from "path";
-import * as Imploder from "../../ts/imploder";
+import {Imploder} from "../../imploder";
 
 let haveDiffsInSets = <T>(oldValues: Set<T> | undefined, newValues: Set<T>): boolean => {
 	if(!oldValues){

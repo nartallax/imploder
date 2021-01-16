@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as tsc from "typescript";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
 export class ModulePathResolverImpl implements Imploder.ModulePathResolver {

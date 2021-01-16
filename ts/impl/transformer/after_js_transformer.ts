@@ -1,6 +1,6 @@
 import {AbstractTransformer} from "./abstract_transformer";
 import * as tsc from "typescript";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 export class AfterJsBundlerTransformer extends AbstractTransformer {
 

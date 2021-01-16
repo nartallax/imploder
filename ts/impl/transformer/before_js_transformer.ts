@@ -1,13 +1,12 @@
 import * as tsc from "typescript";
-import * as Imploder from "imploder";
-import {logDebug, logErrorAndExit, logWarn} from "utils/log";
+import {Imploder} from "imploder";
 import {AbstractTransformer} from "./abstract_transformer";
 
 export class BeforeJsBundlerTransformer extends AbstractTransformer {
 
 	transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
 		let moduleName = this.moduleNameByNode(fileNode);
-		logDebug("Visiting " + this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
+		this.context.logger.debug("Visiting " + this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
 
 		let meta: Imploder.ModuleData = {
 			dependencies: [],
@@ -20,7 +19,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		}
 
 		if(fileNode.referencedFiles.length > 0){
-			logWarn("File " + moduleName + " references some other files. They will not be included in bundle.");
+			this.context.logger.warn("File " + moduleName + " references some other files. They will not be included in bundle.");
 		}
 		
 		if(fileNode.moduleName){
@@ -76,7 +75,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 				if(!node.exportClause){
 					// такое может быть только в случае export * from "..."
 					if(!node.moduleSpecifier || !tsc.isStringLiteral(node.moduleSpecifier)){
-						logErrorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
+						this.context.logger.errorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
 					}
 					moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text);
 				} else {

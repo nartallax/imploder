@@ -1,4 +1,4 @@
-import * as Imploder from "../../ts/imploder";
+import {Imploder} from "../../imploder";
 import * as tsc from "typescript";
 
 type VisitResult = false | void | undefined | tsc.Node | tsc.Node[];

@@ -1,5 +1,6 @@
+import {LoggerImpl} from "impl/logger";
+import {Imploder} from "imploder";
 import * as tsc from "typescript";
-import {logError, logWarn, logInfo} from "utils/log";
 
 export function typescriptDiagnosticEntryToString(d: tsc.Diagnostic): string {
 	let msg: (string | null)[] = [];
@@ -22,24 +23,25 @@ export function typescriptDiagnosticEntryToString(d: tsc.Diagnostic): string {
 	return msg.map(_ => _ && _.trim()).filter(_ => !!_).join(" ");
 }
 
-export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic): boolean {
+export function processTypescriptDiagnosticEntry(d: tsc.Diagnostic, logger?: Imploder.Logger): boolean {
 	let msgString = typescriptDiagnosticEntryToString(d);
-	if(d.category == tsc.DiagnosticCategory.Error){
-		logError(msgString)
-		return true;
+	if(!logger){
+		LoggerImpl.writeDefault(msgString);
+	} else if(d.category === tsc.DiagnosticCategory.Error){
+		logger.error(msgString)
 	} else if(d.category === tsc.DiagnosticCategory.Warning) {
-		logWarn(msgString);
+		logger.warn(msgString);
 	} else {
-		logInfo(msgString);
+		logger.info(msgString);
 	}
 
-	return false;
+	return d.category === tsc.DiagnosticCategory.Error;
 }
 
-export function processTypescriptDiagnostics(diagnostics?: Iterable<tsc.Diagnostic> | null): boolean {
+export function processTypescriptDiagnostics(diagnostics?: Iterable<tsc.Diagnostic> | null, logger?: Imploder.Logger): boolean {
 	let haveErrors = false;
     for(let d of diagnostics || []) {
-		haveErrors = haveErrors || processTypescriptDiagnosticEntry(d);
+		haveErrors = haveErrors || processTypescriptDiagnosticEntry(d, logger);
 	}
 	return haveErrors;
 }

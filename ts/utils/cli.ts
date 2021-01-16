@@ -1,4 +1,4 @@
-import {logError} from "utils/log";
+import {LoggerImpl} from "impl/logger";
 
 type ErrorHandler = (e: Error) => never;
 type HelpShower = (lines: string[]) => void;
@@ -31,8 +31,7 @@ export class CLI<T> {
 	}
 
 	static printErrorAndExit(error: Error): never {
-		logError(error.message);
-		return process.exit(1);
+		LoggerImpl.writeDefaultAndExit(error.message);
 	}
 
 	static str<T = string>(params: {keys: string | readonly string[], definition?: string, allowedValues?: readonly T[], default?: T}): CliArgDef<T>{

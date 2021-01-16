@@ -4,4 +4,7 @@ test_projects/*/node_modules
 test_projects/*/generated.ts
 ts/generated/*
 parts/loader.js
-bin/*
+js
+dts
+main.js
+imploder.d.ts

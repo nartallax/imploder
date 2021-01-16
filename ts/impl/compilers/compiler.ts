@@ -1,7 +1,7 @@
 import * as tsc from "typescript";
 import * as path from "path";
 import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 /*
 Полезные доки и примеры: 

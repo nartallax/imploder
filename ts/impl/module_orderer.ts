@@ -1,5 +1,5 @@
 import {SeqSet} from "utils/seq_set";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 
 /** упорядочиватель файлов-результатов компиляции. определяет порядок их размещения в бандле */
 export class ModuleOrderer {

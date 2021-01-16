@@ -1,7 +1,6 @@
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 import * as http from "http";
 import * as URL from "url";
-import {logDebug, logError} from "utils/log";
 import {typescriptDiagnosticEntryToString} from "utils/tsc_diagnostics";
 
 export class HttpApi {
@@ -24,7 +23,7 @@ export class HttpApi {
 			res.statusCode = resultCode;
 			res.end(resultBody);
 		} catch(e){
-			logError(e);
+			this.context.logger.error(e);
 			res.statusCode = 500;
 			res.end("Some error happened.")
 		}
@@ -58,7 +57,7 @@ export class HttpApi {
 		return new Promise((ok, bad) => {
 			try {
 				this.server.listen(this.context.config.httpPort, "localhost", () => {
-					logDebug("HTTP server listening at http://localhost:" + this.context.config.httpPort);
+					this.context.logger.debug("HTTP server listening at http://localhost:" + this.context.config.httpPort);
 					ok();
 				});
 			} catch(e){bad(e)}

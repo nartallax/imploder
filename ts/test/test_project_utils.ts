@@ -1,16 +1,16 @@
 import * as path from "path";
 import * as fs from "fs";
 import {BundlerImpl} from "impl/bundler";
-import {logErrorAndExit} from "utils/log";
+import {LoggerImpl} from "impl/logger";
 
 let testProjectsRoot: string | null = null;
 export function testProjectDir(name: string): string {
 	if(!testProjectsRoot){
-		let root = path.resolve(__dirname, "../test_projects/");
+		let root = path.resolve(__dirname, "./test_projects/");
 		try {
 			fs.statSync(root);
 		} catch(e){
-			logErrorAndExit(`Failed to stat() test projects root directory (which is ${root}). Maybe you're trying to run tests on packed npm package? You cannot do that; you may only run tests on source code.`);
+			LoggerImpl.writeDefaultAndExit(`Failed to stat() test projects root directory (which is ${root}). Maybe you're trying to run tests on packed npm package? You cannot do that; you may only run tests on source code.`);
 		}
 		testProjectsRoot = root;
 	}

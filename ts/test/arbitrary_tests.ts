@@ -2,9 +2,10 @@ import {unlink} from "utils/afs"
 import {WatchTestProject} from "test/watch_test_project";
 import * as path from "path";
 import {testProjectDir} from "test/test_project_utils";
+import {Imploder} from "imploder";
 
-export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Promise<boolean>))} = {
-	"watch_simple": async () => {
+export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Imploder.CLIArgs) => (boolean | Promise<boolean>))} = {
+	"watch_simple": async cliArgsBase => {
 		await new (class extends WatchTestProject {
 			async run(){
 				await this.inTempDir(async () => {
@@ -28,13 +29,13 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 					})
 				})
 			}
-		})("watch").run()
+		})("watch", cliArgsBase).run()
 
 		return true;
 	},
 
 	// почему-то иногда этот тест зависает, но я никак не могу выловить, почему же
-	"watch_with_transformers": async () => {
+	"watch_with_transformers": async cliArgsBase => {
 		await new (class extends WatchTestProject {
 			async run(){
 				await this.inTempDir(async () => {
@@ -42,8 +43,8 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 					let configText = await this.readProjectFile("tsconfig.json");
 					let conf = JSON.parse(configText);
 					conf.imploderConfig.transformerProjects = [
-						path.resolve(testProjectDir(this.name), "../transformer_list_all_classes/tsconfig.json"),
-						path.resolve(testProjectDir(this.name), "../transformer_change_ts/tsconfig.json")
+						path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json"),
+						path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json")
 					];
 					await this.writeProjectFile("tsconfig.json", JSON.stringify(conf));
 
@@ -78,7 +79,7 @@ export const ArbitraryTests: { readonly [testName: string]: (() => (boolean | Pr
 					});
 				});
 			}
-		})("watch").run();
+		})("watch", cliArgsBase).run();
 		return true;
 	}
 }

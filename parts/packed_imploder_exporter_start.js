@@ -1,19 +1,4 @@
-#!/usr/bin/env node
-
 let define = (() => {
-	setTimeout(async () => {
-		try {
-			let mainPackageName = "imploder_main";
-			let mainFunctionName = "imploderMain";
-			let pkg = resolve(mainPackageName);
-			await Promise.resolve(pkg[mainFunctionName].call(null));
-		} catch(e){
-			console.error("Bundler failed:");
-			console.error(e.stack);
-			process.exit(1);
-		}
-	}, 1);
-
 	let defMap = {};
 	let products = {require: require};
 	let currentlyResolvingModules = new Set();
@@ -48,7 +33,26 @@ let define = (() => {
 		}
 	}
 	
-	return function define(name, deps, def){
+	let result = function define(name, deps, def){
 		defMap[name] = {deps, def};
 	}
+
+	result.imploderDefinitionCompleted = function(){
+		try {
+			let mainPackageName = "imploder";
+			let pkg = resolve(mainPackageName);
+			if(typeof(module) === "object" && module && typeof(module.exports) === "object" && module.exports){
+				module.exports = pkg;
+			} else {
+				console.error("Imploder failed at launch: there is no module.exports!");
+				process.exit(1);
+			}
+		} catch(e){
+			console.error("Imploder failed at launch:");
+			console.error(e.stack);
+			process.exit(1);
+		}
+	}
+
+	return result;
 })();

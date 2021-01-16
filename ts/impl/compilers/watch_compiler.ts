@@ -1,7 +1,6 @@
 import * as tsc from "typescript";
-import * as Imploder from "imploder";
+import {Imploder} from "imploder";
 import {processTypescriptDiagnosticEntry} from "utils/tsc_diagnostics";
-import {logInfo, logError, logDebug, logWarn} from "utils/log";
 import {Lock} from "utils/lock";
 import {ImploderAbstractCompiler} from "impl/compilers/compiler";
 
@@ -69,10 +68,12 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			this.context.config.tscParsedCommandLine.options,
 			system,
 			undefined,
-			processTypescriptDiagnosticEntry,
 			(diagnostic: tsc.Diagnostic) => {
-				logError("DEFAULT HOST EMITTED DIAG!");
-				processTypescriptDiagnosticEntry(diagnostic);
+				processTypescriptDiagnosticEntry(diagnostic, this.context.logger);
+			},
+			(diagnostic: tsc.Diagnostic) => {
+				this.context.logger.error("DEFAULT HOST EMITTED DIAG!");
+				processTypescriptDiagnosticEntry(diagnostic, this.context.logger);
 			}
 		)
 
@@ -120,7 +121,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 				} else if(diag.code === 6193 || diag.code === 6194){
 					// build ended, skipping
 				} else {
-					processTypescriptDiagnosticEntry(diag);
+					processTypescriptDiagnosticEntry(diag, this.context.logger);
 				}
 			}
 		);
@@ -129,7 +130,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 	private onDiag(diag: tsc.Diagnostic){
 		this.lastBuildDiag.push(diag);
 		if(!this.context.config.noBuildDiagnosticMessages){
-			processTypescriptDiagnosticEntry(diag);
+			processTypescriptDiagnosticEntry(diag, this.context.logger);
 		}
 	}
 
@@ -139,32 +140,32 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		this.buildLock.lock();
 		this.clearLastBuildDiagnostics();
 		this.filesChanged = 0;
-		logDebug("Build started.");
+		this.context.logger.debug("Build started.");
 	}
 
 	private endBuild(){
 		this.updateErrorCount();
+		let logger = this.context.logger;
+		let logFn = this.context.config.noBuildDiagnosticMessages? logger.debug.bind(logger): logger.info.bind(logger);
 		if(this.filesChanged !== 0){
-			let logger = this.context.config.noBuildDiagnosticMessages? logDebug: logInfo;
-			logger(`Build ended, errors: ${this.errorCount} (but soon new one will start, files changed since build start = ${this.filesChanged})`);
+			logFn(`Build ended, errors: ${this.errorCount} (but soon new one will start, files changed since build start = ${this.filesChanged})`);
 		} else {
-			let logger = this.errorCount === 0 || this.context.config.noBuildDiagnosticMessages? logDebug: logWarn;
-			logger(`Build ended, errors: ${this.errorCount}`);
+			logFn(`Build ended, errors: ${this.errorCount}`);
 			if(this.hasFileChangesLock){
 				this.hasFileChangesLock = false;
 				this.buildLock.unlock();
 			}
-			logDebug("Lock level after build end: " + this.buildLock.getLockLevel());
+			logger.debug("Lock level after build end: " + this.buildLock.getLockLevel());
 		}
 		this.buildLock.unlock();
 	}
 
 	notifyFsObjectChange(fsObjectChangedPath: string): void {
-		logDebug("FS object change: " + fsObjectChangedPath);
+		this.context.logger.debug("FS object change: " + fsObjectChangedPath);
 		if(this.filesChanged === 0 && !this.hasFileChangesLock){
 			this.buildLock.lock();
 			this.hasFileChangesLock = true;
-			logDebug("Lock level on FS object change: " + this.buildLock.getLockLevel());
+			this.context.logger.debug("Lock level on FS object change: " + this.buildLock.getLockLevel());
 		}
 		this.filesChanged++;
 	}
