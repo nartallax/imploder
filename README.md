@@ -1,7 +1,7 @@
 
 # Imploder
 
-This tool allows you to pack Typescript projects into launchable single-js-file bundles.  
+This tool allows you to pack Typescript projects into launchable single-js-file bundles.   
 
 Disclaimer: this tool does not support, and is not aiming to support all possible ways of using Typescript. It does not support triple-slash directives, it does not support non-module code files and so on.  
 
