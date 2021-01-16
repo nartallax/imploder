@@ -106,7 +106,7 @@ To define custom transformer, you should create separate project and link this p
 
 	"transformerProjects": ["../my_transformer/tsconfig.json"]
 
-Entrypoint of transformer project should not be just any function; it should be TransformerCreationFunction (see imploder.d.ts). For example of transformer projects, see test projects transformer_change_ts and/or transformer_list_all_classes.  
+Entrypoint of transformer project should not be just any function; it should be TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts). For example of transformer projects, see test projects transformer_change_ts and/or transformer_list_all_classes.  
 
 ## Other options
 
