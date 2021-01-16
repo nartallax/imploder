@@ -18,6 +18,8 @@ That is, you should also install Typescript and tslib, though it not always requ
 	npm install --save-dev typescript
 	npm install --save-dev tslib
 
+Examples of tool usage are available [in tests directory](test_projects); however, keep in mind that some of the options shown there is required just for testing and won't work well with your project.  
+
 ## Basic usage: Bundling
 
 To get started, you need to modify your tsconfig.json.  
@@ -34,7 +36,7 @@ Add block imploderConfig to your tsconfig.json like this:
 		"compilerOptions": { ... }
 	}
 
-In this block you can see that tool is pointed to .ts file (my_main_file.ts), which is exporting function myEntryPoint. This is how entry point is defined. When the tool produces bundle, this function will be invoked. The function should not expect any arguments (they won't be passed) and should not return any value (it will be ignored).  
+In this block you can see that tool is pointed to .ts file (my_main_file.ts), which is exporting function myEntryPoint. This is how entry point is defined. When bundle produced by the tool runs, this function is invoked. The function should not expect any arguments (they won't be passed) and should not return any value (it will be ignored).  
 There is also outFile defined. This file will contain the bundle. A bundle contains code of modules of project you bundling as well as loader. A bundle could be launched as any javascript file, and will execute entrypoint of project it contains.  
 Defining target is not required, but strongly recommended. Default target is ES5. ES3 is not supported. Target constants are the same as in compilerOptions.  
 Some of compilerOptions won't be compatible with the tool. In this case, you will see error messages during tool launch.  
