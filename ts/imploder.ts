@@ -76,15 +76,6 @@ export namespace Imploder {
 		target: keyof typeof tsc.ScriptTarget;
 		/** Имя функции-обработчика ошибок запуска. Должна быть доступна в том месте, где запускается бандл */
 		errorHandlerName?: string;
-		/** Имя функции require для AMD, умолчание = "require" */
-		amdRequireName: string;
-		/** Имя функции require для CommonJS, умолчание = "require" */
-		commonjsRequireName: string;
-		/** Использовать CommonJS для подгрузки исходных внешних зависимостей, или AMD?
-		 * По умолчанию true.
-		  * Следует выставлять в true при сборке бандла, который будет запускаться в NodeJS, например
-		 * Не влияет на подгрузку модулей, включенных в бандл. Не влияет на асинхронную подгрузку модулей. */
-		loadInitialExternalsWithCommonJS: boolean;
 		/** Минифицировать ли код */
 		minify: boolean;
 		/** Включить ли tslib в бандл, если он требуется каким-либо модулем

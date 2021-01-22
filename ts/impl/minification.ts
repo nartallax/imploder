@@ -8,6 +8,7 @@ export interface MinifierOptions {
 	code: string;
 	moduleName: string;	
 	overrides?: Partial<terser.CompressOptions>;
+	shortenFunctionNames?: boolean;
 }
 
 export async function minifyJsFunctionExpression(opts: MinifierOptions, context: Imploder.Context): Promise<string> {
@@ -36,8 +37,8 @@ export async function minifyJsFunctionExpression(opts: MinifierOptions, context:
 				if_return: true,
 				inline: false,
 				join_vars: true,
-				keep_classnames: true,
-				keep_fnames: true,
+				keep_classnames: !opts.shortenFunctionNames,
+				keep_fnames: !opts.shortenFunctionNames,
 				keep_fargs: false,
 				keep_infinity: false,
 				loops: true,
@@ -63,8 +64,8 @@ export async function minifyJsFunctionExpression(opts: MinifierOptions, context:
 			},
 			mangle: {
 				eval: false,
-				keep_classnames: true,
-				keep_fnames: true,
+				keep_classnames: !opts.shortenFunctionNames,
+				keep_fnames: !opts.shortenFunctionNames,
 				module: false
 			},
 			format: {

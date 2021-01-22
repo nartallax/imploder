@@ -121,9 +121,12 @@ export class BundlerImpl implements Imploder.Bundler {
 	private minifiedLoaderCode: string | null = null;
 	private async getPrefixCode(): Promise<string> {
 		let resultLoaderCode = loaderCode;
+		//this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 }).then(code => console.error("LOADER: " + code))
 		if(this.context.config.minify){
 			if(this.minifiedLoaderCode === null){
-				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 });
+				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { 
+					target: tsc.ScriptTarget.ES5
+				});
 			}
 			resultLoaderCode = this.minifiedLoaderCode;
 		}
@@ -135,21 +138,12 @@ export class BundlerImpl implements Imploder.Bundler {
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
 	private getPostfixCode(wrapParams: Imploder.BundlerWrapperParameters): string {
 		let cfg = this.context.config;
-		let params: any = {
+		let params: any = { // на самом деле не any, а LoaderParams, 
 			entryPoint: {
 				module: this.getEntryModuleName(),
 				function: cfg.entryFunction
 			}
 		};
-		if(cfg.amdRequireName !== "require"){
-			params.amdRequire = cfg.amdRequireName
-		}
-		if(cfg.commonjsRequireName !== "require"){
-			params.commonjsRequire = cfg.commonjsRequireName;
-		}
-		if(cfg.loadInitialExternalsWithCommonJS){
-			params.preferCommonjs = true;
-		}
 		let paramStr = JSON.stringify(params);
 		if(wrapParams.afterEntryPointExecuted){
 			paramStr = paramStr.substr(0, paramStr.length - 1) + 

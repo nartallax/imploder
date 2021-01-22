@@ -182,9 +182,6 @@ function fixProfile(profile: Imploder.Profile, tsconfigPath: string){
 		LoggerImpl.writeDefaultAndExit(`Option "outFile" is required, but absent.`);
 	}
 	profile.outFile = path.resolve(path.dirname(tsconfigPath), profile.outFile);
-	profile.loadInitialExternalsWithCommonJS = profile.loadInitialExternalsWithCommonJS === false? false: true;
-	profile.amdRequireName = profile.amdRequireName || "require";
-	profile.commonjsRequireName = profile.commonjsRequireName || "require";
 	profile.noLoaderCode = !!profile.noLoaderCode;
 	profile.minify = !!profile.minify;
 	profile.watchMode = !!profile.watchMode;

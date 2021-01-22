@@ -1,5 +1,4 @@
 type AmdRequire = (names: string[], onOk: (results: any[]) => void, onError?: (error: any) => void) => void;
-type CommonjsRequire = (name: string) => any;
 
 interface ModuleDefinition extends ImploderModuleLoaderData {
 	name: string;
@@ -7,23 +6,24 @@ interface ModuleDefinition extends ImploderModuleLoaderData {
 	code: string;
 }
 
-interface LauncherParams {
+interface LoaderParams {
 	entryPoint: { module: string, function: string }
 	entryPointArgs?: string[];
 	afterEntryPointExecuted?: (error: Error | null, entryPointExecutionResult: any) => void;
 	errorHandler?: (e: Error, action?: string) => void;
-	amdRequire?: (name: string | string[], onOk: (...moduleData: any) => void, onError?: (error: any) => void) => void;
-	commonjsRequire?: (name: string) => any;
-	preferCommonjs?: boolean;
 }
 
-function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LauncherParams, evl: (code: string) => any){
+// в каких-то случаях в среде, где мы запускаемся, может быть requirejs, и он может определить define
+declare const define: unknown;
+
+function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderParams, evl: (code: string) => any){
 	"use strict";
 	function handleError(e: Error, action?: string): never {
-		if(params.errorHandler){
-			params.errorHandler(e, action);
+		let handler = params.errorHandler
+		if(handler){
+			handler(e, action);
 		} else {
-			console.error("Error" + (action? " " + action: "") + ": " + (e.stack || e.message || e));
+			console.error("Error " + (action? " " + action: "") + ": " + (e.stack || e.message || e));
 		}
 		throw e;
 	}
@@ -47,58 +47,63 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LauncherPa
 		defMap[def.name] = def as ModuleDefinition;
 	}
 
-	let amdRequire: AmdRequire = params.amdRequire || (require as any as AmdRequire);
-	let commonjsRequire: CommonjsRequire = params.commonjsRequire || require;
-
+	let amd: Boolean = typeof(define) === "function" && !!(define as any).amd;
 	/** функция, которую будут дергать в качестве require изнутри модулей */
 	function requireAny(names: string | string[], onOk?: (...modules: any) => void, onError?: (error: Error) => void){
-		if(Array.isArray(names) && !onOk){
-			throw new Error("Passed array of module names to require (" + names.join(", ") + "), but provided no callback! This is inconsistent.");
-		}
-
 		if(!onOk){
+			// дернуты как commonjs, т.е. синхронно с одним именем
 			let name = names as string;
 			if(name in defMap){
 				return getProduct(name);
 			} else {
-				return commonjsRequire(name)
+				// тут мы просто надеемся, что человек, который пишет код - не дурак
+				// и знает, в каком окружении он будет запускаться
+				// и поэтому просто дергаем require как commonjs синхронный require
+				return require(name);
 			}
 		} else {
+			// дернуты как amd
+			let callError = (e: Error) => {
+				if(onError){
+					onError(e);
+				}
+				handleError(e);
+			}
+
 			try {
 				let nameArr = Array.isArray(names)? names: [names];
-				let results = {} as {[moduleName: string]: any};
-				let externalNameArr = nameArr.filter(name => {
+				let resultArr = [] as any[];
+				let nameIndex = {} as {[moduleName: string]: any};
+
+				let externalNameArr = nameArr.filter((name, index) => {
+					nameIndex[name] = index;
 					if(name in defMap){
-						results[name] = getProduct(name);
+						resultArr[index] = getProduct(name);
 						return false;
 					}
 					return true;
-				})
-
-				let callOk = () => {
-					let resultsArr = [] as any[];
-					for(let i = 0; i < nameArr.length; i++){
-						resultsArr.push(results[nameArr[i]]);
-					}
-					return onOk.apply(null, resultsArr);
-				}
+				});
 
 				if(externalNameArr.length === 0){
-					return callOk();
+					return onOk(resultArr);
 				} else {
-					return amdRequire(externalNameArr, function(externalResults){
-						for(let i = 0; i < externalNameArr.length; i++){
-							results[externalNameArr[i]] = externalResults[i]
-						}
-						callOk();
-					}, onError);
+					if(amd){
+						let amdRequire = amd as any as AmdRequire;
+						return amdRequire(externalNameArr, function(externalResults){
+							for(let i = 0; i < externalNameArr.length; i++){
+								resultArr[nameIndex[externalNameArr[i]]] = externalResults[i]
+							}
+							onOk(resultArr);
+						}, onError);
+					} else {
+						// если у нас запросили модули асинхронно, но при этом у нас есть только синрохнный commonjs-овый require - 
+						// то используем его, чего еще делать
+						externalNameArr.forEach(name => resultArr[nameIndex[name]] = require(name));
+						onOk(resultArr);
+					}
 				}
 			} catch(e){
-				if(onError){
-					onError(e)
-				} else {
-					throw e;
-				}
+				callError(e)
 			}
 		}
 	}
@@ -218,21 +223,9 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LauncherPa
 		return result;
 	}
 
-	function requireExternal(names: string[], onOk: (moduleVals: ArrayLike<any>) => void, onError: (error: Error) => void){
-		if(params.preferCommonjs){
-			try {
-				onOk(names.map(name => commonjsRequire(name)))
-			} catch(e){
-				onError(e);
-			}
-		} else {
-			amdRequire(names, function(){ onOk(arguments) }, onError);	
-		}
-	}
-
 	function preloadExternalModules(entryPoint: string, onDone: () => void){
 		let externalNames = discoverExternalModules(entryPoint);
-		requireExternal(externalNames, externalValues => {
+		requireAny(externalNames, externalValues => {
 			externalNames.forEach((name, i) => {
 				products[name] = externalValues[i];
 			});
