@@ -48,6 +48,11 @@ After configuration block is added, it's time to build. Launch build:
 	node ./node_modules/.bin/imploder --tsconfig ./tsconfig.json
 
 After build is finished, you should end up with either bundle in desired location, or with bunch of errors in tool output.  
+Note that entryFunction is not required; it's just a nice way to export actual entrypoint instead of writing launch code all over the module.  
+Everything that entryModule exports will be available as module product. That is, you can later do the following in some other file (assuming NodeJS):
+
+	const {myEntryPoint} = require("elsewhere/my_bundle.js");
+	myEntryPoint();
 
 ## Watch mode
 
