@@ -1,8 +1,35 @@
-import {unlink} from "utils/afs"
+import {readTextFile, unlink, writeTextFile} from "utils/afs"
 import {WatchTestProject} from "test/watch_test_project";
 import * as path from "path";
-import {testProjectDir} from "test/test_project_utils";
+import {testProjectDir, wrapConsoleLog} from "test/test_project_utils";
 import {Imploder} from "imploder";
+import {SingleBuildTestProject} from "test/single_build_test_project";
+
+async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs){
+	let proj = new SingleBuildTestProject("bundle_as_module", cliArgsBase);
+	if(!await proj.run()){
+		return false;
+	}
+	let wrappedBundle = await proj.bundler.wrapBundleCode(proj.producedBundleText);
+	let fullPathToWrappedBundle = path.resolve(testProjectDir(proj.name), "./js/bundle_wrapped.js")
+	await writeTextFile(fullPathToWrappedBundle, wrappedBundle);
+	let otherProjectEntryPoint = path.resolve(testProjectDir(proj.name), jsName)
+	let projectCode = await readTextFile(otherProjectEntryPoint);
+	 
+	let [stdout] = await wrapConsoleLog(() => new Promise((ok, bad) => {
+		let testIsCompleted = ok
+		void testIsCompleted;
+		try {
+			eval(projectCode);
+		} catch(e){
+			bad(e);
+		}
+	}));
+	if(stdout !== "42! spice must flow"){
+		console.error("Test failed: stdout not matches expected: " + stdout);
+	}
+	return true;
+}
 
 export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Imploder.CLIArgs) => (boolean | Promise<boolean>))} = {
 	"watch_simple": async cliArgsBase => {
@@ -80,6 +107,25 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 				});
 			}
 		})("watch", cliArgsBase).run();
+		return true;
+	},
+
+	"bundle_as_commonjs_module": cliArgsBase => bundleRunThenRunJs("./commonjs_project.js", cliArgsBase),
+	"bundle_as_amd_module": cliArgsBase => bundleRunThenRunJs("./amd_project.js", cliArgsBase),
+
+	"profiles": async cliArgsBase => {
+		let args = {...cliArgsBase, profile: "for_old"};
+		let forOld = new SingleBuildTestProject("profiles", args, {ethalonBundle: "oldBundle.js", testBundle: "./js/bundle_old.js"});
+		if(!(await forOld.run())){
+			return false;
+		}
+
+		args = {...cliArgsBase, profile: "for_new"};
+		let forNew = new SingleBuildTestProject("profiles", args, {ethalonBundle: "newBundle.js", testBundle: "./js/bundle_new.js"});
+		if(!(await forNew.run())){
+			return false;
+		}
+
 		return true;
 	}
 }

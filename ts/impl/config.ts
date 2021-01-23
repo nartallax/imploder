@@ -64,7 +64,7 @@ export function updatePartialConfigWithTsconfig(tsconfigPath: string, partConfig
 }
 
 export function updateCliArgsWithTsconfig(cliArgs: Imploder.CLIArgs): Imploder.Config {
-	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(cliArgs.tsconfigPath);
+	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(cliArgs.tsconfigPath, cliArgs.profile);
 	fixProfile(profile, cliArgs.tsconfigPath);
 	validateFixConfig(cliArgs.tsconfigPath, tscParsedCommandLine, profile);
 
@@ -174,9 +174,6 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 function fixProfile(profile: Imploder.Profile, tsconfigPath: string){
 	if(!profile.entryModule){
 		LoggerImpl.writeDefaultAndExit(`Option "entryModule" is required, but absent.`);
-	}
-	if(!profile.entryFunction){
-		LoggerImpl.writeDefaultAndExit(`Option "entryFunction" is required, but absent.`);
 	}
 	if(!profile.outFile){
 		LoggerImpl.writeDefaultAndExit(`Option "outFile" is required, but absent.`);

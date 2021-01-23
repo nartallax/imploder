@@ -10,18 +10,23 @@ import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
 import {LoggerImpl} from "impl/logger";
 
+export interface SingleBuildTestProjectPathOverrides {
+	ethalonBundle?: string;
+	testBundle?: string;
+}
+
 export class SingleBuildTestProject {
 
 	private readonly compileErrorText: string | null = this.fileContentOrNull("./compile_error.txt");
 	private readonly runtimeErrorText: string | null = this.fileContentOrNull("./runtime_error.txt");
 	private readonly runtimeErrorRegexp: string | null = this.fileContentOrNull("./runtime_error_regexp.txt");
-	private readonly bundleText: string | null = this.fileContentOrNull("./bundle.js");
+	private readonly bundleText: string | null = this.fileContentOrNull(this.pathOverrides?.ethalonBundle ?? "./bundle.js");
 	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt");
 
 	private _producedBundleText: string | null = null;
-	private get producedBundleText(): string {
+	get producedBundleText(): string {
 		if(!this._producedBundleText){
-			this._producedBundleText = this.fileContentOrNull("./js/bundle.js");
+			this._producedBundleText = this.fileContentOrNull(this.pathOverrides?.testBundle ?? "./js/bundle.js");
 			if(this._producedBundleText === null){
 				throw new Error("Expected test project \"" + this.name + "\" to produce bundle code, but it is not.");
 			}
@@ -55,7 +60,7 @@ export class SingleBuildTestProject {
 	}
 
 	private _bundler: BundlerImpl | null = null;
-	private get bundler(): BundlerImpl {
+	get bundler(): BundlerImpl {
 		if(!this._bundler){
 			this._bundler = new BundlerImpl(this.context);
 		}
@@ -63,8 +68,9 @@ export class SingleBuildTestProject {
 	}
 
 	constructor(
-		private readonly name: string,
-		private readonly cliArgsBase: Imploder.CLIArgs
+		readonly name: string,
+		private readonly cliArgsBase: Imploder.CLIArgs,
+		private readonly pathOverrides?: SingleBuildTestProjectPathOverrides
 	){}
 
 	private fileContentOrNull(subpath: string): string | null {
@@ -172,10 +178,18 @@ export class SingleBuildTestProject {
 		return this.checkBundle();
 	}
 
+	static readonly excludedTestProjectDirectories = new Set([
+		"watch",
+		"transformer_list_all_classes",
+		"transformer_change_ts",
+		"bundle_as_module",
+		"profiles"
+	])
+
 	static readonly availableProjects: ReadonlyArray<string> = testListStr
 		.split("\n")
 		.map(_ => _.trim())
-		.filter(_ => !!_ && _ !== "watch" && _ !== "transformer_list_all_classes" && _ !== "transformer_change_ts")
+		.filter(_ => !!_ && !SingleBuildTestProject.excludedTestProjectDirectories.has(_))
 
 	static couldRunTest(name: string): boolean {
 		return this.availableProjects.includes(name);

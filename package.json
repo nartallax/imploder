@@ -6,8 +6,12 @@
   "types": "imploder.d.ts",
   "author": "Nartallax",
   "license": "0BSD",
-  "bin": { "imploder": "bin/imploder.cli.js" },
-  "files": [ "imploder.d.ts" ],
+  "bin": {
+    "imploder": "bin/imploder.cli.js"
+  },
+  "files": [
+    "imploder.d.ts"
+  ],
   "bugs": "https://github.com/nartallax/imploder/issues",
   "repository": "github:nartallax/imploder",
   "scripts": {
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^14.14.5",
+    "requirejs": "^2.3.6",
     "tslib": "^2.0.3"
   }
 }

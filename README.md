@@ -22,6 +22,8 @@ Examples of tool usage are available [in tests directory](test_projects); howeve
 
 ## Basic usage: Bundling
 
+[Example](test_projects/namespace/tsconfig.json)  
+
 To get started, you need to modify your tsconfig.json.  
 Add block imploderConfig to your tsconfig.json like this:  
 
@@ -49,6 +51,8 @@ After build is finished, you should end up with either bundle in desired locatio
 
 ## Watch mode
 
+[Example](test_projects/watch/tsconfig.json)  
+
 Watch mode is special mode supported by Typescript compiler. It allows to watch .ts files for changes and recompile them after changes immediately.  
 This mode is supported by the tool. To activate it, add following option to imploderConfig block:  
 
@@ -64,6 +68,8 @@ Port number is arbitrary.
 Now, after tool is restarted, when HTTP request is sent to <http://localhost:7570/assemble_bundle> , a bundle is assembled and put into designated file, as well as sent over HTTP as response. Build errors are also sent over HTTP, if any. In case of errors, bundle is not produced.  
 
 ## Profiles
+
+[Example](test_projects/profiles/tsconfig.json)  
 
 Now you may want to separate production and development options. The tool offers means to do this: profiles.  
 You may define profile like this (within imploderConfig block):  
@@ -86,6 +92,8 @@ Values from profile definition will override values from "base" profile, which i
 
 ## Minification
 
+[Example](test_projects/profiles/tsconfig.json)  
+
 The tool is able to minify modules before putting them into bundle. To do this, add following option to config:  
 
 	"minify": true
@@ -101,6 +109,8 @@ Some overrides could break the tool.
 
 ## Transformers
 
+[Example](test_projects/transformed/tsconfig.json)  
+
 The tool is able to apply user-defined source code transformations at compilation. Transformer could alter resulting code in arbitrary way, as well as generate new files.  
 To define custom transformer, you should create separate project and link this project in tsconfig.json of project you want to transform:  
 
@@ -112,11 +122,15 @@ Entrypoint of transformer project should not be just any function; it should be 
 
 ### TSLib embedding
 
+[Example](test_projects/profiles/tsconfig.json)  
+
 By default, the tool embeds tslib as one of the modules if any other module requires it. You can prevent it with following option:  
 
 	"embedTslib": false
 
 ### Module blacklisting/whitelisting
+
+[Example](test_projects/whitelist_blacklist/tsconfig.json)  
 
 You could blacklist/whitelist some modules with following tsconfig.json options:  
 
@@ -140,6 +154,11 @@ The tool provides its own module loader. One of reasons behind this is need for 
 By default (that is, in requirejs loader) if there is circular dependency between modules, one of the modules receives empty module object (which is filled with values later), which sometimes could lead to runtime errors if said module tries to use any value from that module object at definition time (for example, during creation of subclass).  
 The loader of the tool have knowledge about names of values each module exports, and this allows the loader to actually run definition of module only when module value is actually used.  
 Note that there is still possible to generate circular dependency link that will not possible to be resolved, and this will fail at runtime; the loader could only resolve circular dependencies that are actually resolvable.  
+
+## Compatibility with other loaders
+
+Bundles could be used as [CommonJS modules](test_projects/bundle_as_module/commonjs_project.js), as well as [RequireJS (AMD) modules.](test_projects/bundle_as_module/amd_web_project.js)  
+Note that if RequireJS is present and entryFunction is passed to the tool, bundle won't be launched on its own, as RequireJS provides no means of doing so. entryFunction will be called when the module is required.  
 
 ## Compiling the tool
 

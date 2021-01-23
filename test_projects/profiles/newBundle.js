@@ -1,0 +1,1 @@
+[["/main","n=>{n.main=async function main(){await new Promise(n=>setTimeout(n,1)),console.log('Works')}}"]]

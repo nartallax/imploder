@@ -1,0 +1,29 @@
+{ 
+    "imploderConfig": {
+        "entryModule": "main.ts",
+        "entryFunction": "main",
+        "minify": true,
+
+        "profiles": {
+            "for_new": {
+                "outFile": "js/bundle_new.js",
+                "target": "ES2018"
+            },
+            "for_old": {
+                "outFile": "js/bundle_old.js",
+                "target": "ES5"
+            }
+        },
+
+        "embedTslib": false,
+        "noLoaderCode": true
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["*"]
+        }
+    }
+}

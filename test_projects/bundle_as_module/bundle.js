@@ -1,0 +1,1 @@
+[["/main",["/meaning_of_everything"],"(e,n,r)=>{e.spice='must flow',Object.defineProperty(e,'meaningOfEverything',{enumerable:!0,get:()=>r.meaningOfEverything})}"],["/meaning_of_everything","n=>{n.meaningOfEverything=42}"]]

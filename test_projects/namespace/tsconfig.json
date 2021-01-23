@@ -3,9 +3,11 @@
         "entryModule": "main.ts",
         "entryFunction": "main",
         "outFile": "js/bundle.js",
-        "noLoaderCode": true,
+        "target": "ES2018",
         "minify": true,
-        "target": "ES2018"
+
+
+        "noLoaderCode": true
     },
     
     "compilerOptions": {
