@@ -1,0 +1,65 @@
+import {updateCliArgsWithTsconfig} from "impl/config";
+import {ImploderContextImpl} from "impl/context";
+import {Imploder} from "imploder";
+
+export async function getTransformersFromImploderProject(projectTsconfigPath: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {	
+	let config = updateCliArgsWithTsconfig({tsconfigPath: projectTsconfigPath});
+	config.watchMode = false;
+	config.noLoaderCode = false;
+	config.embedTslib = false;
+	let projectContext = new ImploderContextImpl(config)
+	context.logger.debug("Building transformer project: " + projectTsconfigPath);
+	await projectContext.compiler.run();
+	await projectContext.bundler.produceBundle();
+	if(!projectContext.compiler.lastBuildWasSuccessful){
+		context.logger.errorAndExit("Transformer project " + projectTsconfigPath + " build failed.");
+	}
+
+	try {
+		return getTransformersFromImploderBundle(projectContext.config.outFile, context);
+	} catch(e: unknown){
+		throw new Error("Failed to run transformer project " + projectTsconfigPath + ": " + ((e as Error).stack || (e + "")));
+	}
+}
+
+export async function getTransformersFromImploderBundle(moduleName: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {
+	let moduleResult: unknown = require(moduleName);
+	if(typeof(moduleResult) !== "object" || !moduleResult){
+		throw new Error("Expected result of " + moduleName + " to be non-null object, got " + moduleResult + " instead.");
+	}
+	let keys = Object.keys(moduleResult);
+	if(keys.length < 1){
+		throw new Error("Expected result of " + moduleName + " to export something.");
+	}
+	let key: string;
+	if(keys.length > 2){
+		if(!("default" in moduleResult)){
+			throw new Error("Module " + moduleName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
+		} else {
+			key = "default";
+		}
+	} else {
+		key = keys[0];
+	}
+
+	let fn = (moduleResult as {[k: string]: any})[key] as Imploder.TransformerCreationFunction;
+
+	let execResult = await Promise.resolve(fn(context));
+	let result = Array.isArray(execResult)? execResult: [execResult];
+
+	result.forEach(result => validateTransformer(result, moduleName, context));
+
+	return result;
+}
+
+function validateTransformer(trans: Imploder.CustomTransformerDefinition, name: string, context: Imploder.Context){
+	if(typeof(trans) !== "object" || trans === null){
+		context.logger.errorAndExit("Transformer from " + name + " is not object (or is null): " + trans);
+	}
+	if(!trans.transformerName){
+		context.logger.errorAndExit("Transformer from " + name + " has no name. This is not allowed.");
+	}
+	if(!trans.createForAfter && !trans.createForBefore){
+		context.logger.errorAndExit("Transformer " + name + " has neither of instance creation functions. This is not allowed.");
+	}
+}

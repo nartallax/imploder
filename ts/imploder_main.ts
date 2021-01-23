@@ -23,7 +23,7 @@ ImploderContextImpl.createPathResolver = context => new ModulePathResolverImpl(c
 ImploderContextImpl.createLogger = context => new LoggerImpl(context.config);
 ImploderContextImpl.createModuleStorage = context => new ModuleStorageImpl(context);
 
-export async function runAsCli(){
+export async function runAsCli(): Promise<void>{
 	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
 	if(cliArgs.test){
@@ -46,12 +46,12 @@ export async function runAsCli(){
 	await runFromConfig(config);
 }
 
-export async function runFromTsconfig(tsconfigPath: string, overrides?: Partial<Imploder.Config>){
+export function runFromTsconfig(tsconfigPath: string, overrides?: Partial<Imploder.Config>): Promise<Imploder.Context> {
 	let config = updatePartialConfigWithTsconfig(tsconfigPath, overrides || {});
-	await runFromConfig(config);
+	return runFromConfig(config);
 }
 
-export async function runFromConfig(config: Imploder.Config){
+export async function runFromConfig(config: Imploder.Config): Promise<Imploder.Context> {
 	let context = new ImploderContextImpl(config);
 	if(!config.watchMode){
 		context.logger.info("Starting to build project.");
@@ -70,4 +70,10 @@ export async function runFromConfig(config: Imploder.Config){
 		}
 		context.logger.info("Up and running.");
 	}
+
+	return context;
+}
+
+export function isContext(smth: unknown): smth is Imploder.Context {
+	return typeof(smth) === "object" && !!smth && smth instanceof ImploderContextImpl;
 }

@@ -6,10 +6,11 @@
         "noLoaderCode": true,
         "minify": true,
         "target": "ES2018",
-        "transformerProjects": [
-            "../transformer_list_all_classes/tsconfig.json",
-            "../transformer_change_ts/tsconfig.json"
-        ]
+        "transformers": [{
+            "imploderProject": "../transformer_list_all_classes/tsconfig.json"
+        }, {
+            "imploderProject": "../transformer_change_ts/tsconfig.json"
+        }]
     },
     
     "compilerOptions": {

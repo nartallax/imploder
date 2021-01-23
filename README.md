@@ -114,14 +114,21 @@ Some overrides could break the tool.
 
 ## Transformers
 
-[Example](test_projects/transformed/tsconfig.json)  
+[Example of transformer usage](test_projects/transformed/tsconfig.json)  
+[Example of transformer definition](test_projects/transformer_list_all_classes), [another example of transformer definition](test_projects/transformer_change_ts)  
 
 The tool is able to apply user-defined source code transformations at compilation. Transformer could alter resulting code in arbitrary way, as well as generate new files.  
-To define custom transformer, you should create separate project and link this project in tsconfig.json of project you want to transform:  
+Transformers are referenced in transformers property within imploderConfig:
 
-	"transformerProjects": ["../my_transformer/tsconfig.json"]
+	"transformers": [{
+		"imploderProject": "../my_transformer/tsconfig.json"
+	}, {
+		"imploderBundle": "my_great_package"
+	}]
 
-Entrypoint of transformer project should not be just any function; it should be TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts). For example of transformer projects, see test projects transformer_change_ts and/or transformer_list_all_classes.  
+There are currently two ways to reference transformers: with imploderProject and imploderBundle.  
+imploderProject expects path to tsconfig.json, which defines Imploder project. Referenced project will be built on start of the tool. Bundle of the project should export TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts).  
+imploderBundle expects name of package, which resolves to bundle of Imploder project (or path to bundle). The same requirements apply to the bundle as to project.  
 
 ## Other options
 
@@ -183,3 +190,4 @@ These features probably will be implemented at some point; just not yet.
 Decide about asynchronous module loading and separation of project into several bundles  
 Support for modules in C - asmjs/wasm  
 Test for not enough file watchers to properly watch all the files (it could lead to interesting results in projects with file-generating transformers, even in single-build launch)  
+Ability to use [ttypescript](https://github.com/cevek/ttypescript) transformers  

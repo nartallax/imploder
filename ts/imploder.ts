@@ -11,7 +11,11 @@ export namespace Imploder {
 	/** Запустить тул, передав в него путь к tsconfig.json и какие-либо еще опции
 	 * Переданные дополнительные опции имеют приоритет перед опциями в tsconfig.json
 	 * Это - предпочтительный способ для запуска тула из какого-либо js/ts-кода */
-	export const runFromTsconfig: (tsconfigPath: string, overrides?: Partial<Imploder.Config>) => Promise<void> = main.runFromTsconfig;
+	export const runFromTsconfig: (tsconfigPath: string, overrides?: Partial<Imploder.Config>) => Promise<Context> = main.runFromTsconfig;
+
+	/** Функция для проверки на то, является ли что-либо контекстом тула
+	 * Нужна для обеспечения универсальности при написании трансформеров, например */
+	export const isContext: (smth: unknown) => smth is Context = main.isContext;
 
 	/** Объект, содержащий в себе различные части тула */
 	export interface Context {
@@ -95,9 +99,8 @@ export namespace Imploder {
 		 * Передача некоторых из них, возможно, сломает тул */
 		minificationOverrides?: Partial<terser.CompressOptions>;
 
-		/** Список путей к проектам с трансформаторами.
-		 * Пути могут быть относительными, от корня проекта, в котором указаны. */
-		transformerProjects?: string[];
+		/** Список трансформеров, применяемых к проекту */
+		transformers?: TransformerReference[];
 
 		// watchmode
 		/** Запуститься в watch-моде. Отслеживать изменения в файлах и перекомпилировать сразу же. */
@@ -123,6 +126,10 @@ export namespace Imploder {
 	export interface TsconfigInclusion extends Profile {
 		profiles?: { [profileName: string]: Imploder.Profile }
 	}
+
+	export interface TransformerFromImploderProject { imploderProject: string }
+	export interface TransformerFromImploderBundle { imploderBundle: string }
+	export type TransformerReference = TransformerFromImploderProject | TransformerFromImploderBundle;
 
 	/** Конфиг всего тула в целом */
 	export interface Config extends CLIArgs, Profile { 

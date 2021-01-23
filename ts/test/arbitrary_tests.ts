@@ -69,10 +69,11 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 
 					let configText = await this.readProjectFile("tsconfig.json");
 					let conf = JSON.parse(configText);
-					conf.imploderConfig.transformerProjects = [
-						path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json"),
-						path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json")
-					];
+					conf.imploderConfig.transformers = [{
+						imploderProject: path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json")
+					}, {
+						imploderProject: path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json")
+					}];
 					await this.writeProjectFile("tsconfig.json", JSON.stringify(conf));
 
 					// создавать этот файл нужно строго до запуска компиляции

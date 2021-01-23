@@ -3,10 +3,8 @@ import {Imploder} from "imploder";
 import * as path from "path";
 import {AfterJsBundlerTransformer} from "./after_js_transformer";
 import {BeforeJsBundlerTransformer} from "./before_js_transformer";
-import {updateCliArgsWithTsconfig} from "impl/config";
-import {readTextFile} from "utils/afs";
 import {SeqSet} from "utils/seq_set";
-import {ImploderContextImpl} from "impl/context";
+import {getTransformersFromImploderBundle, getTransformersFromImploderProject} from "impl/transformer/transformer_creators";
 
 export class TransformerControllerImpl implements Imploder.TransformerController {
 
@@ -53,78 +51,22 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 	private async buildTransformerProjects(): Promise<Imploder.CustomTransformerDefinition[]>{
 		let allTransformers = [] as Imploder.CustomTransformerDefinition[];
 
-		for(let transformerProjectTsconfig of (this.context.config.transformerProjects || [])){
-			let configPath = path.resolve(path.dirname(this.context.config.tsconfigPath), transformerProjectTsconfig);
-			let config = updateCliArgsWithTsconfig({tsconfigPath: configPath});
-			config.watchMode = false;
-			config.noLoaderCode = true;
-			config.embedTslib = false;
-			let context = new ImploderContextImpl(config)
-			this.context.logger.debug("Building transformer project: " + configPath);
-			await context.compiler.run();
-			await context.bundler.produceBundle();
-			if(!context.compiler.lastBuildWasSuccessful){
-				this.context.logger.errorAndExit("Transformer project " + configPath + " build failed.");
-			}
-
-			let transformers: Imploder.CustomTransformerDefinition[];
+		for(let ref of (this.context.config.transformers || [])){
 			try {
-				transformers = await this.getTransformersFromBareBundle(context);
-			} catch(e: unknown){
-				this.context.logger.errorAndExit("Failed to run transformer project " + context.config.tsconfigPath + ": " + ((e as Error).stack || (e + "")));
+				let bundleRef = ref as Imploder.TransformerFromImploderBundle;
+				if(bundleRef.imploderBundle){
+					allTransformers.push(...await getTransformersFromImploderBundle(bundleRef.imploderBundle, this.context));
+				} else {
+					let projectRef = ref as Imploder.TransformerFromImploderProject;
+					let configPath = path.resolve(path.dirname(this.context.config.tsconfigPath), projectRef.imploderProject);
+					allTransformers.push(...await getTransformersFromImploderProject(configPath, this.context));
+				}
+			} catch(e){
+				this.context.logger.errorAndExit("Transformer project " + JSON.stringify(ref) + " failed to load: " + e.message)
 			}
-			transformers.forEach(t => this.validateTransformer(t, context));
-			allTransformers.push(...transformers);
 		}
 
 		return allTransformers;
-	}
-
-	// немного темной магии на тему получения трансформеров из их кода
-	// на самом деле просто eval-им их код
-	// добавляя в обертку некоторые завязки на тему того, что передавать в энтрипоинт и что делать с результатом
-	private getTransformersFromBareBundle(context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]>{
-		return new Promise(async (ok, bad) => {
-			try {
-
-				let bareCode = await readTextFile(context.config.outFile);
-				let wrappedCode = await context.bundler.wrapBundleCode(bareCode, {
-					afterEntryPointExecuted: "transformerBundleExecutionResultReceiverFunction",
-					entryPointArgCode: ["transformerProjectEntrypointArgumentContext"]
-				});
-
-				this.invokeTransformerBundleCode(wrappedCode, async (err, transOrPromise) => {
-					if(err){
-						bad(err);
-					} else {
-						try {
-							let trans = await Promise.resolve(transOrPromise);
-							let arr = Array.isArray(trans)? trans: [trans];
-							ok(arr);
-						} catch(e){ bad(e) }
-					}
-				}, this.context);
-
-			} catch(e){ bad(e) }
-		})
-	}
-
-	private invokeTransformerBundleCode(wrappedTransformerBundleCode: string, transformerBundleExecutionResultReceiverFunction: (err: unknown, transformers: Imploder.TransformerProjectEntryPointReturnType) => void, transformerProjectEntrypointArgumentContext: Imploder.Context): void {
-		void transformerBundleExecutionResultReceiverFunction;
-		void transformerProjectEntrypointArgumentContext;
-		eval(wrappedTransformerBundleCode);
-	}
-
-	private validateTransformer(trans: Imploder.CustomTransformerDefinition, context: Imploder.Context){
-		if(typeof(trans) !== "object" || trans === null){
-			this.context.logger.errorAndExit("Transformer from " + context.config.tsconfigPath + " is not object (or is null): " + trans);
-		}
-		if(!trans.transformerName){
-			this.context.logger.errorAndExit("Transformer from " + context.config.tsconfigPath + " has no name. This is not allowed.");
-		}
-		if(!trans.createForAfter && !trans.createForBefore){
-			this.context.logger.errorAndExit("Transformer " + trans.transformerName + " has neither of instance creation functions. This is not allowed.");
-		}
 	}
 
 	private orderCustomTransformers(transformers: Imploder.CustomTransformerDefinition[]): Imploder.CustomTransformerDefinition[] {
