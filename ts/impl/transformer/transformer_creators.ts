@@ -1,6 +1,7 @@
 import {updateCliArgsWithTsconfig} from "impl/config";
 import {ImploderContextImpl} from "impl/context";
 import {Imploder} from "imploder";
+import * as path from "path";
 
 export async function getTransformersFromImploderProject(projectTsconfigPath: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {	
 	let config = updateCliArgsWithTsconfig({tsconfigPath: projectTsconfigPath});
@@ -23,18 +24,22 @@ export async function getTransformersFromImploderProject(projectTsconfigPath: st
 }
 
 export async function getTransformersFromImploderBundle(moduleName: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {
-	let moduleResult: unknown = require(moduleName);
+	let pathOrName = require.resolve(moduleName, {
+		paths: [path.dirname(context.config.tsconfigPath)]
+	})
+
+	let moduleResult: unknown = require(pathOrName);
 	if(typeof(moduleResult) !== "object" || !moduleResult){
-		throw new Error("Expected result of " + moduleName + " to be non-null object, got " + moduleResult + " instead.");
+		throw new Error("Expected result of " + pathOrName + " to be non-null object, got " + moduleResult + " instead.");
 	}
 	let keys = Object.keys(moduleResult);
 	if(keys.length < 1){
-		throw new Error("Expected result of " + moduleName + " to export something.");
+		throw new Error("Expected result of " + pathOrName + " to export something.");
 	}
 	let key: string;
 	if(keys.length > 2){
 		if(!("default" in moduleResult)){
-			throw new Error("Module " + moduleName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
+			throw new Error("Module " + pathOrName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
 		} else {
 			key = "default";
 		}
@@ -47,7 +52,7 @@ export async function getTransformersFromImploderBundle(moduleName: string, cont
 	let execResult = await Promise.resolve(fn(context));
 	let result = Array.isArray(execResult)? execResult: [execResult];
 
-	result.forEach(result => validateTransformer(result, moduleName, context));
+	result.forEach(result => validateTransformer(result, pathOrName, context));
 
 	return result;
 }
