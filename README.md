@@ -1,4 +1,4 @@
-
+ 
 # Imploder
 
 This tool allows you to pack Typescript projects into launchable single-js-file bundles.  
