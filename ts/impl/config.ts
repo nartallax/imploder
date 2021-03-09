@@ -109,6 +109,19 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		LoggerImpl.writeDefaultAndExit("No file names are passed from tsconfig.json, therefore there is no root package. Nothing will be compiled.");
 	}
 
+	if(!(profile.target in tsc.ScriptTarget)){
+		for(let targetName in tsc.ScriptTarget){
+			if(targetName.toLowerCase() === profile.target.toLowerCase()){
+				profile.target = targetName as keyof typeof tsc.ScriptTarget;
+				break;
+			}
+		}
+
+		if(!(profile.target in tsc.ScriptTarget)){
+			throw new Error("This target is not known to Typescript: \"" + profile.target + "\"");
+		}
+	}
+
 	let rawOptions: any;
 	if(config.raw){
 		rawOptions = config.raw.compilerOptions;
