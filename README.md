@@ -45,7 +45,7 @@ Some of compilerOptions won't be compatible with the tool. In this case, you wil
 
 After configuration block is added, it's time to build. Launch build:  
 
-	node ./node_modules/.bin/imploder --tsconfig ./tsconfig.json
+	./node_modules/.bin/imploder --tsconfig ./tsconfig.json
 
 After build is finished, you should end up with either bundle in desired location, or with bunch of errors in tool output.  
 Note that entryFunction is not required; it's just a nice way to export actual entrypoint instead of writing launch code all over the module.  

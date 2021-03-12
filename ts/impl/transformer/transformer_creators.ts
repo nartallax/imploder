@@ -29,25 +29,38 @@ export async function getTransformersFromImploderBundle(moduleName: string, cont
 	})
 
 	let moduleResult: unknown = require(pathOrName);
-	if(typeof(moduleResult) !== "object" || !moduleResult){
-		throw new Error("Expected result of " + pathOrName + " to be non-null object, got " + moduleResult + " instead.");
+	let fn: Imploder.TransformerCreationFunction;
+	switch(typeof(moduleResult)){
+		case "function":
+			fn = moduleResult as Imploder.TransformerCreationFunction;
+			break;
+		case "object":
+			if(!moduleResult){
+				throw new Error("Expected result of " + pathOrName + " to be non-null object, got " + moduleResult + " instead.");
+			}
+			let keys = Object.keys(moduleResult);
+			if(keys.length < 1){
+				throw new Error("Expected result of " + pathOrName + " to export something.");
+			}
+			let key: string;
+			if(keys.length > 2){
+				if(!("default" in moduleResult)){
+					throw new Error("Module " + pathOrName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
+				} else {
+					key = "default";
+				}
+			} else {
+				key = keys[0];
+			}
+		
+			fn = (moduleResult as {[k: string]: any})[key] as Imploder.TransformerCreationFunction;
+			if(typeof(fn) !== "function"){
+				throw new Error("Expected result of " + pathOrName + " to export transformer creation function, got " + fn + " instead.");
+			}
+			break;
+		default:
+			throw new Error("Expected result of " + pathOrName + " to be object, got " + moduleResult + " instead.");
 	}
-	let keys = Object.keys(moduleResult);
-	if(keys.length < 1){
-		throw new Error("Expected result of " + pathOrName + " to export something.");
-	}
-	let key: string;
-	if(keys.length > 2){
-		if(!("default" in moduleResult)){
-			throw new Error("Module " + pathOrName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
-		} else {
-			key = "default";
-		}
-	} else {
-		key = keys[0];
-	}
-
-	let fn = (moduleResult as {[k: string]: any})[key] as Imploder.TransformerCreationFunction;
 
 	let execResult = await Promise.resolve(fn(context));
 	let result = Array.isArray(execResult)? execResult: [execResult];
