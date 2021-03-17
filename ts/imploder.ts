@@ -201,16 +201,9 @@ export namespace Imploder {
 	 * Немного отличается по смыслу от объекта tsc.CustomTransformer
 	 * Например, tsc.CustomTransformer создается каждый раз, когда он нужен; этот объект создается при старте тула один раз */
 	export interface CustomTransformerDefinition {
-		/** Имя трансформера. Используется при отладочных выводах, а также при построении последовательности запуска трансформеров */
+		/** Имя трансформера. Используется при отладочных выводах */
 		readonly transformerName: string;
 
-		// опции про контроль порядка запуска трансформеров
-		// в launchAfter перечисляются имена трансформеров, которые должны быть запущены строго ранее этого
-		// launchAfterRequired - то же самое, но при этом отсутствие такого трансформера - ошибка (в launchAfter - нет)
-		// при прочих равных трансформеры сортируются по именам
-		readonly launchAfter?: string[];
-		readonly launchAfterRequired?: string[];
-		
 		/** Создать инстанс трансформера, который будет запускаться до транспиляции typescript кода в javascript */
 		createForBefore?(transformContext: tsc.TransformationContext): tsc.CustomTransformer;
 
