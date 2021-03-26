@@ -4,47 +4,52 @@ import * as path from "path";
 import {AfterJsBundlerTransformer} from "./after_js_transformer";
 import {BeforeJsBundlerTransformer} from "./before_js_transformer";
 import {getTransformersFromImploderBundle, getTransformersFromImploderProject} from "impl/transformer/transformer_creators";
+import {WrapperTransformer} from "impl/transformer/wrapper_transformer";
 
 
 export class TransformerControllerImpl implements Imploder.TransformerController {
 
 	constructor(private readonly context: Imploder.Context){}
 
-	private _transformers: tsc.CustomTransformers | null = null;
-	private customTransformerDefs: Imploder.CustomTransformerDefinition[] = [];
-	async getTransformers(): Promise<tsc.CustomTransformers> {
-		return this._transformers ||= await this.createTransformers();
-	}
-
+	private customTransformerDefs: Imploder.CustomTransformerDefinition[] | null = null;
+	
 	onModuleDelete(moduleName: string): void {
+		if(!this.customTransformerDefs){
+			throw new Error("Fatal: transformers not initialized, could not handle module deletion.");
+		}
 		this.customTransformerDefs.forEach(def => def.onModuleDelete && def.onModuleDelete(moduleName));
 	}
 
-	private transformerFactoriesFromDefinitions(defs: Imploder.CustomTransformerDefinition[], key: keyof(Imploder.CustomTransformerDefinition) & ("createForBefore" | "createForAfter")): tsc.CustomTransformerFactory[] {
-		return defs.map(x => {
-			const creator = x[key];
+	private transformerFactoriesFromDefinitions(defs: Imploder.CustomTransformerDefinition[], onError: Imploder.TransformerErrorHandler, key: keyof(Imploder.CustomTransformerDefinition) & ("createForBefore" | "createForAfter")): tsc.CustomTransformerFactory[] {
+		return defs.map(transDef => {
+			const creator = transDef[key];
 			if(!creator){
 				return null;
 			}
-			let factory: tsc.CustomTransformerFactory = context => creator.call(x, context)
+			let factory: tsc.CustomTransformerFactory = context => {
+				let baseTransformer = creator.call(transDef, context);
+				let wrapperTransformer = new WrapperTransformer(onError, baseTransformer, transDef)
+				return wrapperTransformer;
+			}
 			return factory;
 		}).filter(x => !!x) as tsc.CustomTransformerFactory[];
 	}
 
-	private async createTransformers(): Promise<tsc.CustomTransformers> {
-		let transformersFromProjects = await this.loadTransformers();
-		this.customTransformerDefs = transformersFromProjects;
+	async createTransformers(onError: Imploder.TransformerErrorHandler): Promise<tsc.CustomTransformers>{
+		let defs = (this.customTransformerDefs ||= await this.loadTransformers());
 
-		return {
+		let result: tsc.CustomTransformers = {
 			before: [
-				...this.transformerFactoriesFromDefinitions(transformersFromProjects, "createForBefore"),
+				...this.transformerFactoriesFromDefinitions(defs, onError, "createForBefore"),
 				context => new BeforeJsBundlerTransformer(context, this.context),
 			],
 			after: [
-				...this.transformerFactoriesFromDefinitions(transformersFromProjects, "createForAfter"),
-				context => new AfterJsBundlerTransformer(context, this.context)
+				...this.transformerFactoriesFromDefinitions(defs, onError, "createForAfter"),
+				context => new AfterJsBundlerTransformer(context, this.context),
 			]
 		}
+
+		return result;
 	}
 
 	private async loadTransformers(): Promise<Imploder.CustomTransformerDefinition[]>{

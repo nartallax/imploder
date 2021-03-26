@@ -56,7 +56,16 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 	}
 
 	private async createWatchHost(system: tsc.System){
-		let transformers = await this.context.transformerController.getTransformers();
+		let transformers = await this.context.transformerController.createTransformers((err, def, file) => {
+			this.addDiagnostic({
+				category: tsc.DiagnosticCategory.Error,
+				code: 1,
+				file: tsc.isSourceFile(file)? file: undefined,
+				messageText: "Transformer " + def.transformerName + " throws error: " + err.message,
+				start: undefined,
+				length: undefined
+			});
+		});
 
 		// зачем такие сложности, с созданием двух хостов?
 		// первый хост нужен для того, чтобы вызывать на нем createProgram
@@ -93,7 +102,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 					// возможно, это избыточно?
 					for(let diag of tsc.getPreEmitDiagnostics(result.getProgram())){
-						this.onDiag(diag);
+						this.addDiagnostic(diag);
 					}
 
 					try {
@@ -102,10 +111,19 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 							writeFile,
 							cancellationToken,
 							emitOnlyDtsFiles,
-							!customTransformers? transformers: {
-								before: [ ...(customTransformers.before || []), ...(transformers.before || []) ],
-								after: [ ...(customTransformers.after || []), ...(transformers.after || [])],
-								afterDeclarations: [ ...(customTransformers.afterDeclarations || []), ...(transformers.afterDeclarations || []) ],
+							{
+								before: [
+									...(customTransformers?.before || []), 
+									...(transformers.before || [])
+								],
+								after: [ 
+									...(customTransformers?.after || []), 
+									...(transformers.after || [])
+								],
+								afterDeclarations: [ 
+									...(customTransformers?.afterDeclarations || []), 
+									...(transformers.afterDeclarations || []) 
+								],
 							}
 						)
 					} finally {
@@ -114,7 +132,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 				}
 				return result;
 			},
-			diag => this.onDiag(diag),
+			diag => this.addDiagnostic(diag),
 			diag => {
 				if(diag.code === 6031 || diag.code === 6032){
 					// build started, skipping
@@ -127,7 +145,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		);
 	}
 
-	private onDiag(diag: tsc.Diagnostic){
+	addDiagnostic(diag: tsc.Diagnostic): void {
 		this.lastBuildDiag.push(diag);
 		if(!this.context.config.noBuildDiagnosticMessages){
 			processTypescriptDiagnosticEntry(diag, this.context.logger);

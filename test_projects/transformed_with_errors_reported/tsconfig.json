@@ -1,0 +1,21 @@
+{ 
+    "imploderConfig": {
+        "entryModule": "main.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "noLoaderCode": true,
+        "minify": true,
+        "target": "ES2018",
+        "transformers": [{
+            "imploderProject": "../transformer_report_error/tsconfig.json"
+        }]
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["./*"]
+        }
+    }
+}

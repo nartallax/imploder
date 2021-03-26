@@ -182,6 +182,8 @@ export class SingleBuildTestProject {
 		"watch",
 		"transformer_list_all_classes",
 		"transformer_change_ts",
+		"transformer_report_error",
+		"transformer_throw_error",
 		"bundle_as_module",
 		"profiles"
 	])

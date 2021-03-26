@@ -38,13 +38,21 @@ export namespace Imploder {
 		run(): Promise<void>;
 		notifyFsObjectChange(fsObjectChangedPath: string): void;
 		waitBuildEnd(): Promise<void>;
+		/** Имеет смысл вызывать в процессе компиляции, например, из трансформеров.
+		 * Добавление ошибки приведет к провалу компиляции.
+		 * Альтернативный способ остановить компиляцию - выбросить ошибку из трасформера,
+		 * но это не так удобно, т.к. не позволяет указывать на конкретную строку в */
+		addDiagnostic(diag: tsc.Diagnostic): void;
 	}
 
 	/** Класс, управляющий трансформерами */
 	export interface TransformerController {
-		getTransformers(): Promise<tsc.CustomTransformers>;
+		createTransformers(onError: TransformerErrorHandler): Promise<tsc.CustomTransformers>;
 		onModuleDelete(moduleName: string): void;
 	}
+
+	/** Обработчик ошибок, выдаваемых трансформаторами */
+	export type TransformerErrorHandler = (e: Error, def: Imploder.CustomTransformerDefinition, file: tsc.SourceFile | tsc.Bundle) => void
 	
 	/** Сборщик бандл-файла из кучи исходников */
 	export interface Bundler {
