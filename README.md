@@ -71,6 +71,7 @@ Note that not each build results in bundle file update. To actually update the b
 
 Port number is arbitrary.  
 Now, after tool is restarted, when HTTP request is sent to <http://localhost:7570/assemble_bundle> , a bundle is assembled and put into designated file, as well as sent over HTTP as response. Build errors are also sent over HTTP, if any. In case of errors, bundle is not produced.  
+Alternatively you may call /assemble_bundle_errors_only endpoint, which will only output errors, but not bundle code.  
 
 ## Profiles
 

@@ -29,23 +29,33 @@ export class HttpApi {
 		}
 	}
 
+	private async getBundle(): Promise<{httpCode: number, err?: string, bundle?: string}>{
+		await this.context.compiler.waitBuildEnd();
+		if(!this.context.compiler.lastBuildWasSuccessful){
+			let errorStr: string;
+			if(!this.context.config.showErrorsOverHttp){
+				errorStr = "There was errors during build.";
+			} else {
+				errorStr = this.context.compiler.lastBuildDiagnostics
+					.map(x => typescriptDiagnosticEntryToString(x))
+					.join("\n");
+			}
+			return {httpCode:500, err: errorStr};
+		}
+		let bundleCode = await this.context.bundler.produceBundle();
+		return {httpCode: 200, bundle:bundleCode};
+	}
+
 	private async runFunction(name: string): Promise<[number, string]>{
 		switch(name.toLowerCase().replace(/(^\/|\/$)/g, "")){
-			case "assemble_bundle":
-				await this.context.compiler.waitBuildEnd();
-				if(!this.context.compiler.lastBuildWasSuccessful){
-					let errorStr: string;
-					if(!this.context.config.showErrorsOverHttp){
-						errorStr = "There was errors during build.";
-					} else {
-						errorStr = this.context.compiler.lastBuildDiagnostics
-							.map(x => typescriptDiagnosticEntryToString(x))
-							.join("\n");
-					}
-					return [500, errorStr];
-				}
-				let bundleCode = await this.context.bundler.produceBundle();;
-				return [200, bundleCode];
+			case "assemble_bundle_errors_only":{
+				let res = await this.getBundle();
+				return [res.httpCode, res.err || ""];
+			}
+			case "assemble_bundle":{
+				let res = await this.getBundle();
+				return [res.httpCode, res.err || res.bundle || ""];
+			}
 			default: throw new Error("Unknown HTTP API endpoint: " + name);
 		}
 	}
