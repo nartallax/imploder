@@ -13,13 +13,13 @@ export class LoggerImpl implements Imploder.Logger {
 	private readonly writeLogStr: (str: string) => void;
 
 	constructor(args: Imploder.CLIArgs & {writeLogLine?: (str: string) => void}){
-		this.writeLogStr = args.writeLogLine || (str => process.stderr.write(str + "\n"));
+		this.writeLogStr = args.writeLogLine || (str => process.stderr.write(timeStr() + "\t" + str + "\n"));
 		this.verbosityLevel = args.verbose? 1: 0;
 	}
 
 	private logWithLevel(verbosityLevel: number, str: string){
 		if(verbosityLevel <= this.verbosityLevel){
-			this.writeLogStr(timeStr() + "\t" + str);
+			this.writeLogStr(str);
 		}
 	}
 

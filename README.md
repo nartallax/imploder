@@ -9,14 +9,17 @@ Disclaimer: this tool does not support, and is not aiming to support all possibl
 
 ## Install
 
-	npm install --save-dev @nartallax/imploder
-
-The tool will use any Typescript version it could find. The tool will use tslib that is installed in the project.  
-Versions of Typescript below 4 are not supported.  
-That is, you should also install Typescript and tslib, though it not always required:  
+First, you need to install peer dependencies for the tool:  
 
 	npm install --save-dev typescript
 	npm install --save-dev tslib
+
+Then you install the tool itself:
+
+	npm install --save-dev @nartallax/imploder
+
+npm of version 7 and higher will install peer dependencies automatically.  
+Note that Typescript, as said earlier, is peer dependency for the tool. That means tool will use any Typescript version installed.  
 
 Examples of tool usage are available [in tests directory](test_projects); however, keep in mind that some of the options shown there is required just for testing and won't work well with your project.  
 
