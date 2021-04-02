@@ -1,9 +1,33 @@
 import {readTextFile, unlink, writeTextFile} from "utils/afs"
 import {WatchTestProject} from "test/watch_test_project";
 import * as path from "path";
+import * as http from "http";
 import {testProjectDir, wrapConsoleLog} from "test/test_project_utils";
 import {Imploder} from "imploder";
 import {SingleBuildTestProject} from "test/single_build_test_project";
+
+function httpGetBundle(port: number): Promise<{code: number, body: string}> {
+	return new Promise((ok, bad) => {
+		let req = http.request({
+			host: "localhost",
+			port: port,
+			path: "/assemble_bundle"
+		}, resp => {
+			let data: Buffer[] = [];
+			resp.on("error", bad);
+			resp.on("data", chunk => data.push(chunk));
+			resp.on("end", () => ok({
+				code: resp.statusCode || -1,
+				body: Buffer.concat(data).toString("utf-8")
+			}))
+		});
+		
+		req.on("error", bad);
+
+		req.end();
+	});
+
+}
 
 async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs){
 	let proj = new SingleBuildTestProject("bundle_as_module", cliArgsBase);
@@ -127,6 +151,35 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 			return false;
 		}
 
+		return true;
+	},
+
+	"lazy_start": async cliArgsBase => {
+		await new (class extends WatchTestProject {
+			async run(){
+				await this.inTempDir(async () => {
+					let portNum = 57372; // arbitrary
+
+					let configText = await this.readProjectFile("tsconfig.json");
+					let conf = JSON.parse(configText);
+					conf.imploderConfig.lazyStart = true;
+					conf.imploderConfig.httpPort = portNum;
+					conf.imploderConfig.showErrorsOverHttp = true;
+					await this.writeProjectFile("tsconfig.json", JSON.stringify(conf));
+
+					let compiler = this.compiler; // ensuring the compiler is existent
+					void compiler;
+
+					await this.withHttpApi(async () => {
+						await this.writeProjectFile("main.ts", "ONONONONONO");
+						let httpResp = await httpGetBundle(portNum);
+						if(httpResp.code !== 500 || httpResp.body.indexOf("Error: Cannot find name") < 0){
+							throw new Error("Bad response to invalid code. Expected HTTP 500 and errors, got " + httpResp.code + " and " + httpResp.body);
+						}
+					})
+				});
+			}
+		})("watch", cliArgsBase).run();
 		return true;
 	}
 }

@@ -6,6 +6,7 @@ import {ImploderContextImpl} from "impl/context";
 import {updateCliArgsWithTsconfig} from "impl/config";
 import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
 import {BundlerImpl} from "impl/bundler";
+import {HttpApi} from "impl/http_api";
 
 export class WatchTestProject {
 	
@@ -20,6 +21,16 @@ export class WatchTestProject {
 				this.projDir = null;
 			}
 		})
+	}
+
+	protected async withHttpApi<T>(action: () => T | Promise<T>): Promise<T>{
+		let api = new HttpApi(this.context);
+		try {
+			await api.start();
+			return await Promise.resolve(action());
+		} finally {
+			await api.stop();
+		}
 	}
 
 	protected async withCompilerRunning<T>(action: () => T | Promise<T>): Promise<T> {

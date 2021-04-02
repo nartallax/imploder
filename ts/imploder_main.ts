@@ -64,7 +64,9 @@ export async function runFromConfig(config: Imploder.Config): Promise<Imploder.C
 		}
 	} else {
 		context.logger.info("Starting initial build.");
-		await context.compiler.run();
+		if(!context.config.lazyStart){
+			await context.compiler.run();
+		}
 		if(typeof(config.httpPort) === "number"){
 			await new HttpApi(context).start();
 		}

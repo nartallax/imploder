@@ -30,6 +30,7 @@ export class HttpApi {
 	}
 
 	private async getBundle(): Promise<{httpCode: number, err?: string, bundle?: string}>{
+		await this.context.compiler.run();
 		await this.context.compiler.waitBuildEnd();
 		if(!this.context.compiler.lastBuildWasSuccessful){
 			let errorStr: string;
@@ -72,6 +73,13 @@ export class HttpApi {
 				});
 			} catch(e){bad(e)}
 		});
+	}
+
+	stop(): Promise<void> {
+		return new Promise((ok, bad) => {
+			this.server.close(err => err? bad(err): ok());
+		});
+
 	}
 
 }

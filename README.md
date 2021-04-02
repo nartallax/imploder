@@ -164,6 +164,15 @@ You can disable such behavior with following option (which is not recommended):
 
 	"preserveOutDir": true
 
+### Lazy start
+
+By default, in watchmode compiler will start as soon as the tool is launched. You can prevent this passing following option:  
+
+	"lazyStart": true
+
+With this option, compiler will be started after first request to HTTP server.  
+This option is mainly intended for case when you have a multitude of (frontend) projects, but do not want to load them all at once.  
+
 ## Better circular links resolution
 
 The tool provides its own module loader. One of reasons behind this is need for better circular dependencies resolution between modules.  

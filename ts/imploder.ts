@@ -34,7 +34,7 @@ export namespace Imploder {
 		readonly compilerHost: tsc.CompilerHost;
 		readonly lastBuildWasSuccessful: boolean;
 		readonly lastBuildDiagnostics: ReadonlyArray<tsc.Diagnostic>;
-
+		
 		run(): Promise<void>;
 		notifyFsObjectChange(fsObjectChangedPath: string): void;
 		waitBuildEnd(): Promise<void>;
@@ -119,6 +119,8 @@ export namespace Imploder {
 		/** Показывать ли ошибки при провале сборки, если сборка запущена через HTTP?
 		 * По умолчанию показ ошибок через HTTP отключен из соображений безопасности */
 		showErrorsOverHttp?: boolean;
+		/** Если true - не запускать компиляцию, пока она не понадобится */
+		lazyStart?: boolean;
 
 		// отладочные опции
 		/** Выдавать ли больше логов в stderr */

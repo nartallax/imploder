@@ -190,6 +190,9 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 	/** запуститься в вотчмоде */
 	async run(){
+		if(this._watch){
+			return;
+		}
 		await this.beforeStart();
 
 		let system = this.createSystemForWatch();
@@ -201,7 +204,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 	stopWatch(){
 		if(!this._watch){
-			throw new Error("Could not stop watchmode if watchmode is not started.");
+			return;
 		}
 		this._watch.close();
 		this._watch = null;
