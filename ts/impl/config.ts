@@ -99,7 +99,7 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.
 	let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
 	let haveErrors = processTypescriptDiagnostics(result.errors);
 	if(haveErrors){
-		process.exit(1);
+		throw new Error("Tsconfig has errors.");
 	}
 	return [result, rawJson.imploderConfig];
 }

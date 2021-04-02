@@ -38,11 +38,15 @@ export class WatchTestProject {
 			await this.compiler.run();
 			return await Promise.resolve(action());
 		} finally {
-			this.compiler.stopWatch();
-			await this.compiler.buildLock.withLock(() => {});
-			this._compiler = null;
-			this._context = null;
+			await this.shutdownCompiler();
 		}
+	}
+
+	protected async shutdownCompiler(): Promise<void>{
+		this.compiler.stopWatch();
+		await this.compiler.buildLock.withLock(() => {});
+		this._compiler = null;
+		this._context = null;
 	}
 
 	private _context: Imploder.Context | null = null;

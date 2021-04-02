@@ -177,6 +177,9 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 							throw new Error("Bad response to invalid code. Expected HTTP 500 and errors, got " + httpResp.code + " and " + httpResp.body);
 						}
 					})
+					// if compiler is not explicitly shut down, test process exits with code 1... for some reason
+					// dunno, let's just shutdown
+					await this.shutdownCompiler();
 				});
 			}
 		})("watch", cliArgsBase).run();
