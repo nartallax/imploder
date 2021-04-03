@@ -21,7 +21,7 @@ function httpGetBundle(port: number): Promise<{code: number, body: string}> {
 				body: Buffer.concat(data).toString("utf-8")
 			}))
 		});
-		
+
 		req.on("error", bad);
 
 		req.end();
@@ -29,9 +29,9 @@ function httpGetBundle(port: number): Promise<{code: number, body: string}> {
 
 }
 
-async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs){
+async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs) {
 	let proj = new SingleBuildTestProject("bundle_as_module", cliArgsBase);
-	if(!await proj.run()){
+	if(!await proj.run()) {
 		return false;
 	}
 	let wrappedBundle = await proj.bundler.wrapBundleCode(proj.producedBundleText);
@@ -39,26 +39,26 @@ async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs)
 	await writeTextFile(fullPathToWrappedBundle, wrappedBundle);
 	let otherProjectEntryPoint = path.resolve(testProjectDir(proj.name), jsName)
 	let projectCode = await readTextFile(otherProjectEntryPoint);
-	 
+
 	let [stdout] = await wrapConsoleLog(() => new Promise((ok, bad) => {
 		let testIsCompleted = ok
 		void testIsCompleted;
 		try {
 			eval(projectCode);
-		} catch(e){
+		} catch(e) {
 			bad(e);
 		}
 	}));
-	if(stdout !== "42! spice must flow"){
+	if(stdout !== "42! spice must flow") {
 		console.error("Test failed: stdout not matches expected: " + stdout);
 	}
 	return true;
 }
 
-export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Imploder.CLIArgs) => (boolean | Promise<boolean>))} = {
+export const ArbitraryTests: {readonly [testName: string]: ((cliArgsBase: Imploder.CLIArgs) => (boolean | Promise<boolean>))} = {
 	"watch_simple": async cliArgsBase => {
 		await new (class extends WatchTestProject {
-			async run(){
+			async run() {
 				await this.inTempDir(async () => {
 					await this.withCompilerRunning(async () => {
 						await this.bundleAndTest("./bundle_a.js", "./stdout_a.txt");
@@ -88,7 +88,7 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 	// почему-то иногда этот тест зависает, но я никак не могу выловить, почему же
 	"watch_with_transformers": async cliArgsBase => {
 		await new (class extends WatchTestProject {
-			async run(){
+			async run() {
 				await this.inTempDir(async () => {
 
 					let configText = await this.readProjectFile("tsconfig.json");
@@ -141,13 +141,13 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 	"profiles": async cliArgsBase => {
 		let args = {...cliArgsBase, profile: "for_old"};
 		let forOld = new SingleBuildTestProject("profiles", args, {ethalonBundle: "oldBundle.js", testBundle: "./js/bundle_old.js"});
-		if(!(await forOld.run())){
+		if(!(await forOld.run())) {
 			return false;
 		}
 
 		args = {...cliArgsBase, profile: "for_new"};
 		let forNew = new SingleBuildTestProject("profiles", args, {ethalonBundle: "newBundle.js", testBundle: "./js/bundle_new.js"});
-		if(!(await forNew.run())){
+		if(!(await forNew.run())) {
 			return false;
 		}
 
@@ -156,7 +156,7 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 
 	"lazy_start": async cliArgsBase => {
 		await new (class extends WatchTestProject {
-			async run(){
+			async run() {
 				await this.inTempDir(async () => {
 					let portNum = 57372; // arbitrary
 
@@ -173,7 +173,7 @@ export const ArbitraryTests: { readonly [testName: string]: ((cliArgsBase: Implo
 					await this.withHttpApi(async () => {
 						await this.writeProjectFile("main.ts", "ONONONONONO");
 						let httpResp = await httpGetBundle(portNum);
-						if(httpResp.code !== 500 || httpResp.body.indexOf("Error: Cannot find name") < 0){
+						if(httpResp.code !== 500 || httpResp.body.indexOf("Error: Cannot find name") < 0) {
 							throw new Error("Bad response to invalid code. Expected HTTP 500 and errors, got " + httpResp.code + " and " + httpResp.body);
 						}
 					})

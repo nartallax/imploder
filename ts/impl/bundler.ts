@@ -2,9 +2,8 @@ import * as tsc from "typescript";
 import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
 import * as path from "path";
-import {readTextFile, stat, writeTextFile} from "utils/afs";
+import {readTextFile, writeTextFile} from "utils/afs";
 import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
-import * as fs from "fs";
 import {Imploder} from "imploder";
 
 export class BundlerImpl implements Imploder.Bundler {
@@ -62,19 +61,8 @@ export class BundlerImpl implements Imploder.Bundler {
 	}
 
 	private async getTslibDefArr(): Promise<ImploderModuleDefinitonArray> {
-		let root = path.resolve(path.dirname(this.context.config.tsconfigPath), "./node_modules/tslib/");
-		let stats: fs.Stats;
-		try {
-			stats = await stat(root);
-		} catch(e){
-			throw new Error("Failed to fstat tslib directory " + root);
-		}
-		if(!stats.isDirectory()){
-			throw new Error("Expected " + root + " to be tslib directory, but it's not directory.");
-		}
-
-		let libPath = path.resolve(root, "./tslib.js");
-		let libCode = await readTextFile(libPath);
+		let tslibjsPath = require.resolve("tslib", {paths:[path.dirname(this.context.config.tsconfigPath)]})
+		let libCode = await readTextFile(tslibjsPath);
 		// оборачиваем код tslib в функцию типа определение модуля
 		// чтобы с ним можно было обращаться так же, как с любым другим модулем
 		libCode = "function(global){var define=function(){};" + libCode + "}"

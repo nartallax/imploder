@@ -144,6 +144,8 @@ By default, the tool embeds tslib as one of the modules if any other module requ
 
 	"embedTslib": false
 
+Note that path to tslib.js is resolved relative to tsconfig.json directory path by Node default package search rules.  
+
 ### Module blacklisting/whitelisting
 
 [Example](test_projects/whitelist_blacklist/tsconfig.json)  
