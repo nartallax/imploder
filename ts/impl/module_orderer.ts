@@ -7,6 +7,9 @@ export class ModuleOrderer {
 
 	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>}{
 		let circularDependentRelatedModules = new Set<string>();
+		if(!this.storage.has(entryPointModule)){
+			throw new Error(`Could not order modules: entry point module (${entryPointModule}) is not found.`);
+		}
 		let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentRelatedModules);
 		//let nonModules = this.getSortedNonModules(modules);
 		modules.forEach(name => this.detectRecursiveRefExport(name));

@@ -1,0 +1,20 @@
+{ 
+    "imploderConfig": {
+        "entryModule": "this_is_absent_module_name_nya.ts",
+        "entryFunction": "main",
+        "outFile": "js/bundle.js",
+        "target": "ES2018",
+        "minify": true,
+
+
+        "noLoaderCode": true
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["*"]
+        }
+    }
+}
