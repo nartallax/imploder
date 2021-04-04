@@ -43,7 +43,11 @@ export async function runAsCli(): Promise<void>{
 
 	let config = updateCliArgsWithTsconfig(cliArgs);
 	
-	await runFromConfig(config);
+	let context = await runFromConfig(config);
+
+	if(!context.config.watchMode){
+		process.exit(context.compiler.lastBuildWasSuccessful? 0: 1);
+	}
 }
 
 export function runFromTsconfig(tsconfigPath: string, overrides?: Partial<Imploder.Config>): Promise<Imploder.Context> {
