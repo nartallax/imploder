@@ -1,17 +1,28 @@
-export class SeqSet<T extends string | number | boolean | null>{
+export class SeqSet<T>{
 	seq = [] as T[];
-	private set = new Set<T>();
+	private set = new Set<string>();
 
-	push(v: T){
-		if(this.set.has(v)){
-			throw new Error("Could not add repeated value \"" + v + "\" to SeqSet.");
+	constructor(
+		private readonly getKey: (value: T) => string = value => value + "", 
+		private readonly throwOnDuplicate: boolean = false
+	){}
+
+	push(v: T): boolean {
+		let k = this.getKey(v);
+		if(this.set.has(k)){
+			if(this.throwOnDuplicate){
+				throw new Error("Could not add repeated value \"" + v + "\" to SeqSet.");
+			} else {
+				return false;
+			}
 		}
-		this.set.add(v);
+		this.set.add(k);
 		this.seq.push(v);
+		return true;
 	}
 
 	has(v: T){
-		return this.set.has(v);
+		return this.set.has(this.getKey(v));
 	}
 
 	pop(): T {
@@ -19,7 +30,12 @@ export class SeqSet<T extends string | number | boolean | null>{
 		if(res === undefined){
 			throw new Error("SeqSet underflow.");
 		}
-		this.set.delete(res);
+		this.set.delete(this.getKey(res));
 		return res;
+	}
+
+	clear(): void {
+		this.seq.length = 0;
+		this.set.clear();
 	}
 }

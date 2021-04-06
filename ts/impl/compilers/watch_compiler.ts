@@ -78,11 +78,11 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			system,
 			undefined,
 			(diagnostic: tsc.Diagnostic) => {
-				processTypescriptDiagnosticEntry(diagnostic, this.context.logger);
+				processTypescriptDiagnosticEntry(diagnostic, this.context.logger, this.projectRoot);
 			},
 			(diagnostic: tsc.Diagnostic) => {
 				this.context.logger.error("DEFAULT HOST EMITTED DIAG!");
-				processTypescriptDiagnosticEntry(diagnostic, this.context.logger);
+				processTypescriptDiagnosticEntry(diagnostic, this.context.logger, this.projectRoot);
 			}
 		)
 
@@ -139,16 +139,17 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 				} else if(diag.code === 6193 || diag.code === 6194){
 					// build ended, skipping
 				} else {
-					processTypescriptDiagnosticEntry(diag, this.context.logger);
+					processTypescriptDiagnosticEntry(diag, this.context.logger, this.projectRoot);
 				}
 			}
 		);
 	}
 
 	addDiagnostic(diag: tsc.Diagnostic): void {
-		this.lastBuildDiag.push(diag);
-		if(!this.context.config.noBuildDiagnosticMessages){
-			processTypescriptDiagnosticEntry(diag, this.context.logger);
+		if(this.lastBuildDiag.push(diag)){
+			if(!this.context.config.noBuildDiagnosticMessages){
+				processTypescriptDiagnosticEntry(diag, this.context.logger, this.projectRoot);
+			}
 		}
 	}
 

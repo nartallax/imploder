@@ -34,6 +34,7 @@ export namespace Imploder {
 		readonly compilerHost: tsc.CompilerHost;
 		readonly lastBuildWasSuccessful: boolean;
 		readonly lastBuildDiagnostics: ReadonlyArray<tsc.Diagnostic>;
+		readonly projectRoot: string;
 		
 		run(): Promise<void>;
 		notifyFsObjectChange(fsObjectChangedPath: string): void;

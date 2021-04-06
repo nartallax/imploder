@@ -2,6 +2,7 @@ import * as tsc from "typescript";
 import * as path from "path";
 import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
 import {Imploder} from "imploder";
+import {SeqSet} from "utils/seq_set";
 
 /*
 Полезные доки и примеры: 
@@ -13,11 +14,12 @@ https://stackoverflow.com/questions/62026189/typescript-custom-transformers-with
 
 export abstract class ImploderAbstractCompiler {
 	protected readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
+	readonly projectRoot = path.dirname(this.context.config.tsconfigPath);
 
 	constructor(protected readonly context: Imploder.Context){
 		this.tscConfig = {
 			...this.context.config.tscParsedCommandLine,
-			rootNames: [path.dirname(this.context.config.tsconfigPath) + "/"]
+			rootNames: [this.projectRoot + "/"]
 		}
 	}
 
@@ -43,18 +45,23 @@ export abstract class ImploderAbstractCompiler {
 	}
 
 	protected errorCount = 0;
-	protected lastBuildDiag = [] as tsc.Diagnostic[]
+	protected lastBuildDiag = new SeqSet<tsc.Diagnostic>(d => {
+		return (!d.file? "<nofile>": d.file.fileName) + "|" +
+			(d.start || -1) + "|" + 
+			(d.length || -1) + "|" + 
+			(d.messageText || -1);
+	});
 	get lastBuildDiagnostics(): ReadonlyArray<tsc.Diagnostic>{
-		return this.lastBuildDiag;
+		return this.lastBuildDiag.seq;
 	}
 
 	protected clearLastBuildDiagnostics(){
 		this.errorCount = 0;
-		this.lastBuildDiag = [];
+		this.lastBuildDiag.clear();
 	}
 
 	protected updateErrorCount(){
-		this.errorCount = this.lastBuildDiag.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
+		this.errorCount = this.lastBuildDiag.seq.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
 	}
 
 	get lastBuildWasSuccessful(): boolean {

@@ -38,7 +38,7 @@ export class HttpApi {
 				errorStr = "There was errors during build.";
 			} else {
 				errorStr = this.context.compiler.lastBuildDiagnostics
-					.map(x => typescriptDiagnosticEntryToString(x))
+					.map(x => typescriptDiagnosticEntryToString(x, this.context.compiler.projectRoot))
 					.join("\n");
 			}
 			return {httpCode:500, err: errorStr};

@@ -97,7 +97,7 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.
 	let rawJson = JSON.parse(fileContentStr);
 	let projectRoot = path.dirname(tsconfigPath);
 	let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
-	let haveErrors = processTypescriptDiagnostics(result.errors);
+	let haveErrors = processTypescriptDiagnostics(result.errors, undefined, projectRoot);
 	if(haveErrors){
 		throw new Error("Tsconfig has errors.");
 	}

@@ -32,7 +32,7 @@ export class ModuleOrderer {
 	}
 
 	private detectRecursiveRefExport(entryPoint: string){
-		let nameStack = new SeqSet<string>();
+		let nameStack = new SeqSet<string>(undefined, true);
 		let visit = (name: string) => {
 			if(nameStack.has(name)){
 				throw new Error("Recursive \"export *\" detected: " + this.unwindNameStack(nameStack, name).join(" <- "));
@@ -49,7 +49,7 @@ export class ModuleOrderer {
 	}
 
 	private getSortedModules(entryPoint: string, circularDependentRelatedModules: Set<string>): [string[], Set<string>] {
-		let nameStack = new SeqSet<string>();
+		let nameStack = new SeqSet<string>(undefined, true);
 		let absentModules = new Set<string>();
 		let result = new Set<string>();
 
