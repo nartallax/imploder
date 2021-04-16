@@ -37,6 +37,7 @@ export namespace Imploder {
 		readonly projectRoot: string;
 		
 		run(): Promise<void>;
+		stop(): void | Promise<void>;
 		notifyFsObjectChange(fsObjectChangedPath: string): void;
 		waitBuildEnd(): Promise<void>;
 		/** Имеет смысл вызывать в процессе компиляции, например, из трансформеров.

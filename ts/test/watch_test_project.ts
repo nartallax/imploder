@@ -43,7 +43,7 @@ export class WatchTestProject {
 	}
 
 	protected async shutdownCompiler(): Promise<void>{
-		this.compiler.stopWatch();
+		this.compiler.stop();
 		await this.compiler.buildLock.withLock(() => {});
 		this._compiler = null;
 		this._context = null;

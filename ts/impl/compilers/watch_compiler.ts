@@ -203,7 +203,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		this._watch = watchProgram;
 	}
 
-	stopWatch(){
+	stop(){
 		if(!this._watch){
 			return;
 		}

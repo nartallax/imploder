@@ -57,7 +57,7 @@ export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements 
 			// мы это видим по тому, что buildLock не снят
 			// и запускаем сборку по новой
 			await super.run();
-			this.stopWatch();
+			this.stop();
 		} while(this.buildLock.isLocked());
 	}
 
