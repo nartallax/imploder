@@ -11,7 +11,10 @@ export namespace Imploder {
 	/** Запустить тул, передав в него путь к tsconfig.json и какие-либо еще опции
 	 * Переданные дополнительные опции имеют приоритет перед опциями в tsconfig.json
 	 * Это - предпочтительный способ для запуска тула из какого-либо js/ts-кода */
-	export const runFromTsconfig: (tsconfigPath: string, overrides?: Partial<Imploder.Config>) => Promise<Context> = main.runFromTsconfig;
+	export const runFromTsconfig: (tsconfigPath: string, overrides?: Partial<Config>) => Promise<Context> = main.runFromTsconfig;
+
+	/** Распарсить конфиг, не запуская тул */
+	export const parseConfig: (tsconfigPath: string, overrides?: Partial<Config>) => Promise<Config> = async (path, overrides) => main.updatePartialConfigWithTsconfig(path, overrides);
 
 	/** Функция для проверки на то, является ли что-либо контекстом тула
 	 * Нужна для обеспечения универсальности при написании трансформеров, например */

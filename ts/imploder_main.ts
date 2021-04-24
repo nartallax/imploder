@@ -11,6 +11,7 @@ import {ModulePathResolverImpl} from "impl/module_path_resolver";
 import {HttpApi} from "impl/http_api";
 import {ModuleStorageImpl} from "impl/module_storage";
 import {Imploder} from "imploder";
+export {updatePartialConfigWithTsconfig} from "impl/config";
 
 
 ImploderContextImpl.createCompiler = context => context.config.watchMode

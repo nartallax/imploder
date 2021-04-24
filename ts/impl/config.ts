@@ -43,12 +43,12 @@ function parseTsconfigToProfile(tsconfigPath: string, profileName?: string): [ts
 	return [tscParsedCommandLine, profile]
 }
 
-export function updatePartialConfigWithTsconfig(tsconfigPath: string, partConfig: Partial<Imploder.Config>): Imploder.Config {
+export function updatePartialConfigWithTsconfig(tsconfigPath: string, partConfig?: Partial<Imploder.Config>): Imploder.Config {
 	tsconfigPath = path.resolve(tsconfigPath);
-	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(tsconfigPath, partConfig.profile);
+	let [tscParsedCommandLine, profile] = parseTsconfigToProfile(tsconfigPath, (partConfig || {}).profile);
 	profile = {
 		...profile,
-		...partConfig
+		...(partConfig || {})
 	};
 
 	fixProfile(profile, tsconfigPath);
