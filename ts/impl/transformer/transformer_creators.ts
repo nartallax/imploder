@@ -3,7 +3,7 @@ import {ImploderContextImpl} from "impl/context";
 import {Imploder} from "imploder";
 import * as path from "path";
 
-export async function getTransformersFromImploderProject(projectTsconfigPath: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {	
+export async function getTransformersFromImploderProject(projectTsconfigPath: string, context: Imploder.Context, params: {[k: string]: unknown} | undefined): Promise<Imploder.CustomTransformerDefinition[]> {	
 	let config = updateCliArgsWithTsconfig({tsconfigPath: projectTsconfigPath});
 	config.watchMode = false;
 	config.noLoaderCode = false;
@@ -17,13 +17,13 @@ export async function getTransformersFromImploderProject(projectTsconfigPath: st
 	}
 
 	try {
-		return getTransformersFromImploderBundle(projectContext.config.outFile, context);
+		return getTransformersFromImploderBundle(projectContext.config.outFile, context, params);
 	} catch(e: unknown){
 		throw new Error("Failed to run transformer project " + projectTsconfigPath + ": " + ((e as Error).stack || (e + "")));
 	}
 }
 
-export async function getTransformersFromImploderBundle(moduleName: string, context: Imploder.Context): Promise<Imploder.CustomTransformerDefinition[]> {
+export async function getTransformersFromImploderBundle(moduleName: string, context: Imploder.Context, params: {[k: string]: unknown} | undefined): Promise<Imploder.CustomTransformerDefinition[]> {
 	let pathOrName = require.resolve(moduleName, {
 		paths: [path.dirname(context.config.tsconfigPath)]
 	})
@@ -62,7 +62,7 @@ export async function getTransformersFromImploderBundle(moduleName: string, cont
 			throw new Error("Expected result of " + pathOrName + " to be object, got " + moduleResult + " instead.");
 	}
 
-	let execResult = await Promise.resolve(fn(context));
+	let execResult = await Promise.resolve(fn(context, params));
 	let result = Array.isArray(execResult)? execResult: [execResult];
 
 	result.forEach(result => validateTransformer(result, pathOrName, context));

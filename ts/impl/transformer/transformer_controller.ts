@@ -57,13 +57,13 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 
 		for(let ref of (this.context.config.transformers || [])){
 			try {
-				let bundleRef = ref as Imploder.TransformerFromImploderBundle;
-				if(bundleRef.imploderBundle){
-					allTransformers.push(...await getTransformersFromImploderBundle(bundleRef.imploderBundle, this.context));
+				if(isImploderBundleRef(ref)){
+					allTransformers.push(...await getTransformersFromImploderBundle(ref.imploderBundle, this.context, ref.params));
+				} else if(isImploderProjectRef(ref)){
+					let configPath = path.resolve(path.dirname(this.context.config.tsconfigPath), ref.imploderProject);
+					allTransformers.push(...await getTransformersFromImploderProject(configPath, this.context, ref.params));
 				} else {
-					let projectRef = ref as Imploder.TransformerFromImploderProject;
-					let configPath = path.resolve(path.dirname(this.context.config.tsconfigPath), projectRef.imploderProject);
-					allTransformers.push(...await getTransformersFromImploderProject(configPath, this.context));
+					this.context.logger.errorAndExit("Transformer referenced incorrectly: cannot recognise what the reference is: " + JSON.stringify(ref));
 				}
 			} catch(e){
 				this.context.logger.errorAndExit("Transformer project " + JSON.stringify(ref) + " failed to load: " + e.message)
@@ -73,4 +73,12 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 		return allTransformers;
 	}
 
+}
+
+function isImploderBundleRef(v: Imploder.TransformerReference): v is Imploder.TransformerFromImploderBundle {
+	return !!(v as Imploder.TransformerFromImploderBundle).imploderBundle
+}
+
+function isImploderProjectRef(v: Imploder.TransformerReference): v is Imploder.TransformerFromImploderProject {
+	return !!(v as Imploder.TransformerFromImploderProject).imploderProject
 }

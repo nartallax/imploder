@@ -9,7 +9,8 @@
         "transformers": [{
             "imploderProject": "../transformer_list_all_classes/tsconfig.json"
         }, {
-            "imploderProject": "../transformer_change_ts/tsconfig.json"
+            "imploderProject": "../transformer_change_ts/tsconfig.json",
+            "params": {"functionName": "logText2"}
         }]
     },
     

@@ -127,7 +127,8 @@ Transformers are referenced in transformers property within imploderConfig:
 	"transformers": [{
 		"imploderProject": "../my_transformer/tsconfig.json"
 	}, {
-		"imploderBundle": "my_great_package"
+		"imploderBundle": "my_great_package",
+		"params": { "thisIsParamName": "thisIsParamValue" }
 	}]
 
 There are currently two ways to reference transformers: with imploderProject and imploderBundle.  

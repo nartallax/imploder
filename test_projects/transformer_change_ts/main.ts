@@ -3,6 +3,10 @@ import * as tsc from "typescript";
 
 type VisitResult = false | void | undefined | tsc.Node | tsc.Node[];
 
+interface TransformerParams {
+	functionName?: string;
+}
+
 let transformVisitRecursive = <T extends tsc.Node>(node: T, context: tsc.TransformationContext, visitor: (node: tsc.Node) => VisitResult): T => {
 
 	let wrappedVisitor = (node: tsc.Node) => {
@@ -24,7 +28,7 @@ let transformVisitRecursive = <T extends tsc.Node>(node: T, context: tsc.Transfo
 class LogChangerTransformer implements Imploder.CustomTransformerDefinition {
 	readonly transformerName = "log_changer_transformer";
 
-	constructor(private readonly toolContext: Imploder.Context){}
+	constructor(private readonly toolContext: Imploder.Context, private readonly params: TransformerParams){}
 
 	createForBefore(transformContext: tsc.TransformationContext): tsc.CustomTransformer {
 		return {
@@ -48,7 +52,7 @@ class LogChangerTransformer implements Imploder.CustomTransformerDefinition {
 						return tsc.factory.updateCallExpression(node,
 							tsc.factory.createPropertyAccessExpression(
 								tsc.factory.createIdentifier("utilModule123321"),
-								tsc.factory.createIdentifier("logText")
+								tsc.factory.createIdentifier(this.params.functionName || "logText")
 							),
 							node.typeArguments,
 							node.arguments
@@ -81,6 +85,6 @@ class LogChangerTransformer implements Imploder.CustomTransformerDefinition {
 	}
 }
 
-export function main(toolContext: Imploder.Context): Imploder.TransformerProjectEntryPointReturnType {
-	return new LogChangerTransformer(toolContext);
+export function main(toolContext: Imploder.Context, params?: TransformerParams): Imploder.TransformerProjectEntryPointReturnType {
+	return new LogChangerTransformer(toolContext, params || {});
 }

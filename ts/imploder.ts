@@ -142,8 +142,15 @@ export namespace Imploder {
 		profiles?: { [profileName: string]: Imploder.Profile }
 	}
 
-	export interface TransformerFromImploderProject { imploderProject: string }
-	export interface TransformerFromImploderBundle { imploderBundle: string }
+	export interface TransformerFromImploderBase { 
+		params?: {[k: string]: unknown }
+	}
+	export interface TransformerFromImploderProject extends TransformerFromImploderBase { 
+		imploderProject: string 
+	}
+	export interface TransformerFromImploderBundle extends TransformerFromImploderBase { 
+		imploderBundle: string
+	}
 	export type TransformerReference = TransformerFromImploderProject | TransformerFromImploderBundle;
 
 	/** Конфиг всего тула в целом */
@@ -234,7 +241,7 @@ export namespace Imploder {
 	export type TransformerProjectEntryPointReturnType = PromiseOrValue<ArrayOrSingleValue<CustomTransformerDefinition>>
 
 	/** Под эту сигнатуру должен подходить энтрипоинт проекта, указанного как проект трансформера */
-	export type TransformerCreationFunction = (context: Context) => TransformerProjectEntryPointReturnType
+	export type TransformerCreationFunction = (context: Context, params: {[k: string]: unknown} | undefined) => TransformerProjectEntryPointReturnType
 
 	/** Объект, который управляет логами */
 	export interface Logger {
