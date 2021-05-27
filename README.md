@@ -133,6 +133,7 @@ Transformers are referenced in transformers property within imploderConfig:
 There are currently two ways to reference transformers: with imploderProject and imploderBundle.  
 imploderProject expects path to tsconfig.json, which defines Imploder project. Referenced project will be built on start of the tool. Bundle of the project should export TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts).  
 imploderBundle expects name of package, which resolves to bundle of Imploder project (or path to bundle, which is resolved relative to directory of tsconfig.json). The same requirements apply to the bundle as to project.  
+Note that if some transformers are mentioned in base config, and some are mentioned in profile config, then profile config transformers will be applied after base config transformers.  
 
 ## Other options
 

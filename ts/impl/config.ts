@@ -34,9 +34,15 @@ function parseTsconfigToProfile(tsconfigPath: string, profileName?: string): [ts
 		if(!inclusionConfig.profiles || !(profileName in inclusionConfig.profiles)){
 			LoggerImpl.writeDefaultAndExit(`Profile name is passed in command-line arguments ("${profileName}"), but there is no such profile defined.`);
 		}
+		let targetProfile = inclusionConfig.profiles[profileName];
+		let transformers = [
+			...(profile.transformers || []),
+			...(targetProfile.transformers || [])
+		]
 		profile = {
 			...profile,
-			...inclusionConfig.profiles[profileName]
+			...targetProfile,
+			transformers
 		};
 	}
 
