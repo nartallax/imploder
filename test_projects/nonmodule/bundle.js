@@ -1,0 +1,1 @@
+[["/main",[],{"nonModule":true},"console.log('Oh wow, I\\'m working')"]]

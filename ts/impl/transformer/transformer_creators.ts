@@ -43,7 +43,7 @@ export async function getTransformersFromImploderBundle(moduleName: string, cont
 				throw new Error("Expected result of " + pathOrName + " to export something.");
 			}
 			let key: string;
-			if(keys.length > 2){
+			if(keys.length > 1){
 				if(!("default" in moduleResult)){
 					throw new Error("Module " + pathOrName + " exports more than one value, neither of which is named \"default\"; not sure what value to pick.");
 				} else {

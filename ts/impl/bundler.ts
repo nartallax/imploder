@@ -83,7 +83,7 @@ export class BundlerImpl implements Imploder.Bundler {
 			let shouldIncludeFullExportInfo = circularDependentRelatedModules.has(name);
 			let haveModuleRefs = meta.exportModuleReferences.length > 0 && shouldIncludeFullExportInfo;
 			let needExports = meta.exports.length > 0 && shouldIncludeFullExportInfo
-			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs){
+			if(needExports || !!meta.altName || meta.hasOmniousExport || haveModuleRefs || !meta.isModuleFile){
 
 				let short: ImploderModuleLoaderData = {}
 				if(haveModuleRefs){
@@ -98,6 +98,9 @@ export class BundlerImpl implements Imploder.Bundler {
 				if(meta.altName){
 					short.altName = meta.altName;
 				}
+				if(!meta.isModuleFile){
+					short.nonModule = true;
+				}
 
 				return [name, meta.dependencies, short, code]
 			} else {
@@ -109,7 +112,6 @@ export class BundlerImpl implements Imploder.Bundler {
 	private minifiedLoaderCode: string | null = null;
 	private async getPrefixCode(): Promise<string> {
 		let resultLoaderCode = loaderCode;
-		//this.minify(resultLoaderCode, "<loader>", { target: tsc.ScriptTarget.ES5 }).then(code => console.error("LOADER: " + code))
 		if(this.context.config.minify){
 			if(this.minifiedLoaderCode === null){
 				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { 
@@ -160,7 +162,7 @@ export class BundlerImpl implements Imploder.Bundler {
 				proms.push((async () => {
 					let code = await readTextFile(modulePath);
 					if(this.context.config.minify){
-						code = await this.minify(code, moduleName);
+						code = await this.minify(code, moduleName, {}, mod.isModuleFile);
 					}
 					mod.jsCode = code;
 				})());
@@ -171,8 +173,9 @@ export class BundlerImpl implements Imploder.Bundler {
 		}
 	}
 
-	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}): Promise<string> {
+	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}, isModuleDef: boolean = true): Promise<string> {
 		return minifyJsFunctionExpression({
+			isModuleDef,
 			target: tsc.ScriptTarget[this.context.config.target],
 			...opts,
 			code, 

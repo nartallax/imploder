@@ -3,6 +3,7 @@ import * as terser from "terser";
 import * as tsc from "typescript";
 
 export interface MinifierOptions {
+	isModuleDef: boolean;
 	removeLegalComments?: boolean;
 	target: tsc.ScriptTarget;
 	code: string;
@@ -14,7 +15,11 @@ export interface MinifierOptions {
 export async function minifyJsFunctionExpression(opts: MinifierOptions, context: Imploder.Context): Promise<string> {
 	let ecma = tscEcmaToTerserEcma(opts.target, context);
 	try {
-		let res = await terser.minify("return " + opts.code.replace(/^[\n\r\s]+/, ""), {
+		let code = opts.code;
+		if(opts.isModuleDef){
+			code = "return " + opts.code.replace(/^[\n\r\s]+/, "");
+		}
+		let res = await terser.minify(code, {
 			compress: {
 				passes: 3,
 				toplevel: false, // true probably will drop entire module definition

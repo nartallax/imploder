@@ -1,0 +1,17 @@
+{ 
+    "imploderConfig": {
+        "entryModule": "main.ts",
+        "outFile": "js/bundle.js",
+        "target": "ES2018",
+        "minify": true,
+        "noLoaderCode": true
+    },
+    
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "js",
+        "paths": {
+            "*": ["*"]
+        }
+    }
+}

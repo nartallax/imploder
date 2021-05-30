@@ -15,7 +15,7 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 			hasOmniousExport: false,
 			altName: null,
 			jsCode: null,
-			hasImportOrExport: false
+			isModuleFile: false
 		}
 
 		if(fileNode.referencedFiles.length > 0){

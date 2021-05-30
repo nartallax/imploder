@@ -152,7 +152,12 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 					}
 					deps.push(depMeta.arbitraryType || (!depMeta.exports && !depMeta.exportRefs)? getProduct(name): getProxy(depMeta));
 				});
-				let defFunc: Function = evl("'use strict';(" + meta.code + ")\n//# sourceURL=" + meta.name);
+				let fullCode = meta.code;
+				if(meta.nonModule){
+					fullCode = "function(){" + fullCode + "}"
+				}
+				fullCode = "'use strict';(" + fullCode + ")\n//# sourceURL=" + meta.name;
+				let defFunc: Function = evl(fullCode);
 				let returnProduct = defFunc.apply(null, deps);
 				if(meta.arbitraryType){
 					product = returnProduct;

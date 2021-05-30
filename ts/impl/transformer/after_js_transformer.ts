@@ -16,7 +16,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 				// что-то делаем только на первом вызове define()
 				return;
 			}
-				
+			
 			definingFunction = this.processDefineCall(moduleMeta, node, fileNode);
 
 			return false;
@@ -29,21 +29,21 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 			return !tsc.isFunctionExpression(node)
 		});
 
+		this.setModuleFileFlag(moduleMeta);
+
 		if(!definingFunction){
-			if(moduleMeta.hasImportOrExport){
+			if(moduleMeta.isModuleFile){
 				throw new Error("Transformed code of module " + moduleName + " does not contain any define() invocations");
 			} else {
 				return fileNode;
 			}
 		}
 
-		this.setImportExportFlag(moduleMeta);
-
 		return tsc.factory.updateSourceFile(fileNode, tsc.createNodeArray([definingFunction]));
 	}
 
-	private setImportExportFlag(moduleMeta: Imploder.ModuleData){
-		moduleMeta.hasImportOrExport = moduleMeta.hasImportOrExport
+	private setModuleFileFlag(moduleMeta: Imploder.ModuleData){
+		moduleMeta.isModuleFile = moduleMeta.isModuleFile
 			|| moduleMeta.exports.length > 0
 			|| moduleMeta.hasOmniousExport
 			|| moduleMeta.dependencies.length > 0
@@ -51,6 +51,8 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 	}
 
 	private processDefineCall(moduleMeta: Imploder.ModuleData, defineCallNode: tsc.CallExpression, fileNode: tsc.SourceFile): tsc.Node {
+		moduleMeta.isModuleFile = true; // если файл содержит define(), то логично, что он полноценный модуль
+
 		let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2];
 		if(!tsc.isArrayLiteralExpression(depArrNode)){
 			throw new Error("Second-from-end argument of define() is not array literal.");

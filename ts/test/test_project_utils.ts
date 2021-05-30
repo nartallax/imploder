@@ -45,7 +45,7 @@ export async function wrapConsoleLog<T>(action: () => T | Promise<T>): Promise<[
 // по-хорошему нужно спавнить новые процессы и ловить их вывод
 export async function runTestBundle(code: string, bundler: BundlerImpl): Promise<string> {
 	let [stdout] = await wrapConsoleLog(() => {
-		return new Promise(async (ok, bad) => {
+		return new Promise<void>(async (ok, bad) => {
 			let nop = () => {};
 		
 			// смысл в изворотах с mainThen - в том, что код энтрипоинта исполняется асинхронно

@@ -135,6 +135,7 @@ There are currently two ways to reference transformers: with imploderProject and
 imploderProject expects path to tsconfig.json, which defines Imploder project. Referenced project will be built on start of the tool. Bundle of the project should export TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts).  
 imploderBundle expects name of package, which resolves to bundle of Imploder project (or path to bundle, which is resolved relative to directory of tsconfig.json). The same requirements apply to the bundle as to project.  
 Note that if some transformers are mentioned in base config, and some are mentioned in profile config, then profile config transformers will be applied after base config transformers.  
+You can pass some values to transformers you mention. This is done with params option as shown above.  
 
 ## Other options
 
@@ -199,6 +200,10 @@ As a user of the tool you will probably never need this, but I'll write this jus
 
 Running tests is optional, but you definitely should do this.  
 To run compile script, you will need bash shell and bunch of utilities. It runs successfully on Debian 9, probably will run fine on most Linux distributions, and maybe will run on bash on Windows (like gitbash) - not tested and not explicitly supported.  
+
+## Naming
+
+This tools grabs a lot of redundant source files and squeezes them into single compact file. This is comparable to implosion process; thus the name.  
 
 ## TODO
 
