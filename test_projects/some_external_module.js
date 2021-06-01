@@ -1,0 +1,1 @@
+module.exports.someFunction = x => "cat says: " + x;
