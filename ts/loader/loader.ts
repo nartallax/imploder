@@ -197,7 +197,16 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 			meta.exportRefs.forEach(ref => {
 				// тут, теоретически, могла бы возникнуть бесконечная рекурсия
 				// но не возникнет, еще при компиляции есть проверка
-				getAllExportNames(defMap[ref], result, true);
+				if(ref in defMap){
+					getAllExportNames(defMap[ref], result, true);
+				} else if(ref in products){
+					// модуля может не быть, если он внешний и в бандл не вошел
+					result.push(Object.keys(products[ref]));
+				} else {
+					// такого по идее произойти не должно никогда, т.к. оно упадет раньше
+					// еще на этапе подгрузки внешних модулей
+					throw new Error("External module " + ref + " is not loaded at required time.");
+				}
 			});
 		}
 		return result;
@@ -261,8 +270,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 
 	function start(){
 		if(amd){
-			let externalModuleNames = ["require"];
-			discoverExternalModules(params.entryPoint.module, externalModuleNames);
+			let externalModuleNames = discoverExternalModules(params.entryPoint.module, ["require"]);
 			define(externalModuleNames, function(require: AmdRequire){
 				req = require;
 				let modules = arguments as unknown as any[]; // почему typescript дает arguments такой странный тип?

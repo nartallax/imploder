@@ -83,7 +83,13 @@ export class ModuleOrderer {
 	// а также те модули, на которые ссылаются эти зацикленные модули с помощью, например, export * (такие попадают в exportRef-ы)
 	// потому что без имен из этих сосланных модулей список экспортируемых имен будет неполон
 	private updateCircularRelatedModules(s: Set<string>): void {
-		let addRefs = (module: string) => this.storage.get(module).exportModuleReferences.forEach(add);
+		let addRefs = (module: string) => {
+			if(this.storage.has(module)){
+				// модуля может не быть, если это внешний модуль
+				this.storage.get(module).exportModuleReferences.forEach(add);
+			}
+			
+		}
 		let add = (module: string) => {
 			s.add(module);
 			addRefs(module);

@@ -1,6 +1,6 @@
 {
   "name": "@nartallax/imploder",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "A tool to work with Typescript projects.",
   "main": "main.js",
   "types": "imploder.d.ts",
