@@ -23,10 +23,14 @@ export class SingleBuildTestProject {
 	private readonly bundleText: string | null = this.fileContentOrNull(this.pathOverrides?.ethalonBundle ?? "./bundle.js");
 	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt");
 
+	get testBundlePath(): string {
+		return path.resolve(path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"));
+	}
+
 	private _producedBundleText: string | null = null;
 	get producedBundleText(): string {
 		if(!this._producedBundleText){
-			this._producedBundleText = this.fileContentOrNull(this.pathOverrides?.testBundle ?? "./js/bundle.js");
+			this._producedBundleText = this.fileContentOrNull(this.testBundlePath);
 			if(this._producedBundleText === null){
 				throw new Error("Expected test project \"" + this.name + "\" to produce bundle code, but it is not.");
 			}
@@ -74,7 +78,7 @@ export class SingleBuildTestProject {
 	){}
 
 	private fileContentOrNull(subpath: string): string | null {
-		let p = path.join(testProjectDir(this.name), subpath)
+		let p = path.resolve(testProjectDir(this.name), subpath)
 		try {
 			fs.statSync(p);
 		} catch(e){
@@ -119,7 +123,7 @@ export class SingleBuildTestProject {
 	}
 
 	private runBundle(): Promise<string> {
-		return runTestBundle(this.producedBundleText, this.bundler)
+		return runTestBundle(this.producedBundleText, this.bundler, this.testBundlePath)
 	}
 
 	private async checkStdout(): Promise<boolean> {
@@ -191,7 +195,7 @@ export class SingleBuildTestProject {
 	static readonly availableProjects: ReadonlyArray<string> = testListStr
 		.split("\n")
 		.map(_ => _.trim())
-		.filter(_ => !!_ && !SingleBuildTestProject.excludedTestProjectDirectories.has(_))
+		.filter(_ => !!_ && !_.toLowerCase().match(/\.(ts|js)$/) && !SingleBuildTestProject.excludedTestProjectDirectories.has(_))
 
 	static couldRunTest(name: string): boolean {
 		return this.availableProjects.includes(name);

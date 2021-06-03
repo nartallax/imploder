@@ -1,8 +1,8 @@
-import {readTextFile, unlink, writeTextFile} from "utils/afs"
+import { unlink, writeTextFile} from "utils/afs"
 import {WatchTestProject} from "test/watch_test_project";
 import * as path from "path";
 import * as http from "http";
-import {testProjectDir, wrapConsoleLog} from "test/test_project_utils";
+import {failOnNonEmptyCodeOrSignal, runJsCode, testProjectDir} from "test/test_project_utils";
 import {Imploder} from "imploder";
 import {SingleBuildTestProject} from "test/single_build_test_project";
 
@@ -38,19 +38,16 @@ async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs)
 	let fullPathToWrappedBundle = path.resolve(testProjectDir(proj.name), "./js/bundle_wrapped.js")
 	await writeTextFile(fullPathToWrappedBundle, wrappedBundle);
 	let otherProjectEntryPoint = path.resolve(testProjectDir(proj.name), jsName)
-	let projectCode = await readTextFile(otherProjectEntryPoint);
+	
+	let result = await runJsCode(otherProjectEntryPoint);
+	if(!!result.stderr.trim()){
+		throw new Error("Expected no stderr, got: " + result.stderr);
+	}
 
-	let [stdout] = await wrapConsoleLog(() => new Promise((ok, bad) => {
-		let testIsCompleted = ok
-		void testIsCompleted;
-		try {
-			eval(projectCode);
-		} catch(e) {
-			bad(e);
-		}
-	}));
-	if(stdout !== "42! spice must flow") {
-		console.error("Test failed: stdout not matches expected: " + stdout);
+	failOnNonEmptyCodeOrSignal(result);
+
+	if(result.stdout !== "42! spice must flow") {
+		console.error("Test failed: stdout not matches expected: " + result.stdout);
 	}
 	return true;
 }

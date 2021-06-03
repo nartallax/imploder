@@ -25,7 +25,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 		if(handler){
 			handler(e, action);
 		} else {
-			console.error("Error " + (action? " " + action: "") + ": " + (e.stack || e.message || e));
+			console.error((action? "Error during " + action + ": ": "") + (e.stack || e.message || e));
 		}
 		throw e;
 	}

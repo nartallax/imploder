@@ -120,8 +120,9 @@ export class WatchTestProject {
 		// файлвотчи срабатывают не мгновенно, нужно сколько-то подождать
 		await this.waitWatchTriggered();
 		await this.context.bundler.produceBundle();
-		let bundle = await this.assertFileEquals("js/bundle.js", goodBundlePath);
-		let stdout = await runTestBundle(bundle, this.context.bundler as BundlerImpl);
+		let testedBundlePath = "js/bundle.js";
+		let bundle = await this.assertFileEquals(testedBundlePath, goodBundlePath);
+		let stdout = await runTestBundle(bundle, this.context.bundler as BundlerImpl, this.resolveProjectFilePath(testedBundlePath));
 		await this.assertFileContentEquals(stdout, goodStdoutPath);
 	}
 

@@ -6,7 +6,6 @@ requirejs.config({
     nodeRequire: require
 });
 
-requirejs([fullPathToWrappedBundle], function(bundle){
+requirejs(["js/bundle_wrapped"], function(bundle){
 	console.log(bundle.meaningOfEverything + "! spice " + bundle.spice);
-	testIsCompleted();
 });

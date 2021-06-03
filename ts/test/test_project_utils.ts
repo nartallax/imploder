@@ -1,7 +1,9 @@
 import * as path from "path";
 import * as fs from "fs";
+import {promises as Fs} from "fs";
 import {BundlerImpl} from "impl/bundler";
 import {LoggerImpl} from "impl/logger";
+import * as ChildProcess from "child_process";
 
 let testProjectsRoot: string | null = null;
 export function testProjectDir(name: string): string {
@@ -17,67 +19,67 @@ export function testProjectDir(name: string): string {
 	return path.join(testProjectsRoot, name);
 }
 
-export async function wrapConsoleLog<T>(action: () => T | Promise<T>): Promise<[string, T]>{
-	let outerConsole = console;
-	let stdout = [] as string[];
-	let result: T;
-	{
-		let console = { 
-			...outerConsole,
-			log: (...values: string[]) => {
-				let str = values.join(" ");
-				stdout.push(str);
-			}
-		};
-		(global as any).console = console;
 
-		try {
-			result = await Promise.resolve(action());
-		} finally {
-			(global as any).console = outerConsole;
-		}
+export async function runTestBundle(code: string, bundler: BundlerImpl, bundlePath: string): Promise<string> {
+	let allCode = await bundler.wrapBundleCode(code);
+	let result = await runBundleCodeAsFile(allCode, bundlePath);
+	if(result.stderr.trim()){
+		throw new Error(result.stderr.split("\n")[0]);
 	}
-	return [stdout.join("\n"), result];
+	failOnNonEmptyCodeOrSignal(result);
+
+	return result.stdout;
 }
 
-// тут я слегка полагаютсь на то, что в коде теста не будет совсем уж полной дестроерской дичи
-// в смысле, тесты не должны никак корраптить глобальные объекты и т.д.
-// по-хорошему нужно спавнить новые процессы и ловить их вывод
-export async function runTestBundle(code: string, bundler: BundlerImpl): Promise<string> {
-	let [stdout] = await wrapConsoleLog(() => {
-		return new Promise<void>(async (ok, bad) => {
-			let nop = () => {};
-		
-			// смысл в изворотах с mainThen - в том, что код энтрипоинта исполняется асинхронно
-			// а нам нужно дождаться, когда он все-таки закончит исполняться, или кинет ошибку
-			// в каких-то случаях он все-таки исполняется синхронно (отсутствие асинхронного кода/асинхронных импортов)
-			// и тогда в этом всем нет особого смысла
-			// но в случае, например, если нам нужно поймать асинхронно кидаемую из энтрипоинта ошибку - 
-			// то нам нужен результат его исполнения (который мы здесь и получаем, и await-им, ибо это Promise)
-			let mainThen = async (err: Error | null, result: any) => {
-				if(err){
-					bad(err);
-				} else {
-					try {
-						await Promise.resolve(result);
-						ok();
-					} catch(e){
-						bad(e);
-					}
-				}
-			}
-			
-			void console;
-			void nop;
-			void mainThen;
-			let allCode = await bundler.wrapBundleCode(code, {afterEntryPointExecuted: "mainThen"});
-			try {
-				eval(allCode);
-			} catch(e){
-				bad(e)
-			}
-		});
-	});
+export function failOnNonEmptyCodeOrSignal(result: {code: number | null, signal: NodeJS.Signals | null}): void {
+	let {code, signal} = result;
+	if(code !== 0 || !!signal){
+		throw new Error(`Expected zero exit code and no exit signal, got code = ${code} and signal = ${signal}`);
+	}
+}
 
-	return stdout;
+async function runBundleCodeAsFile(code: string, originalBundlePath: string): Promise<ProcessExecutionResult> {
+	let tmpJsPath = path.join(path.dirname(originalBundlePath), "wrapped_" + path.basename(originalBundlePath));
+	await Fs.writeFile(tmpJsPath, code, "utf8");
+	try {
+		return await runJsCode(tmpJsPath);
+	} finally {
+		try {
+			await Fs.unlink(tmpJsPath);
+		} catch(e){}
+	}
+}
+
+export interface ProcessExecutionResult {
+	stdout: string;
+	stderr: string;
+	code: number | null;
+	signal: NodeJS.Signals | null;
+}
+
+export async function runJsCode(path: string): Promise<ProcessExecutionResult> {
+	return new Promise((ok, bad) => {
+		try {
+			let res = ChildProcess.spawn(process.argv[0], [path])
+
+			let stderrChunks: Buffer[] = [];
+			let stdoutChunks: Buffer[] = [];
+
+			let onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+				ok({
+					stdout: Buffer.concat(stdoutChunks).toString("utf8").trim(),
+					stderr: Buffer.concat(stderrChunks).toString("utf8").trim(),
+					code, signal
+				})
+			}
+
+			res.on("error", err => bad(err));
+			res.on("exit", onExit);
+			res.on("close", onExit);
+			res.stderr.on("data", chunk => stderrChunks.push(chunk));
+			res.stdout.on("data", chunk => stdoutChunks.push(chunk));
+		} catch(e){
+			bad(e);
+		}
+	});
 }

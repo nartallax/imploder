@@ -1,1 +1,1 @@
-Unresolvable circular dependency detected: /button <- /control <- /button
+Error: Unresolvable circular dependency detected: /button <- /control <- /button
