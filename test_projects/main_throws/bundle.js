@@ -1,0 +1,1 @@
+[["/main","n=>{n.main=function main(){throw new Error('Oh wow!')}}"]]

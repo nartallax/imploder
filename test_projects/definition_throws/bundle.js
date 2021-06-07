@@ -1,0 +1,1 @@
+[["/main","r=>{throw r.main=function main(){console.log('I\\'m alive!')},new Error('Stop right there!')}"]]

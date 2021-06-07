@@ -10,7 +10,6 @@ interface ModuleDefinition extends ImploderModuleLoaderData {
 interface LoaderParams {
 	entryPoint: { module: string, function: string }
 	entryPointArgs?: string[];
-	afterEntryPointExecuted?: (error: Error | null, entryPointExecutionResult: any) => void;
 	errorHandler?: (e: Error, action?: string) => void;
 }
 
@@ -68,8 +67,9 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 			let callError = (e: Error) => {
 				if(onError){
 					onError(e);
+				} else {
+					handleError(e);
 				}
-				handleError(e);
 			}
 
 			try {
@@ -248,17 +248,17 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 			}
 		});
 
-		let res: any = null;
 		let err: Error | null = null;
 		if(params.entryPoint.function){
 			try {
-				res = mainProduct[params.entryPoint.function].apply(null, params.entryPointArgs || []);
+				mainProduct[params.entryPoint.function].apply(null, params.entryPointArgs || []);
 			} catch(e){
 				err = e;
 			}
 		}
-		if(params.afterEntryPointExecuted){
-			params.afterEntryPointExecuted(err, res);
+		
+		if(err) {
+			handleError(err);
 		}
 
 		if(typeof(module) === "object" && module.exports){

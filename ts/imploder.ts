@@ -73,7 +73,6 @@ export namespace Imploder {
 	}
 
 	export interface BundlerWrapperParameters {
-		afterEntryPointExecuted?: string;
 		entryPointArgCode?: string[];
 	}	
 

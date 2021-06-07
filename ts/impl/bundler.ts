@@ -135,10 +135,6 @@ export class BundlerImpl implements Imploder.Bundler {
 			}
 		};
 		let paramStr = JSON.stringify(params);
-		if(wrapParams.afterEntryPointExecuted){
-			paramStr = paramStr.substr(0, paramStr.length - 1) + 
-				`,${JSON.stringify("afterEntryPointExecuted")}:${wrapParams.afterEntryPointExecuted}}`;
-		}
 		if(wrapParams.entryPointArgCode){
 			paramStr = paramStr.substr(0, paramStr.length - 1) + 
 				`,${JSON.stringify("entryPointArgs")}:[${wrapParams.entryPointArgCode.join(",")}]}`;

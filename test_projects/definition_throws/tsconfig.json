@@ -1,6 +1,7 @@
 { 
     "imploderConfig": {
         "entryModule": "main.ts",
+        "entryFunction": "main",
         "outFile": "js/bundle.js",
         "noLoaderCode": true,
         "minify": true,
@@ -12,7 +13,6 @@
         "outDir": "js",
         "paths": {
             "*": ["./*"]
-        },
-        "downlevelIteration": true
+        }
     }
 }
