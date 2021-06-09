@@ -22,6 +22,7 @@ export class SingleBuildTestProject {
 	private readonly runtimeErrorRegexp: string | null = this.fileContentOrNull("./runtime_error_regexp.txt");
 	private readonly bundleText: string | null = this.fileContentOrNull(this.pathOverrides?.ethalonBundle ?? "./bundle.js");
 	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt");
+	private readonly codePrefixText: string | null = this.fileContentOrNull("./code_prefix.js");
 
 	get testBundlePath(): string {
 		return path.resolve(path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"));
@@ -123,7 +124,7 @@ export class SingleBuildTestProject {
 	}
 
 	private runBundle(): Promise<string> {
-		return runTestBundle(this.producedBundleText, this.bundler, this.testBundlePath)
+		return runTestBundle(this.producedBundleText, this.bundler, this.testBundlePath, this.codePrefixText);
 	}
 
 	private async checkStdout(): Promise<boolean> {

@@ -20,8 +20,11 @@ export function testProjectDir(name: string): string {
 }
 
 
-export async function runTestBundle(code: string, bundler: BundlerImpl, bundlePath: string): Promise<string> {
+export async function runTestBundle(code: string, bundler: BundlerImpl, bundlePath: string, codePrefix: string | null = null): Promise<string> {
 	let allCode = await bundler.wrapBundleCode(code);
+	if(codePrefix !== null){
+		allCode = codePrefix + "\n" + allCode;
+	}
 	let result = await runBundleCodeAsFile(allCode, bundlePath);
 	if(result.stderr.trim()){
 		throw new Error(result.stderr.split("\n")[0]);

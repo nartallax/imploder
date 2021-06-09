@@ -17,8 +17,8 @@ interface LoaderParams {
 declare const define: AmdDefine;
 
 function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderParams, evl: (code: string) => any){
-	let req: AmdRequire | NodeRequire = require;
 	"use strict";
+	let req: AmdRequire | NodeRequire = typeof(require) !== "undefined"? require: () => { throw new Error("External require() function is not defined! Could not load any external module.") };
 	function handleError(e: Error, action?: string): never {
 		let handler = params.errorHandler
 		if(handler){
@@ -48,7 +48,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 		defMap[def.name] = def as ModuleDefinition;
 	}
 
-	let amd: Boolean = typeof(define) === "function" && !!(define as any).amd;
+	let amd: boolean = typeof(define) === "function" && !!(define as any).amd;
 	/** функция, которую будут дергать в качестве require изнутри модулей */
 	function requireAny(names: string | string[], onOk?: (...modules: any) => void, onError?: (error: Error) => void){
 		if(!onOk){
