@@ -2,7 +2,7 @@ import * as tsc from "typescript";
 import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
 import * as path from "path";
-import {readTextFile, writeTextFile} from "utils/afs";
+import {createDirsToFile, readTextFile, writeTextFile} from "utils/afs";
 import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
 import {Imploder} from "imploder";
 
@@ -13,6 +13,7 @@ export class BundlerImpl implements Imploder.Bundler {
 	async produceBundle(): Promise<string>{
 		this.context.logger.debug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
+		await createDirsToFile(this.context.config.outFile);
 		await writeTextFile(this.context.config.outFile, code);
 		this.context.logger.debug("Bundle produced (" + this.context.config.outFile + ")");
 		return code;

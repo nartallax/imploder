@@ -18,6 +18,10 @@ function wrap<T>(call: (callback: (err: Error | NodeJS.ErrnoException | null, re
 	})
 }
 
+export function createDirsToFile(pathToFile: string): Promise<string>{
+	return wrap<string>(cb => fs.mkdir(path.dirname(pathToFile), {recursive: true}, cb));
+}
+
 export function readTextFile(path: string, encoding: string = "utf8"): Promise<string>{
 	return wrap(cb => fs.readFile(path, encoding, cb));
 }
