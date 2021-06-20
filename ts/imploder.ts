@@ -1,6 +1,7 @@
 import * as tsc from "typescript";
 import * as terser from "terser";
 import * as main from "imploder_main";
+import {ExternalInstanceImpl} from "impl/external_instance";
 
 /** Imploder - инструмент сборки Typescript-проектов */
 export namespace Imploder {
@@ -15,6 +16,9 @@ export namespace Imploder {
 
 	/** Распарсить конфиг, не запуская тул */
 	export const parseConfig: (tsconfigPath: string, overrides?: Partial<Config>) => Promise<Config> = async (path, overrides) => main.updatePartialConfigWithTsconfig(path, overrides);
+
+	/** Создать интерфейс к другому инстансу тула на этой же машине (localhost) */
+	export const externalInstance: (config: Config) => ExternalInstance = config => new ExternalInstanceImpl(config)
 
 	/** Функция для проверки на то, является ли что-либо контекстом тула
 	 * Нужна для обеспечения универсальности при написании трансформеров, например */
@@ -250,6 +254,12 @@ export namespace Imploder {
 		warn(msg: string): void;
 		info(msg: string): void;
 		debug(msg: string): void;
+	}
+
+	/** Инстанс тула, запущенный на этой же машине, доступный через хттп */
+	export interface ExternalInstance {
+		assembleBundleErrorsOnly(): Promise<void>
+		assembleBundle(): Promise<string>
 	}
 
 }

@@ -49,6 +49,7 @@ export class HttpApi {
 
 	private async runFunction(name: string): Promise<[number, string]>{
 		switch(name.toLowerCase().replace(/(^\/|\/$)/g, "")){
+			// добавляя методы сюда, не забывай, что сначала их нужно добавить в ExternalInterface
 			case "assemble_bundle_errors_only":{
 				let res = await this.getBundle();
 				return [res.httpCode, res.err || ""];
