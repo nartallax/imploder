@@ -2,7 +2,7 @@
   "name": "@nartallax/imploder",
   "version": "1.0.23",
   "description": "A tool to work with Typescript projects.",
-  "main": "main.js",
+  "main": "imploder.js",
   "types": "imploder.d.ts",
   "author": "Nartallax",
   "license": "0BSD",
@@ -16,8 +16,8 @@
   "repository": "github:nartallax/imploder",
   "scripts": {
     "compile": "./compile.sh",
-    "test": "./install_tests.sh && ./bin/imploder.cli.js --test",
-    "pub": "npm run compile && npm run test && npm publish --access public"
+    "test": "./install_tests.sh && ./target/bin/imploder.cli.js --test",
+    "pub": "npm run compile && npm test && cd target && npm publish --access public"
   },
   "dependencies": {
     "terser": "^5.3.2"

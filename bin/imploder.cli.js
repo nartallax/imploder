@@ -2,5 +2,5 @@
 
 // just a script that launches Imploder as CLI tool
 
-let {Imploder} = require("../main.js");
+let {Imploder} = require("../imploder.js");
 Imploder.runAsCli();

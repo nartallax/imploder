@@ -8,7 +8,7 @@ import * as ChildProcess from "child_process";
 let testProjectsRoot: string | null = null;
 export function testProjectDir(name: string): string {
 	if(!testProjectsRoot){
-		let root = path.resolve(__dirname, "./test_projects/");
+		let root = path.resolve(__dirname, "../test_projects/");
 		try {
 			fs.statSync(root);
 		} catch(e){

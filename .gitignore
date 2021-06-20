@@ -2,9 +2,7 @@ node_modules
 test_projects/*/js
 test_projects/*/node_modules
 test_projects/*/generated.ts
-ts/generated/*
-parts/loader.js
+ts/generated
+target
 js
 dts
-main.js
-imploder.d.ts
