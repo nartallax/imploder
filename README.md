@@ -122,20 +122,45 @@ Some overrides could break the tool.
 [Example of transformer definition](test_projects/transformer_list_all_classes), [another example of transformer definition](test_projects/transformer_change_ts)  
 
 The tool is able to apply user-defined source code transformations at compilation. Transformer could alter resulting code in arbitrary way, as well as generate new files.  
-Transformers are referenced in transformers property within imploderConfig:
+Transformers are referenced in plugins property. This property could appear within compilerOptions, imploderConfig and profiles:
 
-	"transformers": [{
-		"imploderProject": "../my_transformer/tsconfig.json"
-	}, {
-		"imploderBundle": "my_great_package",
-		"params": { "thisIsParamName": "thisIsParamValue" }
-	}]
+	{ 
+		"imploderConfig": {
+			...
+			"plugins": [{
+				"transform": "../some_great_logging_transformer/tsconfig.json",
+				"loggingFunctionName": "logText2",
+				"imploderProject": true,
+				"type": "imploder"
+			}],
+			"profiles": [{
+				"test": {
+					"plugins": [{
+						"transform": "@nartallax/clamsensor",
+						"type": "imploder"
+					}]
+				}
+			}]
+		},
+		
+		"compilerOptions": {
+			...
+			"plugins": [
+				{ 
+					"transform": "../list_all_classes/main.js",
+					"type": "imploder"
+				}
+			]
+			...
+		}
+	}
 
-There are currently two ways to reference transformers: with imploderProject and imploderBundle.  
-imploderProject expects path to tsconfig.json, which defines Imploder project. Referenced project will be built on start of the tool. Bundle of the project should export TransformerCreationFunction [(see imploder.ts)](ts/imploder.ts).  
-imploderBundle expects name of package, which resolves to bundle of Imploder project (or path to bundle, which is resolved relative to directory of tsconfig.json). The same requirements apply to the bundle as to project.  
-Note that if some transformers are mentioned in base config, and some are mentioned in profile config, then profile config transformers will be applied after base config transformers.  
-You can pass some values to transformers you mention. This is done with params option as shown above.  
+Default order of transformers is: compilerOptions, then base profile, then target profile (if --profile is passed). It could be overriden, see below.  
+The interface of plugin object mostly resembles [ttypescript](https://github.com/cevek/ttypescript#how-to-use)'s transformer definitions and should be compatible with them. However, Imploder offers some more options:  
+
+1. imploderProject - if this property is true, transform property is treated as path to tsconfig.json of some other Imploder project. This project will be built, and then build result will be used as transformer.  
+2. type: "imploder" - this is special type of transformer added by Imploder. Transformers with this type will receive Imploder.Context on creation. Also with this type you could return not just transformer factory, but promise of transformer factory.  
+3. transformerExecutionOrder - a number that determines order of execution of transformers. Transformers with lower value of the property will get executed first. Transformers without such property get executed last. Transformers with equal order values are executed in appearance order.  
 
 ## Other options
 
@@ -212,4 +237,3 @@ These features probably will be implemented at some point; just not yet.
 Decide about asynchronous module loading and separation of project into several bundles  
 Support for modules in C - asmjs/wasm  
 Test for not enough file watchers to properly watch all the files (it could lead to interesting results in projects with file-generating transformers, even in single-build launch)  
-Ability to use [ttypescript](https://github.com/cevek/ttypescript) transformers  

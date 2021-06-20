@@ -33,9 +33,7 @@ let haveDiffsInSets = <T>(oldValues: Set<T> | undefined, newValues: Set<T>): boo
 	return false;
 }
 
-class ClassEnumeratorTransformer implements Imploder.CustomTransformerDefinition {
-	readonly transformerName = "list_all_classes_transformer";
-
+class ClassEnumeratorTransformer {
 	private readonly knownClasses = new Map<string, Set<string>>(); // module name -> class names
 	private readonly generatedFilePath: string;
 
@@ -43,11 +41,18 @@ class ClassEnumeratorTransformer implements Imploder.CustomTransformerDefinition
 		this.generatedFilePath = path.resolve(path.dirname(this.toolContext.config.tsconfigPath), "generated.ts");
 	}
 
+	static makeInstance(toolContext: Imploder.Context): Imploder.CustomTransformerFactory {
+		let factory = new ClassEnumeratorTransformer(toolContext);
+		let result: Imploder.CustomTransformerFactory = (_: tsc.TransformationContext) => factory.createInstance()
+		result.onModuleDelete = factory.onModuleDelete.bind(factory);
+		return result;
+	}
+
 	onModuleDelete(moduleName: string) {
 		this.updateClasses(moduleName, null);
 	}
 
-	createForBefore(): tsc.CustomTransformer {
+	createInstance(): (file: tsc.SourceFile) => tsc.SourceFile {
 
 		let visitRecursive = (node: tsc.Node, handler: (node: tsc.Node) => void | undefined | boolean, depth: number = 0): void => {
 			//console.error(new Array(depth + 1).join("  ") + tsc.SyntaxKind[node.kind]);
@@ -59,37 +64,36 @@ class ClassEnumeratorTransformer implements Imploder.CustomTransformerDefinition
 			}
 		}
 
-		return {
-			transformSourceFile: (file: tsc.SourceFile): tsc.SourceFile => {
-				if(file.fileName === this.generatedFilePath){
-					//console.error("Skipping generated file: " + file.fileName);
-					return file;
+		return file => {
+			if(file.fileName === this.generatedFilePath){
+				//console.error("Skipping generated file: " + file.fileName);
+				return file;
+			}
+
+			//console.error("Visiting " + file.fileName);
+			let moduleName = this.toolContext.modulePathResolver.getCanonicalModuleName(file.fileName);
+
+			let classNames = [] as string[];
+
+			visitRecursive(file, node => {
+				if(tsc.isNamespaceExport(node) || tsc.isNamespaceExportDeclaration(node) || tsc.isModuleDeclaration(node)){
+					// скипаем все namespace
+					// внутри namespace могут быть экспортируемые классы, но нам они не интересны
+					// ModuleDeclaration - это старое название неймспейса
+					return false;
 				}
 
-				//console.error("Visiting " + file.fileName);
-				let moduleName = this.toolContext.modulePathResolver.getCanonicalModuleName(file.fileName);
+				if(this.isTargetClassDecl(node)){
+					classNames.push(node.name.getText());
+					return false;
+				}
+			})
 
-				let classNames = [] as string[];
+			//console.error("Found " + classNames);
 
-				visitRecursive(file, node => {
-					if(tsc.isNamespaceExport(node) || tsc.isNamespaceExportDeclaration(node) || tsc.isModuleDeclaration(node)){
-						// скипаем все namespace
-						// внутри namespace могут быть экспортируемые классы, но нам они не интересны
-						// ModuleDeclaration - это старое название неймспейса
-						return false;
-					}
+			this.updateClasses(moduleName, classNames);
 
-					if(this.isTargetClassDecl(node)){
-						classNames.push(node.name.getText());
-						return false;
-					}
-				})
-
-				this.updateClasses(moduleName, classNames);
-
-				return file;
-			},
-			transformBundle(node: tsc.Bundle): tsc.Bundle { return node }
+			return file;
 		}
 	}
 
@@ -187,6 +191,6 @@ class ClassEnumeratorTransformer implements Imploder.CustomTransformerDefinition
 
 }
 
-export function main(toolContext: Imploder.Context): Imploder.TransformerProjectEntryPointReturnType {
-	return new ClassEnumeratorTransformer(toolContext);
+export function main(toolContext: Imploder.Context) {
+	return ClassEnumeratorTransformer.makeInstance(toolContext);
 }

@@ -6,8 +6,10 @@
         "noLoaderCode": true,
         "minify": true,
         "target": "ES2018",
-        "transformers": [{
-            "imploderProject": "../transformer_report_error/tsconfig.json"
+        "plugins": [{
+            "transform": "../transformer_report_error/tsconfig.json",
+            "imploderProject": true,
+            "type": "imploder"
         }]
     },
     

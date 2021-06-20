@@ -56,12 +56,12 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 	}
 
 	private async createWatchHost(system: tsc.System){
-		let transformers = await this.context.transformerController.createTransformers((err, def, file) => {
+		let transformers = await this.context.transformerController.createTransformers((err, ref, file) => {
 			this.addDiagnostic({
 				category: tsc.DiagnosticCategory.Error,
 				code: 1,
 				file: tsc.isSourceFile(file)? file: undefined,
-				messageText: "Transformer " + def.transformerName + " throws error: " + err.message,
+				messageText: `Transformer ${ref.transform} throws error: ${err.message}`,
 				start: undefined,
 				length: undefined
 			});

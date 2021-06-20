@@ -2,8 +2,30 @@ import {updateCliArgsWithTsconfig} from "impl/config";
 import {ImploderContextImpl} from "impl/context";
 import {Imploder} from "imploder";
 import * as path from "path";
+import type * as tsc from "typescript";
 
-export async function getTransformersFromImploderProject(projectTsconfigPath: string, context: Imploder.Context, params: {[k: string]: unknown} | undefined): Promise<Imploder.CustomTransformerDefinition[]> {	
+export interface TransformerRefWithFactory {
+	ref: Imploder.TransformerReference
+	factory: Imploder.CustomTransformerFactory;
+}
+
+/** Имея описание трансформера, получить трансформер */
+export async function createTransformerFromTransformerRef(context: Imploder.Context, ref: Imploder.TransformerReference): Promise<TransformerRefWithFactory> {
+	if(!ref.transform){
+		throw new Error(`Expected transformer ${JSON.stringify(ref)} to have "transform" parameter present.`);
+	}
+
+	let moduleName = ref.transform;
+	if(ref.imploderProject){
+		moduleName = await buildTransformerImploderProjectToBundle(moduleName, context);
+	}
+
+	return await getTransformerFromPackage(moduleName, context, ref);
+}
+
+/** Собрать Imploder-проект, выдать путь к файлу-результату */
+async function buildTransformerImploderProjectToBundle(projectTsconfigPath: string, context: Imploder.Context): Promise<string>{	
+	projectTsconfigPath = path.resolve(path.dirname(context.config.tsconfigPath), projectTsconfigPath);
 	let config = updateCliArgsWithTsconfig({tsconfigPath: projectTsconfigPath});
 	config.watchMode = false;
 	config.noLoaderCode = false;
@@ -16,28 +38,43 @@ export async function getTransformersFromImploderProject(projectTsconfigPath: st
 		context.logger.errorAndExit("Transformer project " + projectTsconfigPath + " build failed.");
 	}
 
-	try {
-		return getTransformersFromImploderBundle(projectContext.config.outFile, context, params);
-	} catch(e: unknown){
-		throw new Error("Failed to run transformer project " + projectTsconfigPath + ": " + ((e as Error).stack || (e + "")));
-	}
+	return projectContext.config.outFile;
 }
 
-export async function getTransformersFromImploderBundle(moduleName: string, context: Imploder.Context, params: {[k: string]: unknown} | undefined): Promise<Imploder.CustomTransformerDefinition[]> {
+/** Имея package, получить из него Imploder.CustomTransformerFactory */
+async function getTransformerFromPackage(moduleName: string, context: Imploder.Context, ref: Imploder.TransformerReference): Promise<TransformerRefWithFactory> {
+	let fn = extractFactoryCreationFunctionFromPackage(moduleName, context, ref)
+	let factory = await runFactoryCreationFunction(fn, context, ref);
+	let result = {ref, factory};
+	validateTransformerFactory(result, moduleName, context)
+	return result;
+}
+
+/** Имея package, получить из него функцию, которая создаст нам Imploder.CustomTransformerFactory */
+function extractFactoryCreationFunctionFromPackage(moduleName: string, context: Imploder.Context, ref: Imploder.TransformerReference): Function {
 	let pathOrName = require.resolve(moduleName, {
 		paths: [path.dirname(context.config.tsconfigPath)]
 	})
 
 	let moduleResult: unknown = require(pathOrName);
-	let fn: Imploder.TransformerCreationFunction;
+	let fn: Function;
 	switch(typeof(moduleResult)){
 		case "function":
-			fn = moduleResult as Imploder.TransformerCreationFunction;
+			fn = moduleResult;
 			break;
 		case "object":
 			if(!moduleResult){
 				throw new Error("Expected result of " + pathOrName + " to be non-null object, got " + moduleResult + " instead.");
 			}
+
+			if(ref.import){
+				if(!(ref.import in moduleResult)){
+					throw new Error(`Package ${pathOrName} does not contains exported value ${ref.import} (that is mentioned in tranfromer plugin entry)`);
+				}
+				fn = (moduleResult as any)[ref.import];
+				break;
+			}
+
 			let keys = Object.keys(moduleResult);
 			if(keys.length < 1){
 				throw new Error("Expected result of " + pathOrName + " to export something.");
@@ -53,31 +90,62 @@ export async function getTransformersFromImploderBundle(moduleName: string, cont
 				key = keys[0];
 			}
 		
-			fn = (moduleResult as {[k: string]: any})[key] as Imploder.TransformerCreationFunction;
-			if(typeof(fn) !== "function"){
-				throw new Error("Expected result of " + pathOrName + " to export transformer creation function, got " + fn + " instead.");
-			}
+			fn = (moduleResult as any)[key];
 			break;
 		default:
-			throw new Error("Expected result of " + pathOrName + " to be object, got " + moduleResult + " instead.");
+			throw new Error(`Expected product of package ${pathOrName} to be object, got ${moduleResult} (of type ${typeof(moduleResult)}) instead.`);
 	}
 
-	let execResult = await Promise.resolve(fn(context, params));
-	let result = Array.isArray(execResult)? execResult: [execResult];
+	if(typeof(fn) !== "function"){
+		throw new Error(`Expected ${pathOrName} to export transformer creation function, got ${fn} (of type ${typeof(fn)}) instead.`);
+	}
 
-	result.forEach(result => validateTransformer(result, pathOrName, context));
-
-	return result;
+	return fn;
 }
 
-function validateTransformer(trans: Imploder.CustomTransformerDefinition, name: string, context: Imploder.Context){
-	if(typeof(trans) !== "object" || trans === null){
-		context.logger.errorAndExit("Transformer from " + name + " is not object (or is null): " + trans);
+function lazyWrapFactoryCreator(fn: () => Imploder.CustomTransformerFactory): Imploder.CustomTransformerFactory {
+	let factory: Imploder.CustomTransformerFactory | null = null;
+	return transformContext => {
+		return (factory ||= fn())(transformContext)
 	}
-	if(!trans.transformerName){
-		context.logger.errorAndExit("Transformer from " + name + " has no name. This is not allowed.");
+}
+
+async function runFactoryCreationFunction(fnValue: Function, context: Imploder.Context, ref: Imploder.TransformerReference): Promise<Imploder.CustomTransformerFactory> {
+	switch(ref.type || "program"){
+		case "program": {
+			let fn = fnValue as (program: tsc.Program, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			return lazyWrapFactoryCreator(() => fn(context.compiler.program, ref));
+		}
+		case "config": {
+			let fn = fnValue as (config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			return fn(ref);
+		}
+		case "checker": {
+			let fn = fnValue as (checker: tsc.TypeChecker, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			return lazyWrapFactoryCreator(() => fn(context.compiler.program.getTypeChecker(), ref));
+		}
+		case "raw": {
+			let fn = fnValue as Imploder.CustomTransformerFactory;
+			return fn;
+		}
+		case "compilerOptions": {
+			let fn = fnValue as (compilerOpts: tsc.CompilerOptions, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			return fn(context.config.tscParsedCommandLine.options, ref);
+		}
+		case "imploder": {
+			let fn = fnValue as (imploderContext: Imploder.Context, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			return await Promise.resolve(fn(context, ref));
+		}
+		default: throw new Error(`Could not get transformer factory out of ${ref.transform}: unknown type ${JSON.stringify(ref.type)}`);
 	}
-	if(!trans.createForAfter && !trans.createForBefore){
-		context.logger.errorAndExit("Transformer " + name + " has neither of instance creation functions. This is not allowed.");
+}
+
+function validateTransformerFactory(ref: TransformerRefWithFactory, name: string, context: Imploder.Context){
+	if(typeof(ref.factory) !== "function"){
+		context.logger.errorAndExit(`Transformer from ${name} is not function: ${ref.factory} (of type ${typeof(ref.factory)})`);
+	}
+
+	if(ref.ref.after && ref.ref.afterDeclarations){
+		context.logger.errorAndExit(`Transformer from ${name} has both "after" and "afterDeclarations", which is not allowed (as it is unclear when to launch the transformer)`);
 	}
 }

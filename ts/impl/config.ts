@@ -30,19 +30,23 @@ function parseTsconfigToProfile(tsconfigPath: string, profileName?: string): [ts
 	let [tscParsedCommandLine, inclusionConfig] = getTsconfigRaw(tsconfigPath);
 	
 	let profile: Imploder.Profile = inclusionConfig;
+	profile.plugins = [
+		...(tscParsedCommandLine.raw.compilerOptions?.plugins || []),
+		...(profile.plugins || [])
+	];
+
 	if(profileName){
 		if(!inclusionConfig.profiles || !(profileName in inclusionConfig.profiles)){
 			LoggerImpl.writeDefaultAndExit(`Profile name is passed in command-line arguments ("${profileName}"), but there is no such profile defined.`);
 		}
 		let targetProfile = inclusionConfig.profiles[profileName];
-		let transformers = [
-			...(profile.transformers || []),
-			...(targetProfile.transformers || [])
-		]
 		profile = {
 			...profile,
 			...targetProfile,
-			transformers
+			plugins: [
+				...(profile.plugins || []),
+				...(targetProfile.plugins || [])
+			]
 		};
 	}
 

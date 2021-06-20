@@ -90,10 +90,13 @@ export const ArbitraryTests: {readonly [testName: string]: ((cliArgsBase: Implod
 
 					let configText = await this.readProjectFile("tsconfig.json");
 					let conf = JSON.parse(configText);
-					conf.imploderConfig.transformers = [{
-						imploderProject: path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json")
+					conf.imploderConfig.plugins = [{
+						transform: path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json"),
+						imploderProject: true,
+						type: "imploder"
 					}, {
-						imploderProject: path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json")
+						transform: path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json"),imploderProject: true,
+						type: "imploder"
 					}];
 					await this.writeProjectFile("tsconfig.json", JSON.stringify(conf));
 

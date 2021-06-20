@@ -61,7 +61,7 @@ export namespace Imploder {
 	}
 
 	/** Обработчик ошибок, выдаваемых трансформаторами */
-	export type TransformerErrorHandler = (e: Error, def: Imploder.CustomTransformerDefinition, file: tsc.SourceFile | tsc.Bundle) => void
+	export type TransformerErrorHandler = (e: Error, ref: TransformerReference, file: tsc.SourceFile | tsc.Bundle) => void
 	
 	/** Сборщик бандл-файла из кучи исходников */
 	export interface Bundler {
@@ -115,8 +115,9 @@ export namespace Imploder {
 		 * Передача некоторых из них, возможно, сломает тул */
 		minificationOverrides?: Partial<terser.CompressOptions>;
 
-		/** Список трансформеров, применяемых к проекту */
-		transformers?: TransformerReference[];
+		/** Список трансформеров, применяемых к проекту
+		 * Будут добавлены в конец списка плагинов в compilerOptions */
+		plugins?: TransformerReference[];
 
 		// watchmode
 		/** Запуститься в watch-моде. Отслеживать изменения в файлах и перекомпилировать сразу же. */
@@ -144,17 +145,6 @@ export namespace Imploder {
 	export interface TsconfigInclusion extends Profile {
 		profiles?: { [profileName: string]: Imploder.Profile }
 	}
-
-	export interface TransformerFromImploderBase { 
-		params?: {[k: string]: unknown }
-	}
-	export interface TransformerFromImploderProject extends TransformerFromImploderBase { 
-		imploderProject: string 
-	}
-	export interface TransformerFromImploderBundle extends TransformerFromImploderBase { 
-		imploderBundle: string
-	}
-	export type TransformerReference = TransformerFromImploderProject | TransformerFromImploderBundle;
 
 	/** Конфиг всего тула в целом */
 	export interface Config extends CLIArgs, Profile { 
@@ -223,29 +213,46 @@ export namespace Imploder {
 		jsCode: string | null;
 	}
 
+	// based on https://github.com/cevek/ttypescript
+	/** Описание трансформера в конфиге */
+	export interface TransformerReference {
+		/** Имя модуля трансформера, или путь к нему */
+		transform?: string;
+	
+		/** Имя экспортируемого значения-трансформатора */
+		import?: string;
+	
+		/** Что подавать на вход трансформеру? */
+		type?: "program" | "config" | "checker" | "raw" | "compilerOptions" | "imploder";
+
+		/** transform указывает на tsconfig.json другого Imploder-проекта, который нужно сначала собрать? */
+		imploderProject?: boolean;
+	
+		/** Запускать этот трансформер на js-коде (после его генерации из ts)? */
+		after?: boolean;
+	
+		/** Запускать этот трансформер в фазу afterDeclarations? */
+		afterDeclarations?: boolean;
+		
+		/** Какие-нибудь еще параметры конфигурации */
+		[options: string]: any;
+
+		/** Определяет порядок, в котором будут исполняться трансформеры относительно друг друга.
+		 * Сначала будут исполнены трансформеры с меньшим значением этого поля (т.е. 1, 2, 3...)
+		 * Если не указан, то равен Number.MAX_SAFE_INTEGER (т.е. исполняется в конце списка).
+		 * При прочих равных первыми исполняются трансформеры, указанные в списке раньше
+		 * Трансформеры, добавляемые в профилях, подключаются позже трансформеров, указанных в основной части конфига */
+		transformerExecutionOrder?: number;
+	}
+
 	/** Кастомный трансформер
 	 * Немного отличается по смыслу от объекта tsc.CustomTransformer
 	 * Например, tsc.CustomTransformer создается каждый раз, когда он нужен; этот объект создается при старте тула один раз */
-	export interface CustomTransformerDefinition {
-		/** Имя трансформера. Используется при отладочных выводах */
-		readonly transformerName: string;
-
-		/** Создать инстанс трансформера, который будет запускаться до транспиляции typescript кода в javascript */
-		createForBefore?(transformContext: tsc.TransformationContext): tsc.CustomTransformer;
-
-		/** Создать инстанс трансформера, который будет запускаться после транспиляции typescript кода в javascript */
-		createForAfter?(transformContext: tsc.TransformationContext): tsc.CustomTransformer;
-
+	export interface CustomTransformerFactory {
+		(context: tsc.TransformationContext): (sourceFile: tsc.SourceFile) => tsc.SourceFile
 		/** Обработать удаление модуля */
 		onModuleDelete?(moduleName: string): void;
 	}
-
-	type PromiseOrValue<T> = T | Promise<T>;
-	type ArrayOrSingleValue<T> = T | T[];
-	export type TransformerProjectEntryPointReturnType = PromiseOrValue<ArrayOrSingleValue<CustomTransformerDefinition>>
-
-	/** Под эту сигнатуру должен подходить энтрипоинт проекта, указанного как проект трансформера */
-	export type TransformerCreationFunction = (context: Context, params: {[k: string]: unknown} | undefined) => TransformerProjectEntryPointReturnType
 
 	/** Объект, который управляет логами */
 	export interface Logger {
