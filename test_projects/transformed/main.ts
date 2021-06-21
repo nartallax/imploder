@@ -1,3 +1,4 @@
+import {aaaaa} from "aaaaa";
 import {myClassEnumeration} from "generated";
 import * as impla from "impl_a";
 
@@ -8,5 +9,5 @@ export interface SomeInterface {
 export function main(){
 	void impla;
 	let result = myClassEnumeration.map(cls => new cls().getString()).join("; ");
-	console.log(result);
+	console.log(result + aaaaa);
 }

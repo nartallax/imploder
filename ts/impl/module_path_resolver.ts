@@ -25,31 +25,31 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 			this.context.compiler.program.getCompilerOptions(), 
 			this.context.compiler.compilerHost
 		);
-		
-		if(res.resolvedModule){
-			if(res.resolvedModule.isExternalLibraryImport){
-				// never alter import from node_modules
-				return moduleDesignator;
-			}
-			
-			if(res.resolvedModule.resolvedFileName.startsWith(this.moduleRoot)){
-				let filename = res.resolvedModule.resolvedFileName.toLowerCase();
-				if(filename.endsWith(".ts") && !filename.endsWith(".d.ts")){
-					// это просто один из наших файлов-модулей. канонизируем имя
-					return this.getCanonicalModuleName(res.resolvedModule.resolvedFileName);
-				}
 
-				// если нет - то непонятно, что это такое. ссылка на внешний модуль, который лежит у нас посреди .ts? 
-				// что? зачем?
-			}
-
-			// это ссылка не на просто наш локальный файл-модуль, а на какой-то внешний файл
-			// тут я вряд ли что-то смогу угадать на тему того, что хочет пользователь
-			// оставляем как есть
+		if(!res.resolvedModule){
+			// тут я уже не знаю, что это и зачем это. просто оставляем в том виде, в котором есть
 			return moduleDesignator;
 		}
 
-		// тут я уже не знаю, что это и зачем это. просто оставляем в том виде, в котором есть
+		if(res.resolvedModule.isExternalLibraryImport){
+			// never alter import from node_modules
+			return moduleDesignator;
+		}
+		
+		if(res.resolvedModule.resolvedFileName.startsWith(this.moduleRoot)){
+			let filename = res.resolvedModule.resolvedFileName.toLowerCase();
+			if(filename.endsWith(".ts") && !filename.endsWith(".d.ts")){
+				// это просто один из наших файлов-модулей. канонизируем имя
+				return this.getCanonicalModuleName(res.resolvedModule.resolvedFileName);
+			}
+
+			// если нет - то непонятно, что это такое. ссылка на внешний модуль, который лежит у нас посреди .ts? 
+			// что? зачем?
+		}
+
+		// это ссылка не на просто наш локальный файл-модуль, а на какой-то внешний файл
+		// тут я вряд ли что-то смогу угадать на тему того, что хочет пользователь
+		// оставляем как есть
 		return moduleDesignator;
 	}
 

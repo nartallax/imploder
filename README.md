@@ -133,14 +133,14 @@ Transformers are referenced in plugins property. This property could appear with
 				"imploderProject": true,
 				"type": "imploder"
 			}],
-			"profiles": [{
+			"profiles": {
 				"test": {
 					"plugins": [{
 						"transform": "@nartallax/clamsensor",
 						"type": "imploder"
 					}]
 				}
-			}]
+			}
 		},
 		
 		"compilerOptions": {
@@ -160,7 +160,7 @@ The interface of plugin object mostly resembles [ttypescript](https://github.com
 
 1. imploderProject - if this property is true, transform property is treated as path to tsconfig.json of some other Imploder project. This project will be built, and then build result will be used as transformer.  
 2. type: "imploder" - this is special type of transformer added by Imploder. Transformers with this type will receive Imploder.Context on creation. Also with this type you could return not just transformer factory, but promise of transformer factory.  
-3. transformerExecutionOrder - a number that determines order of execution of transformers. Transformers with lower value of the property will get executed first. Transformers without such property get executed last. Transformers with equal order values are executed in appearance order.  
+3. transformerExecutionOrder - a number that determines order of execution of transformers. Transformers with lower value of the property will get executed first. Transformers without such property get executed last (i.e. default property value is Number.MAX_SAFE_INTEGER). Transformers with equal order values are executed in appearance order.  
 
 ## Other options
 
