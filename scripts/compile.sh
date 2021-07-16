@@ -12,6 +12,9 @@ mkdir ./ts/generated 2> /dev/null
 
 set -e
 
+# lint the code first
+scripts/eslint.sh
+
 # build loader .ts code, as it is mostly one big string with js in it
 ./node_modules/.bin/tsc --out ./target/loader.js ./ts/loader/loader.ts ./ts/loader/loader_types.d.ts --target ES5
 echo "export const loaderCode = \`" > ./ts/generated/loader_code.ts
