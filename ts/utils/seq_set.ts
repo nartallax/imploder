@@ -21,7 +21,7 @@ export class SeqSet<T>{
 		return true;
 	}
 
-	has(v: T){
+	has(v: T): boolean {
 		return this.set.has(this.getKey(v));
 	}
 

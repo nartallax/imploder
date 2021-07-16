@@ -1,4 +1,4 @@
-import * as tsc from "typescript";
+import * as Tsc from "typescript";
 import {Imploder} from "imploder";
 import {AfterJsBundlerTransformer} from "impl/transformer/after_js_transformer";
 import {BeforeJsBundlerTransformer} from "impl/transformer/before_js_transformer";
@@ -19,7 +19,7 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 		this.customTransformerDefs.forEach(def => def.factory.onModuleDelete && def.factory.onModuleDelete(moduleName));
 	}
 
-	private sortWrapTransformers(refs: TransformerRefWithFactory[], onError: Imploder.TransformerErrorHandler): tsc.CustomTransformerFactory[] {
+	private sortWrapTransformers(refs: TransformerRefWithFactory[], onError: Imploder.TransformerErrorHandler): Tsc.CustomTransformerFactory[] {
 		return refs
 			.map((x, i) => ({ref: x, srcOrder: i}))
 			.sort((a, b) => {
@@ -38,23 +38,23 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 			})
 			.map(x => {
 				let factory = x.ref.factory;
-				let wrappedFactory: tsc.CustomTransformerFactory = transformContext => {
+				let wrappedFactory: Tsc.CustomTransformerFactory = transformContext => {
 					let baseTransformer = factory(transformContext);
-					let wrapperTransformer = new WrapperTransformer(onError, baseTransformer, x.ref)
+					let wrapperTransformer = new WrapperTransformer(onError, baseTransformer, x.ref.ref)
 					return wrapperTransformer;
 				}
 				return wrappedFactory;
 			})
 	}
 
-	async createTransformers(onError: Imploder.TransformerErrorHandler): Promise<tsc.CustomTransformers>{
+	async createTransformers(onError: Imploder.TransformerErrorHandler): Promise<Tsc.CustomTransformers>{
 		let refs = (this.customTransformerDefs ||= await this.loadTransformers());
 
 		let beforeTranss = refs.filter(x => !x.ref.after && !x.ref.afterDeclarations);
 		let afterTranss = refs.filter(x => !!x.ref.after);
 		let afterDeclTranss = refs.filter(x => !!x.ref.afterDeclarations);
 
-		let result: tsc.CustomTransformers = {
+		let result: Tsc.CustomTransformers = {
 			before: [
 				...this.sortWrapTransformers(beforeTranss, onError),
 				context => new BeforeJsBundlerTransformer(context, this.context),

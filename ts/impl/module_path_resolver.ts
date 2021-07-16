@@ -1,5 +1,5 @@
-import * as path from "path";
-import * as tsc from "typescript";
+import * as Path from "path";
+import * as Tsc from "typescript";
 import {Imploder} from "imploder";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
@@ -9,7 +9,7 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 	private readonly ambientModules: Set<string>;
 
 	constructor(private readonly context: Imploder.Context){
-		this.moduleRoot = path.resolve(path.dirname(context.config.tsconfigPath), context.config.tscParsedCommandLine.options.rootDir || ".");
+		this.moduleRoot = Path.resolve(Path.dirname(context.config.tsconfigPath), context.config.tscParsedCommandLine.options.rootDir || ".");
 		let ambientMods = context.compiler.program.getTypeChecker().getAmbientModules().map(x => x.name.replace(/(?:^['"]|['"]$)/g, ""));
 		this.ambientModules = new Set(ambientMods);
 	}
@@ -19,7 +19,7 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 			return moduleDesignator;
 		}
 
-		let res = tsc.resolveModuleName(
+		let res = Tsc.resolveModuleName(
 			moduleDesignator, 
 			sourceFile, 
 			this.context.compiler.program.getCompilerOptions(), 
@@ -60,9 +60,10 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 }
 
 const tsFileExtensions: ReadonlySet<string> = new Set([".ts", ".tsx"]);
+const fileExtensionRegexp = /\.[^.]+$/
 
 function isTsExt(path: string): boolean {
-	let extMatch = path.match(/\.[^\.]+$/);
+	let extMatch = path.match(fileExtensionRegexp);
 	if(!extMatch)
 		return false;
 	let ext = extMatch[0].toLowerCase();
@@ -70,7 +71,7 @@ function isTsExt(path: string): boolean {
 }
 
 function stripTsExt(path: string): string {
-	return isTsExt(path)? path.replace(/\.[^\.]+$/, ""): path;
+	return isTsExt(path)? path.replace(fileExtensionRegexp, ""): path;
 }
 
 function normalizeModulePath(p: string): string {
@@ -78,5 +79,5 @@ function normalizeModulePath(p: string): string {
 }
 
 function getRelativeModulePath(startAt: string, relModulePath: string): string {
-	return normalizeModulePath(path.relative(startAt, relModulePath));
+	return normalizeModulePath(Path.relative(startAt, relModulePath));
 }

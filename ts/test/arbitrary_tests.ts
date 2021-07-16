@@ -1,14 +1,14 @@
-import { unlink, writeTextFile} from "utils/afs"
 import {WatchTestProject} from "test/watch_test_project";
-import * as path from "path";
-import * as http from "http";
+import * as Path from "path";
+import * as Http from "http";
+import {promises as Fs} from "fs";
 import {failOnNonEmptyCodeOrSignal, runJsCode, testProjectDir} from "test/test_project_utils";
 import {Imploder} from "imploder";
 import {SingleBuildTestProject} from "test/single_build_test_project";
 
 function httpGetBundle(port: number): Promise<{code: number, body: string}> {
 	return new Promise((ok, bad) => {
-		let req = http.request({
+		let req = Http.request({
 			host: "localhost",
 			port: port,
 			path: "/assemble_bundle"
@@ -35,12 +35,12 @@ async function bundleRunThenRunJs(jsName: string, cliArgsBase: Imploder.CLIArgs)
 		return false;
 	}
 	let wrappedBundle = await proj.bundler.wrapBundleCode(proj.producedBundleText);
-	let fullPathToWrappedBundle = path.resolve(testProjectDir(proj.name), "./js/bundle_wrapped.js")
-	await writeTextFile(fullPathToWrappedBundle, wrappedBundle);
-	let otherProjectEntryPoint = path.resolve(testProjectDir(proj.name), jsName)
+	let fullPathToWrappedBundle = Path.resolve(testProjectDir(proj.name), "./js/bundle_wrapped.js")
+	await Fs.writeFile(fullPathToWrappedBundle, wrappedBundle, "utf-8");
+	let otherProjectEntryPoint = Path.resolve(testProjectDir(proj.name), jsName)
 	
 	let result = await runJsCode(otherProjectEntryPoint);
-	if(!!result.stderr.trim()){
+	if(result.stderr.trim()){
 		throw new Error("Expected no stderr, got: " + result.stderr);
 	}
 
@@ -69,7 +69,7 @@ export const ArbitraryTests: {readonly [testName: string]: ((cliArgsBase: Implod
 						await this.writeProjectFile("consts.ts", `export const myConst = "this is constant!"`);
 						await this.bundleAndTest("./bundle_c.js", "./stdout_c.txt");
 
-						await unlink(this.resolveProjectFilePath("consts.ts"));
+						await Fs.unlink(this.resolveProjectFilePath("consts.ts"));
 						await this.checkErrors([2307]); // module not found
 
 						await this.writeProjectFile("consts.ts", `export const myConst = "this is constant2!"`);
@@ -91,11 +91,11 @@ export const ArbitraryTests: {readonly [testName: string]: ((cliArgsBase: Implod
 					let configText = await this.readProjectFile("tsconfig.json");
 					let conf = JSON.parse(configText);
 					conf.imploderConfig.plugins = [{
-						transform: path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json"),
+						transform: Path.resolve(testProjectDir(this.projectName), "../transformer_list_all_classes/tsconfig.json"),
 						imploderProject: true,
 						type: "imploder"
 					}, {
-						transform: path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json"),imploderProject: true,
+						transform: Path.resolve(testProjectDir(this.projectName), "../transformer_change_ts/tsconfig.json"),imploderProject: true,
 						type: "imploder"
 					}];
 					await this.writeProjectFile("tsconfig.json", JSON.stringify(conf));

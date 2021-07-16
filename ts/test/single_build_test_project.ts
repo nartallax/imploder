@@ -1,7 +1,7 @@
-import * as path from "path";
-import * as fs from "fs";
+import * as Path from "path";
+import * as FsSync from "fs";
 import {Imploder} from "imploder";
-import {fileExists, unlink, unlinkRecursive} from "utils/afs";
+import {fileExists, unlinkRecursive} from "utils/fs_utils";
 import {BundlerImpl} from "impl/bundler";
 import {testListStr} from "generated/test_list_str";
 import {testProjectDir, runTestBundle} from "./test_project_utils";
@@ -25,7 +25,7 @@ export class SingleBuildTestProject {
 	private readonly codePrefixText: string | null = this.fileContentOrNull("./code_prefix.js");
 
 	get testBundlePath(): string {
-		return path.resolve(path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"));
+		return Path.resolve(Path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"));
 	}
 
 	private _producedBundleText: string | null = null;
@@ -44,7 +44,7 @@ export class SingleBuildTestProject {
 		if(!this._context){
 			let config = updateCliArgsWithTsconfig({ 
 				...this.cliArgsBase,
-				tsconfigPath: path.join(testProjectDir(this.name), "./tsconfig.json") 
+				tsconfigPath: Path.join(testProjectDir(this.name), "./tsconfig.json") 
 			});
 			config.noBuildDiagnosticMessages = true;
 			this._context = new ImploderContextImpl(config);
@@ -79,13 +79,13 @@ export class SingleBuildTestProject {
 	){}
 
 	private fileContentOrNull(subpath: string): string | null {
-		let p = path.resolve(testProjectDir(this.name), subpath)
+		let p = Path.resolve(testProjectDir(this.name), subpath)
 		try {
-			fs.statSync(p);
+			FsSync.statSync(p);
 		} catch(e){
 			return null;
 		}
-		return fs.readFileSync(p, "utf8").trim();
+		return FsSync.readFileSync(p, "utf8").trim();
 	}
 
 	private outputError(error: string): false {
@@ -136,14 +136,14 @@ export class SingleBuildTestProject {
 	}
 
 	private async rmBuildProducts(){
-		let outDirPath = path.join(testProjectDir(this.name), "./js");
+		let outDirPath = Path.join(testProjectDir(this.name), "./js");
 		if(await fileExists(outDirPath)){
 			await unlinkRecursive(outDirPath);
 		}
 
-		let generatedFilePath = path.join(testProjectDir(this.name), "./generated.ts");
+		let generatedFilePath = Path.join(testProjectDir(this.name), "./generated.ts");
 		if(await fileExists(generatedFilePath)){
-			await unlink(generatedFilePath);
+			await FsSync.promises.unlink(generatedFilePath);
 		}
 	}
 

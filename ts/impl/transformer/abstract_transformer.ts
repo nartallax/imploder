@@ -1,25 +1,25 @@
-import * as tsc from "typescript";
+import * as Tsc from "typescript";
 import {Imploder} from "imploder";
 
-export type TransformMappingResult = {recurse: boolean, result: tsc.Node | tsc.Node[]}
+export type TransformMappingResult = {recurse: boolean, result: Tsc.Node | Tsc.Node[]}
 
 /** класс с утилитами для трансформеров */
-export abstract class AbstractTransformer implements tsc.CustomTransformer {
+export abstract class AbstractTransformer implements Tsc.CustomTransformer {
 
 	constructor(
-		protected readonly transformContext: tsc.TransformationContext,
+		protected readonly transformContext: Tsc.TransformationContext,
 		protected readonly context: Imploder.Context
 	){}
 
-	public transformBundle(node: tsc.Bundle): tsc.Bundle {
+	public transformBundle(node: Tsc.Bundle): Tsc.Bundle {
 		return node;
 	}
 
-	public transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
+	public transformSourceFile(fileNode: Tsc.SourceFile): Tsc.SourceFile {
 		return fileNode;
 	}
 
-	protected transformVisitRecursive(node: tsc.Node, mapper: (src: tsc.Node, depth: number) => TransformMappingResult, currentDepth: number = 0): tsc.Node | tsc.Node[] {
+	protected transformVisitRecursive(node: Tsc.Node, mapper: (src: Tsc.Node, depth: number) => TransformMappingResult, currentDepth = 0): Tsc.Node | Tsc.Node[] {
 		let mapped = mapper(node, currentDepth);
 		if(!mapped.recurse){
 			return mapped.result
@@ -27,7 +27,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 			if(Array.isArray(mapped.result)){
 				let arr = mapped.result;
 				for(let i = 0; i < arr.length; i++){
-					arr[i] = tsc.visitEachChild(
+					arr[i] = Tsc.visitEachChild(
 						arr[i], 
 						child => this.transformVisitRecursive(child, mapper, currentDepth + 1), 
 						this.transformContext
@@ -35,7 +35,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 				}
 				return arr;
 			} else {
-				return tsc.visitEachChild(
+				return Tsc.visitEachChild(
 					mapped.result, 
 					child => this.transformVisitRecursive(child, mapper, currentDepth + 1), 
 					this.transformContext
@@ -44,7 +44,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 		}
 	}
 
-	protected visitRecursive(node: tsc.Node, visitor: (node: tsc.Node, depth: number, index: number) => boolean | void, shouldFallThrough: ((node: tsc.Node) => boolean) | null = null, currentDepth: number = 0): boolean {
+	protected visitRecursive(node: Tsc.Node, visitor: (node: Tsc.Node, depth: number, index: number) => boolean | void, shouldFallThrough: ((node: Tsc.Node) => boolean) | null = null, currentDepth = 0): boolean {
 		let stopped = false;
 		let index = -1;
 		node.forEachChild(child => {
@@ -66,7 +66,7 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 
 	/** пройтись по AST файла и вывести его в консоль в каком-то виде
 	* полезно при попытках понять, как же выглядит AST в конкретном случае */
-	protected traverseDumpFileAst(fileNode: tsc.SourceFile): void {
+	protected traverseDumpFileAst(fileNode: Tsc.SourceFile): void {
 		let prefix = fileNode.fileName;
 		if(prefix.length > 30){
 			prefix = "..." + prefix.substr(prefix.length - 30);
@@ -83,11 +83,11 @@ export abstract class AbstractTransformer implements tsc.CustomTransformer {
 			if(text.length > 30){
 				text = text.substr(0, 30) + "...";
 			}
-			console.log(prefix + " " + index + " " + new Array(depth + 2).join("  ") + tsc.SyntaxKind[node.kind] + ": " + text);
+			console.log(prefix + " " + index + " " + new Array(depth + 2).join("  ") + Tsc.SyntaxKind[node.kind] + ": " + text);
 		}, () => true)
 	}
 
-	protected moduleNameByNode(fileNode: tsc.SourceFile): string {
+	protected moduleNameByNode(fileNode: Tsc.SourceFile): string {
 		return this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName);
 	}
 

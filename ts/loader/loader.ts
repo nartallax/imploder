@@ -8,7 +8,7 @@ interface ModuleDefinition extends ImploderModuleLoaderData {
 }
 
 interface LoaderParams {
-	entryPoint: { module: string, function: string }
+	entryPoint: { module: string, function?: string }
 	entryPointArgs?: string[];
 	errorHandler?: (e: Error, action?: string) => void;
 }
@@ -50,7 +50,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 
 	let amd: boolean = typeof(define) === "function" && !!(define as any).amd;
 	/** функция, которую будут дергать в качестве require изнутри модулей */
-	function requireAny(names: string | string[], onOk?: (...modules: any) => void, onError?: (error: Error) => void){
+	function requireAny(names: string | string[], onOk?: (...modules: unknown[]) => void, onError?: (error: Error) => void){
 		if(!onOk){
 			// дернуты как commonjs, т.е. синхронно с одним именем
 			let name = names as string;
@@ -74,7 +74,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 
 			try {
 				let nameArr = Array.isArray(names)? names: [names];
-				let resultArr = [] as any[];
+				let resultArr = [] as unknown[];
 				let nameIndex = {} as {[moduleName: string]: any};
 
 				let externalNameArr = nameArr.filter((name, index) => {
@@ -87,20 +87,20 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 				});
 
 				if(externalNameArr.length === 0){
-					return onOk(resultArr);
+					return onOk.apply(null, resultArr);
 				} else {
 					if(amd){
 						return (req as AmdRequire)(externalNameArr, function(externalResults){
 							for(let i = 0; i < externalNameArr.length; i++){
 								resultArr[nameIndex[externalNameArr[i]]] = externalResults[i]
 							}
-							onOk(resultArr);
+							onOk.apply(null, resultArr);
 						}, onError);
 					} else {
 						// если у нас запросили модули асинхронно, но при этом у нас есть только синрохнный commonjs-овый require - 
 						// то используем его, чего еще делать
 						externalNameArr.forEach(name => resultArr[nameIndex[name]] = (req as NodeRequire)(name));
-						onOk(resultArr);
+						onOk.apply(null, resultArr);
 					}
 				}
 			} catch(e){
@@ -273,17 +273,16 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 			let externalModuleNames = discoverExternalModules(params.entryPoint.module, ["require"]);
 			define(externalModuleNames, function(require: AmdRequire){
 				req = require;
-				let modules = arguments as unknown as any[]; // почему typescript дает arguments такой странный тип?
-				for(let i = externalModuleNames.length; i < modules.length; i++){
-					products[externalModuleNames[i]] = modules[i];
+				for(let i = externalModuleNames.length; i < arguments.length; i++){
+					products[externalModuleNames[i]] = arguments[i];
 				}
 				return afterExternalsLoaded();
 			});
 		} else {
 			let externalModuleNames = discoverExternalModules(params.entryPoint.module);
-			requireAny(externalModuleNames, externalValues => {
-				for(let i = 0; i < externalModuleNames.length; i++){
-					products[externalModuleNames[i]] = externalValues[i];
+			requireAny(externalModuleNames, function(){
+				for(let i = 0; i < arguments.length; i++){
+					products[externalModuleNames[i]] = arguments[i];
 				}
 				afterExternalsLoaded();
 			});

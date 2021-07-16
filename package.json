@@ -1,6 +1,6 @@
 {
   "name": "@nartallax/imploder",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A tool to work with Typescript projects.",
   "main": "imploder.js",
   "types": "imploder.d.ts",
@@ -15,8 +15,8 @@
   "bugs": "https://github.com/nartallax/imploder/issues",
   "repository": "github:nartallax/imploder",
   "scripts": {
-    "compile": "./compile.sh",
-    "test": "./install_tests.sh && ./target/bin/imploder.cli.js --test",
+    "compile": "scripts/compile.sh",
+    "test": "scripts/install_tests.sh && ./target/bin/imploder.cli.js --test",
     "pub": "npm run compile && npm test && cd target && npm publish --access public"
   },
   "dependencies": {
@@ -28,6 +28,10 @@
   },
   "devDependencies": {
     "@types/node": "^14.14.5",
-    "requirejs": "^2.3.6"
+    "@typescript-eslint/eslint-plugin": "^4.28.2",
+    "@typescript-eslint/parser": "^4.28.2",
+    "eslint": "^7.30.0",
+    "requirejs": "^2.3.6",
+    "typescript": "^4.3.5"
   }
 }

@@ -1,5 +1,5 @@
-import * as tsc from "typescript";
-import * as terser from "terser";
+import * as Tsc from "typescript";
+import * as Terser from "terser";
 import * as main from "imploder_main";
 import {ExternalInstanceImpl} from "impl/external_instance";
 
@@ -37,10 +37,10 @@ export namespace Imploder {
 
 	/** Обертка над компилятором tsc */
 	export interface Compiler {
-		readonly program: tsc.Program;
-		readonly compilerHost: tsc.CompilerHost;
+		readonly program: Tsc.Program;
+		readonly compilerHost: Tsc.CompilerHost;
 		readonly lastBuildWasSuccessful: boolean;
-		readonly lastBuildDiagnostics: ReadonlyArray<tsc.Diagnostic>;
+		readonly lastBuildDiagnostics: ReadonlyArray<Tsc.Diagnostic>;
 		readonly projectRoot: string;
 		
 		run(): Promise<void>;
@@ -51,17 +51,17 @@ export namespace Imploder {
 		 * Добавление ошибки приведет к провалу компиляции.
 		 * Альтернативный способ остановить компиляцию - выбросить ошибку из трасформера,
 		 * но это не так удобно, т.к. не позволяет указывать на конкретную строку в */
-		addDiagnostic(diag: tsc.Diagnostic): void;
+		addDiagnostic(diag: Tsc.Diagnostic): void;
 	}
 
 	/** Класс, управляющий трансформерами */
 	export interface TransformerController {
-		createTransformers(onError: TransformerErrorHandler): Promise<tsc.CustomTransformers>;
+		createTransformers(onError: TransformerErrorHandler): Promise<Tsc.CustomTransformers>;
 		onModuleDelete(moduleName: string): void;
 	}
 
 	/** Обработчик ошибок, выдаваемых трансформаторами */
-	export type TransformerErrorHandler = (e: Error, ref: TransformerReference, file: tsc.SourceFile | tsc.Bundle) => void
+	export type TransformerErrorHandler = (e: Error, ref: TransformerReference, file: Tsc.SourceFile | Tsc.Bundle) => void
 	
 	/** Сборщик бандл-файла из кучи исходников */
 	export interface Bundler {
@@ -93,7 +93,7 @@ export namespace Imploder {
 		entryFunction?: string;
 		/** Версия ECMAScript, которой будет соответствовать полученный бандл. 
 		 * Значение по умолчанию - ES5. Версии ниже ES5 не поддерживаются */
-		target: keyof typeof tsc.ScriptTarget;
+		target: keyof typeof Tsc.ScriptTarget;
 		/** Имя функции-обработчика ошибок запуска. Должна быть доступна в том месте, где запускается бандл */
 		errorHandlerName?: string;
 		/** Минифицировать ли код */
@@ -113,7 +113,7 @@ export namespace Imploder {
 
 		/** Опции-переопределения для минификации
 		 * Передача некоторых из них, возможно, сломает тул */
-		minificationOverrides?: Partial<terser.CompressOptions>;
+		minificationOverrides?: Partial<Terser.CompressOptions>;
 
 		/** Список трансформеров, применяемых к проекту
 		 * Будут добавлены в конец списка плагинов в compilerOptions */
@@ -148,7 +148,7 @@ export namespace Imploder {
 
 	/** Конфиг всего тула в целом */
 	export interface Config extends CLIArgs, Profile { 
-		tscParsedCommandLine: tsc.ParsedCommandLine;
+		tscParsedCommandLine: Tsc.ParsedCommandLine;
 		/** Эта опция здесь для того, чтобы её можно было переопределить при запуске из js-кода (т.е. не как CLI-тул)
 		 * Возможности передать значение этой опции через конфиг/CLI нет */
 		writeLogLine?: (logLine: string) => void;
@@ -235,7 +235,7 @@ export namespace Imploder {
 		afterDeclarations?: boolean;
 		
 		/** Какие-нибудь еще параметры конфигурации */
-		[options: string]: any;
+		[options: string]: unknown;
 
 		/** Определяет порядок, в котором будут исполняться трансформеры относительно друг друга.
 		 * Сначала будут исполнены трансформеры с меньшим значением этого поля (т.е. 1, 2, 3...)
@@ -249,7 +249,7 @@ export namespace Imploder {
 	 * Немного отличается по смыслу от объекта tsc.CustomTransformer
 	 * Например, tsc.CustomTransformer создается каждый раз, когда он нужен; этот объект создается при старте тула один раз */
 	export interface CustomTransformerFactory {
-		(context: tsc.TransformationContext): (sourceFile: tsc.SourceFile) => tsc.SourceFile
+		(context: Tsc.TransformationContext): (sourceFile: Tsc.SourceFile) => Tsc.SourceFile
 		/** Обработать удаление модуля */
 		onModuleDelete?(moduleName: string): void;
 	}

@@ -1,4 +1,5 @@
-import {readTextFile, withTempDir, writeTextFile, copyDir, unlink } from "utils/afs";
+import {withTempDir, copyDir} from "utils/fs_utils";
+import {promises as Fs} from "fs";
 import * as path from "path";
 import {Imploder} from "imploder";
 import {runTestBundle, testProjectDir} from "test/test_project_utils";
@@ -44,7 +45,9 @@ export class WatchTestProject {
 
 	protected async shutdownCompiler(): Promise<void>{
 		this.compiler.stop();
-		await this.compiler.buildLock.withLock(() => {});
+		await this.compiler.buildLock.withLock(() => {
+			// просто ждем, пока разлочится
+		});
 		this._compiler = null;
 		this._context = null;
 	}
@@ -92,7 +95,7 @@ export class WatchTestProject {
 		return testedContent;
 	}
 	
-	protected async assertFileContentEquals(testedContent: string, goodPath: string){
+	protected async assertFileContentEquals(testedContent: string, goodPath: string): Promise<void> {
 		let content = await this.readProjectFile(goodPath);
 		if(content !== testedContent){
 			throw new Error(`Assertion error: \n${testedContent}\n !== \n${content}\n (good content received from ${goodPath})`);
@@ -100,15 +103,15 @@ export class WatchTestProject {
 	}
 
 	protected writeProjectFile(filePath: string, content: string): Promise<void>{
-		return writeTextFile(this.resolveProjectFilePath(filePath), content);
+		return Fs.writeFile(this.resolveProjectFilePath(filePath), content, "utf-8");
 	}
 
 	protected deleteProjectFile(filePath: string): Promise<void>{
-		return unlink(this.resolveProjectFilePath(filePath));
+		return Fs.unlink(this.resolveProjectFilePath(filePath));
 	}
 
 	protected readProjectFile(filePath: string): Promise<string> {
-		return readTextFile(this.resolveProjectFilePath(filePath));
+		return Fs.readFile(this.resolveProjectFilePath(filePath), "utf-8");
 	}
 	
 	protected async waitWatchTriggered(): Promise<void>{

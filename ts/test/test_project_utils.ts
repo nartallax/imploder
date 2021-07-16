@@ -1,6 +1,5 @@
-import * as path from "path";
-import * as fs from "fs";
-import {promises as Fs} from "fs";
+import * as Path from "path";
+import {promises as Fs, statSync as FsStatSync} from "fs";
 import {BundlerImpl} from "impl/bundler";
 import {LoggerImpl} from "impl/logger";
 import * as ChildProcess from "child_process";
@@ -8,15 +7,15 @@ import * as ChildProcess from "child_process";
 let testProjectsRoot: string | null = null;
 export function testProjectDir(name: string): string {
 	if(!testProjectsRoot){
-		let root = path.resolve(__dirname, "../test_projects/");
+		let root = Path.resolve(__dirname, "../test_projects/");
 		try {
-			fs.statSync(root);
+			FsStatSync(root);
 		} catch(e){
 			LoggerImpl.writeDefaultAndExit(`Failed to stat() test projects root directory (which is ${root}). Maybe you're trying to run tests on packed npm package? You cannot do that; you may only run tests on source code.`);
 		}
 		testProjectsRoot = root;
 	}
-	return path.join(testProjectsRoot, name);
+	return Path.join(testProjectsRoot, name);
 }
 
 
@@ -42,14 +41,16 @@ export function failOnNonEmptyCodeOrSignal(result: {code: number | null, signal:
 }
 
 async function runBundleCodeAsFile(code: string, originalBundlePath: string): Promise<ProcessExecutionResult> {
-	let tmpJsPath = path.join(path.dirname(originalBundlePath), "wrapped_" + path.basename(originalBundlePath));
+	let tmpJsPath = Path.join(Path.dirname(originalBundlePath), "wrapped_" + Path.basename(originalBundlePath));
 	await Fs.writeFile(tmpJsPath, code, "utf8");
 	try {
 		return await runJsCode(tmpJsPath);
 	} finally {
 		try {
 			await Fs.unlink(tmpJsPath);
-		} catch(e){}
+		} catch(e){
+			// ничего. не получилось удалить - это не очень плохо
+		}
 	}
 }
 

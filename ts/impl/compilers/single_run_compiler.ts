@@ -1,45 +1,5 @@
 import {Imploder} from "imploder";
 import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
-/*
-import * as tsc from "typescript";
-import {processTypescriptDiagnostics} from "utils/tsc_diagnostics";
-
-export class ImploderSingleRunCompiler extends ImploderAbstractCompiler implements Imploder.Compiler {
-	private _program: tsc.Program | null = null;
-	get program(): tsc.Program {
-		if(this._program){
-			return this._program;
-		}
-		throw new Error("Compiler not started yet.");
-	}
-
-	async run(){
-		await this.beforeStart();
-		this.clearLastBuildDiagnostics();
-
-		this._host = tsc.createCompilerHost(this.tscConfig.options);
-		this._program = tsc.createProgram({
-			...this.tscConfig,
-			host: this._host
-		});
-
-		let preEmitDiag = tsc.getPreEmitDiagnostics(this.program);
-		this.lastBuildDiag.push(...preEmitDiag);
-		if(!this.context.config.noBuildDiagnosticMessages){
-			processTypescriptDiagnostics(preEmitDiag);
-		}
-
-		let transformers = await this.context.transformerController.getTransformers();
-		let emitResult = this.program.emit(undefined, undefined, undefined, undefined, transformers);
-
-		this.lastBuildDiag.push(...emitResult.diagnostics);
-		if(!this.context.config.noBuildDiagnosticMessages){
-			processTypescriptDiagnostics(emitResult.diagnostics);
-		}
-		this.updateErrorCount();
-	}
-
-}*/
 
 
 export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements Imploder.Compiler {
@@ -47,7 +7,7 @@ export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements 
 		return false;
 	}
 
-	async run(){
+	async run(): Promise<void> {
 		// да, в итоге оказалось проще имплементировать одиночную компиляцию через watch-компиляцию
 		// это дает более консистентные результаты
 		do {

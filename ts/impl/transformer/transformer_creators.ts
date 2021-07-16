@@ -1,8 +1,8 @@
 import {updateCliArgsWithTsconfig} from "impl/config";
 import {ImploderContextImpl} from "impl/context";
 import {Imploder} from "imploder";
-import * as path from "path";
-import type * as tsc from "typescript";
+import * as Path from "path";
+import type * as Tsc from "typescript";
 
 export interface TransformerRefWithFactory {
 	ref: Imploder.TransformerReference
@@ -25,7 +25,7 @@ export async function createTransformerFromTransformerRef(context: Imploder.Cont
 
 /** Собрать Imploder-проект, выдать путь к файлу-результату */
 async function buildTransformerImploderProjectToBundle(projectTsconfigPath: string, context: Imploder.Context): Promise<string>{	
-	projectTsconfigPath = path.resolve(path.dirname(context.config.tsconfigPath), projectTsconfigPath);
+	projectTsconfigPath = Path.resolve(Path.dirname(context.config.tsconfigPath), projectTsconfigPath);
 	let config = updateCliArgsWithTsconfig({tsconfigPath: projectTsconfigPath});
 	config.watchMode = false;
 	config.noLoaderCode = false;
@@ -50,19 +50,23 @@ async function getTransformerFromPackage(moduleName: string, context: Imploder.C
 	return result;
 }
 
+/** Функция, создающая фабрику трансформеров
+ * Сам по себе тип не имеет особого смысла, в месте вызова функция кастится к одному из типов в зависимости от настроек */
+type TransformerFactoryFactory = (x: never) => Imploder.CustomTransformerFactory
+
 /** Имея package, получить из него функцию, которая создаст нам Imploder.CustomTransformerFactory */
-function extractFactoryCreationFunctionFromPackage(moduleName: string, context: Imploder.Context, ref: Imploder.TransformerReference): Function {
+function extractFactoryCreationFunctionFromPackage(moduleName: string, context: Imploder.Context, ref: Imploder.TransformerReference): TransformerFactoryFactory {
 	let pathOrName = require.resolve(moduleName, {
-		paths: [path.dirname(context.config.tsconfigPath)]
+		paths: [Path.dirname(context.config.tsconfigPath)]
 	})
 
 	let moduleResult: unknown = require(pathOrName);
-	let fn: Function;
+	let fn: TransformerFactoryFactory;
 	switch(typeof(moduleResult)){
 		case "function":
-			fn = moduleResult;
+			fn = moduleResult as TransformerFactoryFactory;
 			break;
-		case "object":
+		case "object": {
 			if(!moduleResult){
 				throw new Error("Expected result of " + pathOrName + " to be non-null object, got " + moduleResult + " instead.");
 			}
@@ -71,7 +75,7 @@ function extractFactoryCreationFunctionFromPackage(moduleName: string, context: 
 				if(!(ref.import in moduleResult)){
 					throw new Error(`Package ${pathOrName} does not contains exported value ${ref.import} (that is mentioned in tranfromer plugin entry)`);
 				}
-				fn = (moduleResult as any)[ref.import];
+				fn = (moduleResult as Record<string, TransformerFactoryFactory>)[ref.import];
 				break;
 			}
 
@@ -90,8 +94,9 @@ function extractFactoryCreationFunctionFromPackage(moduleName: string, context: 
 				key = keys[0];
 			}
 		
-			fn = (moduleResult as any)[key];
+			fn = (moduleResult as Record<string, TransformerFactoryFactory>)[key];
 			break;
+		}
 		default:
 			throw new Error(`Expected product of package ${pathOrName} to be object, got ${moduleResult} (of type ${typeof(moduleResult)}) instead.`);
 	}
@@ -110,30 +115,35 @@ function lazyWrapFactoryCreator(fn: () => Imploder.CustomTransformerFactory): Im
 	}
 }
 
-async function runFactoryCreationFunction(fnValue: Function, context: Imploder.Context, ref: Imploder.TransformerReference): Promise<Imploder.CustomTransformerFactory> {
+async function runFactoryCreationFunction(fnValue: TransformerFactoryFactory, context: Imploder.Context, ref: Imploder.TransformerReference): Promise<Imploder.CustomTransformerFactory> {
 	switch(ref.type || "program"){
 		case "program": {
-			let fn = fnValue as (program: tsc.Program, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as 
+				(program: Tsc.Program, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
 			return lazyWrapFactoryCreator(() => fn(context.compiler.program, ref));
 		}
 		case "config": {
-			let fn = fnValue as (config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as
+				(config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
 			return fn(ref);
 		}
 		case "checker": {
-			let fn = fnValue as (checker: tsc.TypeChecker, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as
+				(checker: Tsc.TypeChecker, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
 			return lazyWrapFactoryCreator(() => fn(context.compiler.program.getTypeChecker(), ref));
 		}
 		case "raw": {
-			let fn = fnValue as Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as Imploder.CustomTransformerFactory;
 			return fn;
 		}
 		case "compilerOptions": {
-			let fn = fnValue as (compilerOpts: tsc.CompilerOptions, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as
+				(compilerOpts: Tsc.CompilerOptions, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
 			return fn(context.config.tscParsedCommandLine.options, ref);
 		}
 		case "imploder": {
-			let fn = fnValue as (imploderContext: Imploder.Context, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
+			let fn = fnValue as unknown as
+				(imploderContext: Imploder.Context, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
 			return await Promise.resolve(fn(context, ref));
 		}
 		default: throw new Error(`Could not get transformer factory out of ${ref.transform}: unknown type ${JSON.stringify(ref.type)}`);

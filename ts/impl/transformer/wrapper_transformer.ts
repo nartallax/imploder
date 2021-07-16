@@ -1,15 +1,15 @@
 import {Imploder} from "imploder";
-import * as tsc from "typescript";
+import * as Tsc from "typescript";
 
-export class WrapperTransformer implements tsc.CustomTransformer {
+export class WrapperTransformer implements Tsc.CustomTransformer {
 
 	constructor(
 		private readonly onError: Imploder.TransformerErrorHandler,
-		private readonly base: (file: tsc.SourceFile) => tsc.SourceFile,
+		private readonly base: (file: Tsc.SourceFile) => Tsc.SourceFile,
 		private readonly ref: Imploder.TransformerReference
 		){}
 
-	transformSourceFile(node: tsc.SourceFile): tsc.SourceFile {
+	transformSourceFile(node: Tsc.SourceFile): Tsc.SourceFile {
 		try {
 			return this.base.call(null, node);
 		} catch(e){
@@ -18,7 +18,7 @@ export class WrapperTransformer implements tsc.CustomTransformer {
 		}
 	}
 
-	transformBundle(node: tsc.Bundle): tsc.Bundle {
+	transformBundle(node: Tsc.Bundle): Tsc.Bundle {
 		return node;
 	}
 

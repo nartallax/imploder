@@ -3,9 +3,11 @@
 # its somehow gruesome, but lets just deal with it.
 
 cd `dirname "$0"`
+cd ..
 
 # preparing the build space
 rm -r ./target 2> /dev/null
+rm -r ./js 2> /dev/null
 mkdir ./ts/generated 2> /dev/null
 
 set -e

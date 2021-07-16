@@ -1,8 +1,8 @@
-import * as tsc from "typescript";
+import * as Tsc from "typescript";
 import {ModuleOrderer} from "impl/module_orderer";
 import {loaderCode} from "generated/loader_code";
-import * as path from "path";
-import {createDirsToFile, readTextFile, writeTextFile} from "utils/afs";
+import * as Path from "path";
+import {promises as Fs} from "fs";
 import {minifyJsFunctionExpression, MinifierOptions} from "impl/minification";
 import {Imploder} from "imploder";
 
@@ -13,8 +13,8 @@ export class BundlerImpl implements Imploder.Bundler {
 	async produceBundle(): Promise<string>{
 		this.context.logger.debug("Starting to produce bundle.");
 		let code = await this.assembleBundleCode();
-		await createDirsToFile(this.context.config.outFile);
-		await writeTextFile(this.context.config.outFile, code);
+		await Fs.mkdir(Path.dirname(this.context.config.outFile), {recursive: true});
+		await Fs.writeFile(this.context.config.outFile, code, "utf-8");
 		this.context.logger.debug("Bundle produced (" + this.context.config.outFile + ")");
 		return code;
 	}
@@ -56,14 +56,14 @@ export class BundlerImpl implements Imploder.Bundler {
 	}
 
 	private getEntryModuleName(): string {
-		let absPath = path.resolve(path.dirname(this.context.config.tsconfigPath), this.context.config.entryModule);
+		let absPath = Path.resolve(Path.dirname(this.context.config.tsconfigPath), this.context.config.entryModule);
 		let name = this.context.modulePathResolver.getCanonicalModuleName(absPath);
 		return name;
 	}
 
 	private async getTslibDefArr(): Promise<ImploderModuleDefinitonArray> {
-		let tslibjsPath = require.resolve("tslib", {paths:[path.dirname(this.context.config.tsconfigPath)]})
-		let libCode = await readTextFile(tslibjsPath);
+		let tslibjsPath = require.resolve("tslib", {paths:[Path.dirname(this.context.config.tsconfigPath)]})
+		let libCode = await Fs.readFile(tslibjsPath, "utf-8");
 		// оборачиваем код tslib в функцию типа определение модуля
 		// чтобы с ним можно было обращаться так же, как с любым другим модулем
 		libCode = "function(global){var define=function(){};" + libCode + "}"
@@ -116,7 +116,7 @@ export class BundlerImpl implements Imploder.Bundler {
 		if(this.context.config.minify){
 			if(this.minifiedLoaderCode === null){
 				this.minifiedLoaderCode = await this.minify(resultLoaderCode, "<loader>", { 
-					target: tsc.ScriptTarget.ES5
+					target: Tsc.ScriptTarget.ES5
 				});
 			}
 			resultLoaderCode = this.minifiedLoaderCode;
@@ -129,7 +129,7 @@ export class BundlerImpl implements Imploder.Bundler {
 	thenCode - код, который будет передан в качестве аргумента в launch (см. код лоадера) */
 	private getPostfixCode(wrapParams: Imploder.BundlerWrapperParameters): string {
 		let cfg = this.context.config;
-		let params: any = { // на самом деле не any, а LoaderParams, 
+		let params: LoaderParams = {
 			entryPoint: {
 				module: this.getEntryModuleName(),
 				function: cfg.entryFunction
@@ -155,9 +155,9 @@ export class BundlerImpl implements Imploder.Bundler {
 		names.forEach(moduleName => {
 			let mod = storage.get(moduleName);
 			if(!mod.jsCode){
-				let modulePath = path.join(outDir, moduleName + ".js");
+				let modulePath = Path.join(outDir, moduleName + ".js");
 				proms.push((async () => {
-					let code = await readTextFile(modulePath);
+					let code = await Fs.readFile(modulePath, "utf-8");
 					if(this.context.config.minify){
 						code = await this.minify(code, moduleName, {}, mod.isModuleFile);
 					}
@@ -170,10 +170,10 @@ export class BundlerImpl implements Imploder.Bundler {
 		}
 	}
 
-	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}, isModuleDef: boolean = true): Promise<string> {
+	private minify(code: string, moduleName: string, opts: Partial<MinifierOptions> = {}, isModuleDef = true): Promise<string> {
 		return minifyJsFunctionExpression({
 			isModuleDef,
-			target: tsc.ScriptTarget[this.context.config.target],
+			target: Tsc.ScriptTarget[this.context.config.target],
 			...opts,
 			code, 
 			moduleName,

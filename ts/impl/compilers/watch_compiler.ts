@@ -1,4 +1,4 @@
-import * as tsc from "typescript";
+import * as Tsc from "typescript";
 import {Imploder} from "imploder";
 import {processTypescriptDiagnosticEntry} from "utils/tsc_diagnostics";
 import {Lock} from "utils/lock";
@@ -8,9 +8,9 @@ import {ImploderAbstractCompiler} from "impl/compilers/compiler";
 export class ImploderWatchCompiler extends ImploderAbstractCompiler implements Imploder.Compiler {
 	readonly buildLock = new Lock();
 
-	private _watch: tsc.Watch<tsc.BuilderProgram> | null = null;
-	private _builderProgram: tsc.BuilderProgram | null = null;
-	get program(): tsc.Program {
+	private _watch: Tsc.Watch<Tsc.BuilderProgram> | null = null;
+	private _builderProgram: Tsc.BuilderProgram | null = null;
+	get program(): Tsc.Program {
 		if(this._watch){
 			return this._watch.getProgram().getProgram();
 		}
@@ -25,17 +25,17 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 	}
 
 	// создать экземпляр tsc.System для работы в вотчмоде
-	private createSystemForWatch(): tsc.System {
-		const watchFile = tsc.sys.watchFile;
-		const watchDir = tsc.sys.watchDirectory;
+	private createSystemForWatch(): Tsc.System {
+		const watchFile = Tsc.sys.watchFile;
+		const watchDir = Tsc.sys.watchDirectory;
 
 		return {
-			...tsc.sys,
+			...Tsc.sys,
 			watchFile: !watchFile || !this.shouldInstallFsWatchers()? undefined:
-				(path, callback, pollingInterval, options) => watchFile.call(tsc.sys, path, (fileName, kind) => {
+				(path, callback, pollingInterval, options) => watchFile.call(Tsc.sys, path, (fileName, kind) => {
 					let module = this.context.modulePathResolver.getCanonicalModuleName(fileName);
 					this.context.moduleStorage.delete(module);
-					if(kind === tsc.FileWatcherEventKind.Deleted){
+					if(kind === Tsc.FileWatcherEventKind.Deleted){
 						this.context.transformerController.onModuleDelete(module);
 					}
 					if(this._watch){
@@ -44,7 +44,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 					}
 				}, pollingInterval, options),
 			watchDirectory: !watchDir || !this.shouldInstallFsWatchers()? undefined: 
-				(path, callback, recursive, options) => watchDir.call(tsc.sys, path, (fileName: string) => {
+				(path, callback, recursive, options) => watchDir.call(Tsc.sys, path, (fileName: string) => {
 					if(this._watch){
 						callback(fileName);
 						// не берем здесь лок, т.к. за изменением только директории не всегда следует компиляция
@@ -55,12 +55,12 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		}
 	}
 
-	private async createWatchHost(system: tsc.System){
+	private async createWatchHost(system: Tsc.System){
 		let transformers = await this.context.transformerController.createTransformers((err, ref, file) => {
 			this.addDiagnostic({
-				category: tsc.DiagnosticCategory.Error,
+				category: Tsc.DiagnosticCategory.Error,
 				code: 1,
-				file: tsc.isSourceFile(file)? file: undefined,
+				file: Tsc.isSourceFile(file)? file: undefined,
 				messageText: `Transformer ${ref.transform} throws error: ${err.message}`,
 				start: undefined,
 				length: undefined
@@ -72,21 +72,21 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		// смысл в том, что обычно createProgram будет чем-то вроде createEmitAndSemanticDiagnosticsBuilderProgram
 		// но я не хочу это хардкодить. поэтому я получаю её таким вот непрямым путем
 		// в худшем случае, при изменениях тул перестанет компилиться/работать
-		let defaultHost = tsc.createWatchCompilerHost(
+		let defaultHost = Tsc.createWatchCompilerHost(
 			this.context.config.tsconfigPath,
 			this.context.config.tscParsedCommandLine.options,
 			system,
 			undefined,
-			(diagnostic: tsc.Diagnostic) => {
+			(diagnostic: Tsc.Diagnostic) => {
 				processTypescriptDiagnosticEntry(diagnostic, this.context.logger, this.projectRoot);
 			},
-			(diagnostic: tsc.Diagnostic) => {
+			(diagnostic: Tsc.Diagnostic) => {
 				this.context.logger.error("DEFAULT HOST EMITTED DIAG!");
 				processTypescriptDiagnosticEntry(diagnostic, this.context.logger, this.projectRoot);
 			}
 		)
 
-		return tsc.createWatchCompilerHost(
+		return Tsc.createWatchCompilerHost(
 			this.context.config.tsconfigPath,
 			this.context.config.tscParsedCommandLine.options,
 			system,
@@ -101,7 +101,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 					this.startBuild();
 
 					// возможно, это избыточно?
-					for(let diag of tsc.getPreEmitDiagnostics(result.getProgram())){
+					for(let diag of Tsc.getPreEmitDiagnostics(result.getProgram())){
 						this.addDiagnostic(diag);
 					}
 
@@ -145,7 +145,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		);
 	}
 
-	addDiagnostic(diag: tsc.Diagnostic): void {
+	addDiagnostic(diag: Tsc.Diagnostic): void {
 		if(this.lastBuildDiag.push(diag)){
 			if(!this.context.config.noBuildDiagnosticMessages){
 				processTypescriptDiagnosticEntry(diag, this.context.logger, this.projectRoot);
@@ -190,7 +190,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 	}
 
 	/** запуститься в вотчмоде */
-	async run(){
+	async run(): Promise<void> {
 		if(this._watch){
 			return;
 		}
@@ -198,12 +198,12 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 		let system = this.createSystemForWatch();
 		let watchHost = await this.createWatchHost(system);
-		this._host = tsc.createCompilerHost(this.context.config.tscParsedCommandLine.options);
-		let watchProgram = tsc.createWatchProgram(watchHost);
+		this._host = Tsc.createCompilerHost(this.context.config.tscParsedCommandLine.options);
+		let watchProgram = Tsc.createWatchProgram(watchHost);
 		this._watch = watchProgram;
 	}
 
-	stop(){
+	stop(): void {
 		if(!this._watch){
 			return;
 		}

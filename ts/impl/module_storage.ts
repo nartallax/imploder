@@ -6,7 +6,7 @@ export class ModuleStorageImpl implements Imploder.ModuleStorage {
 
 	constructor(private readonly context: Imploder.Context){}
 
-	set(name: string, data: Imploder.ModuleData){
+	set(name: string, data: Imploder.ModuleData): void {
 		this.context.logger.debug("Got info on " + name + " module: " + JSON.stringify(data));
 		this.data[name] = data;
 	}

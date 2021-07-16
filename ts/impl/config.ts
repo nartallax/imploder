@@ -132,7 +132,7 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		}
 	}
 
-	let rawOptions: any;
+	let rawOptions: Record<string, unknown>;
 	if(config.raw){
 		rawOptions = config.raw.compilerOptions;
 	} else {

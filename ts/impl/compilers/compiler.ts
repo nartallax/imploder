@@ -1,6 +1,7 @@
-import * as tsc from "typescript";
-import * as path from "path";
-import {unlinkRecursive, fileExists, mkdir} from "utils/afs";
+import * as Tsc from "typescript";
+import * as Path from "path";
+import {promises as Fs} from "fs";
+import {unlinkRecursive, fileExists} from "utils/fs_utils";
 import {Imploder} from "imploder";
 import {SeqSet} from "utils/seq_set";
 
@@ -13,8 +14,8 @@ https://stackoverflow.com/questions/62026189/typescript-custom-transformers-with
 */
 
 export abstract class ImploderAbstractCompiler {
-	protected readonly tscConfig: tsc.ParsedCommandLine & { rootNames: string[] };
-	readonly projectRoot = path.dirname(this.context.config.tsconfigPath);
+	protected readonly tscConfig: Tsc.ParsedCommandLine & { rootNames: string[] };
+	readonly projectRoot = Path.dirname(this.context.config.tsconfigPath);
 
 	constructor(protected readonly context: Imploder.Context){
 		this.tscConfig = {
@@ -23,7 +24,7 @@ export abstract class ImploderAbstractCompiler {
 		}
 	}
 
-	protected async beforeStart(){
+	protected async beforeStart(): Promise<void> {
 		const outDir = this.context.config.tscParsedCommandLine.options.outDir;
 		if(!this.context.config.preserveOutDir && outDir){
 			if(await fileExists(outDir)){
@@ -31,13 +32,13 @@ export abstract class ImploderAbstractCompiler {
 				// создавать тут директорию нужно для вотчмода
 				// потому что иначе он сразу же после начала работы дергается на свежесозданную директорию с выходными данными
 				// это не очень страшно, но неприятно
-				await mkdir(outDir);
+				await Fs.mkdir(outDir);
 			}
 		}
 	}
 
-	protected _host: tsc.CompilerHost | null = null;
-	get compilerHost(): tsc.CompilerHost {
+	protected _host: Tsc.CompilerHost | null = null;
+	get compilerHost(): Tsc.CompilerHost {
 		if(!this._host){
 			throw new Error("Compiler not started, no compiler host available.");
 		}
@@ -45,23 +46,23 @@ export abstract class ImploderAbstractCompiler {
 	}
 
 	protected errorCount = 0;
-	protected lastBuildDiag = new SeqSet<tsc.Diagnostic>(d => {
+	protected lastBuildDiag = new SeqSet<Tsc.Diagnostic>(d => {
 		return (!d.file? "<nofile>": d.file.fileName) + "|" +
 			(d.start || -1) + "|" + 
 			(d.length || -1) + "|" + 
 			(d.messageText || -1);
 	});
-	get lastBuildDiagnostics(): ReadonlyArray<tsc.Diagnostic>{
+	get lastBuildDiagnostics(): ReadonlyArray<Tsc.Diagnostic>{
 		return this.lastBuildDiag.seq;
 	}
 
-	protected clearLastBuildDiagnostics(){
+	protected clearLastBuildDiagnostics(): void {
 		this.errorCount = 0;
 		this.lastBuildDiag.clear();
 	}
 
-	protected updateErrorCount(){
-		this.errorCount = this.lastBuildDiag.seq.filter(_ => _.category === tsc.DiagnosticCategory.Error).length;
+	protected updateErrorCount(): void {
+		this.errorCount = this.lastBuildDiag.seq.filter(_ => _.category === Tsc.DiagnosticCategory.Error).length;
 	}
 
 	get lastBuildWasSuccessful(): boolean {

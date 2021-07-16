@@ -25,7 +25,7 @@ export class ExternalInstanceImpl implements Imploder.ExternalInstance {
 				resp.on("end", () => {
 					let dataStr = Buffer.concat(data).toString("utf8");
 					if(Math.floor((resp.statusCode || 0) / 100) !== 2){
-						bad(new Error(`Imploder returned HTTP ${resp.statusCode}:\n${data}`));
+						bad(new Error(`Imploder returned HTTP ${resp.statusCode}:\n${dataStr}`));
 					} else {
 						ok(dataStr);
 					}

@@ -12,6 +12,8 @@ export interface CliArgDef<V> {
 	readonly type: "string" | "int" | "double" | "bool";
 }
 
+export type CliArgType<T> = T extends CliArgDef<infer V>? V: never;
+
 export interface CliParams<T> {
 	readonly helpHeader?: string;
 	readonly onError?: ErrorHandler;
@@ -160,7 +162,7 @@ export class CLI<T> {
 			if(argName in result){
 				if(def.allowedValues){
 					let s = new Set(def.allowedValues);
-					if(!s.has(result[argName] as any)){
+					if(!s.has(result[argName] as CliArgType<typeof def>)){
 						this.fail("Value of CLI argument \"" + argName + "\" is not in allowed values set: it's \"" + result[argName] + ", while allowed values are " + def.allowedValues.map(x => "\"" + x + "\"").join(", "));
 					}
 				}
@@ -203,11 +205,11 @@ export class CLI<T> {
 			}
 			knownArguments.add(argName);
 
-			let actualValue: any;
 			let def = this.params.definition[argName];
+			let actualValue: CliArgType<typeof def>;
 			switch(def.type){
 				case "bool":
-					actualValue = true;
+					actualValue = true as CliArgType<typeof def>;
 					break;
 				case "string":
 				case "int":
@@ -216,10 +218,10 @@ export class CLI<T> {
 						this.fail("Expected to have some value after CLI key \"" + v + "\".");
 					}
 					i++;
-					actualValue = values[i];
+					actualValue = values[i] as CliArgType<typeof def>;
 
 					if(def.type === "int" || def.type === "double"){
-						let num = parseFloat(actualValue);
+						let num = parseFloat(actualValue as string);
 						if(!Number.isFinite(num)){
 							this.fail("Expected to have number after CLI key \"" + v + "\", got \"" + actualValue + "\" instead.");
 						}
@@ -229,11 +231,11 @@ export class CLI<T> {
 							
 						}
 
-						actualValue = num;
+						actualValue = num as CliArgType<typeof def>;
 					}
 			}
 
-			(result[argName] as any) = actualValue;
+			(result[argName] as CliArgType<typeof def>) = actualValue;
 		}
 
 		return result;

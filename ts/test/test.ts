@@ -18,7 +18,7 @@ const allKnownTesters: ReadonlyArray<Tester> = [
 	{couldRunTest: name => name in ArbitraryTests, runTest: (name, cliArgsBase) => ArbitraryTests[name](cliArgsBase)}
 ]
 
-export async function runAllTests(cliArgsBase: Imploder.CLIArgs){
+export async function runAllTests(cliArgsBase: Imploder.CLIArgs): Promise<void> {
 	LoggerImpl.writeDefault("Running all tests.");
 
 	let failCount = 0;
@@ -40,7 +40,7 @@ export async function runAllTests(cliArgsBase: Imploder.CLIArgs){
 	
 }
 
-export async function runSingleTest(name: string, cliArgsBase: Imploder.CLIArgs){
+export async function runSingleTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<void> {
 	let ok = await runTest(name, cliArgsBase);
 	if(!ok){
 		LoggerImpl.writeDefault("Done. Test failed.")

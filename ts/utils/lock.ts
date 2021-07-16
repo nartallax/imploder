@@ -25,7 +25,7 @@ export class Lock {
 	}
 
 	withLock<T>(action: () => (T | Promise<T>)): Promise<T> {
-		return new Promise(async (ok, err) => {
+		return new Promise((ok, err) => {
 
 			let executeAction = async () => {
 				try {
