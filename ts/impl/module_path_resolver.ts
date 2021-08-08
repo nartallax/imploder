@@ -1,6 +1,7 @@
 import * as Path from "path";
 import * as Tsc from "typescript";
 import {Imploder} from "imploder";
+import {isPathNested} from "utils/path_utils";
 
 /** класс, умеющий находить файлы исходников, в которых расположен модуль по ссылке на него */
 export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
@@ -36,7 +37,7 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 			return moduleDesignator;
 		}
 		
-		if(res.resolvedModule.resolvedFileName.startsWith(this.moduleRoot)){
+		if(isPathNested(res.resolvedModule.resolvedFileName, this.moduleRoot)){
 			let filename = res.resolvedModule.resolvedFileName.toLowerCase();
 			if(filename.endsWith(".ts") && !filename.endsWith(".d.ts")){
 				// это просто один из наших файлов-модулей. канонизируем имя
