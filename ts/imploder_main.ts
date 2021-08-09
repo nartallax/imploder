@@ -25,29 +25,34 @@ ImploderContextImpl.createLogger = context => new LoggerImpl(context.config);
 ImploderContextImpl.createModuleStorage = context => new ModuleStorageImpl(context);
 
 export async function runAsCli(): Promise<void>{
-	let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
+	try {
+		let cliArgs = parseToolCliArgs(CLI.processArgvWithoutExecutables);
 
-	if(cliArgs.test){
-		await runAllTests(cliArgs);
-		return;
-	}
+		if(cliArgs.test){
+			await runAllTests(cliArgs);
+			return;
+		}
 
-	if(cliArgs.testSingle){
-		await runSingleTest(cliArgs.testSingle, cliArgs);
-		return
-	}
+		if(cliArgs.testSingle){
+			await runSingleTest(cliArgs.testSingle, cliArgs);
+			return
+		}
 
-	if(!cliArgs.tsconfigPath){
-		LoggerImpl.writeDefaultAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
-	}
+		if(!cliArgs.tsconfigPath){
+			LoggerImpl.writeDefaultAndExit("Path to tsconfig.json is not passed. Could not start bundler.");
+		}
 
 
-	let config = updateCliArgsWithTsconfig(cliArgs);
-	
-	let context = await runFromConfig(config);
+		let config = updateCliArgsWithTsconfig(cliArgs);
+		
+		let context = await runFromConfig(config);
 
-	if(!context.config.watchMode){
-		process.exit(context.compiler.lastBuildWasSuccessful? 0: 1);
+		if(!context.config.watchMode){
+			process.exit(context.compiler.lastBuildWasSuccessful? 0: 1);
+		}
+	} catch(e){
+		console.error(e.stack || e.message || e);
+		process.exit(1);
 	}
 }
 
