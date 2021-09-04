@@ -108,16 +108,25 @@ function extractFactoryCreationFunctionFromPackage(moduleName: string, context: 
 	return fn;
 }
 
+// завернуть функцию создания трансформер-фабрики в еще одну функцию
+// нужно оно для того, чтобы трансформер-фабрика создавалась отложенно
+// потому что в некоторых случаях она требует значений, которых нет в момент подгрузки трансформера из модуля
+// например, program (потому что компилятор еще не запущен)
+// из минусов - это вносит неконсистентность между типами "program" и "imploder"
+// потому что imploder запускает функцию сразу же, что позволяет, например, генерить какие-нибудь файлы на старте
+function lazyWrapFactoryCreator(fn: () => Imploder.CustomTransformerFactory): Imploder.CustomTransformerFactory {
+	let factory: Imploder.CustomTransformerFactory | null = null;
+	return transformContext => {
+		return (factory ||= fn())(transformContext)
+	}
+}
+
 async function runFactoryCreationFunction(fnValue: TransformerFactoryFactory, context: Imploder.Context, ref: Imploder.TransformerReference): Promise<Imploder.CustomTransformerFactory> {
 	switch(ref.type || "program"){
 		case "program": {
 			let fn = fnValue as unknown as 
 				(program: Tsc.Program, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
-			// тут раньше был ленивый вызов функции с сохранением результата
-			// так делать не надо
-			// потому что, например, файлогенерящие трансформеры могут захотеть на старте создать файлы
-			// т.е. до первой компиляции
-			return fn(context.compiler.program, ref);
+			return lazyWrapFactoryCreator(() => fn(context.compiler.program, ref));
 		}
 		case "config": {
 			let fn = fnValue as unknown as
@@ -127,7 +136,7 @@ async function runFactoryCreationFunction(fnValue: TransformerFactoryFactory, co
 		case "checker": {
 			let fn = fnValue as unknown as
 				(checker: Tsc.TypeChecker, config: Imploder.TransformerReference) => Imploder.CustomTransformerFactory;
-			return fn(context.compiler.program.getTypeChecker(), ref);
+			return lazyWrapFactoryCreator(() => fn(context.compiler.program.getTypeChecker(), ref));
 		}
 		case "raw": {
 			let fn = fnValue as unknown as Imploder.CustomTransformerFactory;
