@@ -155,7 +155,7 @@ export class SingleBuildTestProject {
 			await this.compiler.run();
 			await this.bundler.produceBundle();
 		} catch(e){
-			err = e;
+			err = e as Error;
 		}
 
 		if(!this.checkError(err, "compile-time", this.compileErrorText, null)){
@@ -170,7 +170,7 @@ export class SingleBuildTestProject {
 				return false;
 			}
 		} catch(e){
-			err = e;
+			err = e as Error;
 		}
 		
 		if(!this.checkError(err, "runtime", this.runtimeErrorText, this.runtimeErrorRegexp)){

@@ -8,7 +8,7 @@ export async function fileExists(path: string): Promise<boolean>{
 		await Fs.stat(path);
 		return true;
 	} catch(e){
-		if(e.code === "ENOENT"){
+		if((e as Error & {code: string}).code === "ENOENT"){
 			return false;
 		}
 		throw e;

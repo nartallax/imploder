@@ -51,7 +51,7 @@ export async function runAsCli(): Promise<void>{
 			process.exit(context.compiler.lastBuildWasSuccessful? 0: 1);
 		}
 	} catch(e){
-		console.error(e.stack || e.message || e);
+		console.error((e as Error).stack || (e as Error).message || e);
 		process.exit(1);
 	}
 }

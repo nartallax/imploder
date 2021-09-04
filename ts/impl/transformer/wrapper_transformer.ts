@@ -13,7 +13,7 @@ export class WrapperTransformer implements Tsc.CustomTransformer {
 		try {
 			return this.base.call(null, node);
 		} catch(e){
-			this.onError(e, this.ref, node);
+			this.onError(e as Error, this.ref, node);
 			return node;
 		}
 	}

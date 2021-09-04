@@ -1,1 +1,1 @@
-[["/ts/main",["../../some_external_module"],"(n,o,e)=>{n.main=function main(){console.log(e.someFunction('meow!'))}}"]]
+[["/ts/main",["../../some_external_module"],"(n,o,e)=>{n.main=function main(){console.log((0,e.someFunction)('meow!'))}}"]]

@@ -104,7 +104,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 					}
 				}
 			} catch(e){
-				callError(e)
+				callError(e as Error)
 			}
 		}
 	}
@@ -253,7 +253,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 			try {
 				mainProduct[params.entryPoint.function].apply(null, params.entryPointArgs || []);
 			} catch(e){
-				err = e;
+				err = e as Error;
 			}
 		}
 		

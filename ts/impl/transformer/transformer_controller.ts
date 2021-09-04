@@ -78,7 +78,7 @@ export class TransformerControllerImpl implements Imploder.TransformerController
 					allTransformers.push(await createTransformerFromTransformerRef(this.context, ref));
 				}
 			} catch(e){
-				this.context.logger.errorAndExit("Transformer project " + JSON.stringify(ref) + " failed to load: " + e.stack)
+				this.context.logger.errorAndExit("Transformer project " + JSON.stringify(ref) + " failed to load: " + (e as Error).stack)
 			}
 		}
 

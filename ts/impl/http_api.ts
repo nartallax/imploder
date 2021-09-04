@@ -23,7 +23,7 @@ export class HttpApi {
 			res.statusCode = resultCode;
 			res.end(resultBody);
 		} catch(e){
-			this.context.logger.error(e);
+			this.context.logger.error((e as Error).stack || (e as Error).message);
 			res.statusCode = 500;
 			res.end("Some error happened.")
 		}

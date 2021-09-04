@@ -60,7 +60,7 @@ async function runTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<boo
 			try {
 				return await Promise.resolve(tester.runTest(name, cliArgsBase));
 			} catch(e){
-				LoggerImpl.writeDefault(`Test "${name}" unexpectedly throws error: ${e.stack}`);
+				LoggerImpl.writeDefault(`Test "${name}" unexpectedly throws error: ${(e as Error).stack}`);
 				return false;
 			}
 		}
