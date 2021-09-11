@@ -33,10 +33,23 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			...Tsc.sys,
 			watchFile: !watchFile || !this.shouldInstallFsWatchers()? undefined:
 				(path, callback, pollingInterval, options) => watchFile.call(Tsc.sys, path, (fileName, kind) => {
-					let module = this.context.modulePathResolver.getCanonicalModuleName(fileName);
-					this.context.moduleStorage.delete(module);
+					let moduleName = this.context.modulePathResolver.getCanonicalModuleName(fileName);
 					if(kind === Tsc.FileWatcherEventKind.Deleted){
-						this.context.transformerController.onModuleDelete(module);
+						// по-хорошему, удалять содержимое модуля нужно при каждом изменении, а не только при удалении
+						// потому что измениться могло что угодно, и не надо бы хранить возможно устаревшие данные
+						// энивей по модулю должны пройтись before/after трансформеры до того, как начнет работать бандлер
+						// и эти трансформеры положат самую последнюю инфу о модуле обратно
+						// на практике это не так - почему-то трансформеры иногда после изменений не отрабатывают
+						// и модуль оказывается не включен в бандл
+						// поэтому при остальных изменениях мы просто выкидываем js-код модуля, но не все остальное
+						this.context.moduleStorage.delete(moduleName);
+						this.context.transformerController.onModuleDelete(moduleName);
+					} else {
+						if(this.context.moduleStorage.has(moduleName)){
+							let module = this.context.moduleStorage.get(moduleName);
+							module.jsCode = null;
+							this.context.moduleStorage.set(moduleName, module);
+						}
 					}
 					if(this._watch){
 						callback(fileName, kind);
