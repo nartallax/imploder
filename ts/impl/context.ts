@@ -62,13 +62,11 @@ export class ImploderContextImpl implements Imploder.Context {
 		return this._httpApi;
 	}
 
-	stopEverything(): void {
-		if(this._compiler){
-			this._compiler.stop();
-		}
-		if(this._httpApi){
-			this._httpApi.stop();
-		}
+	async stopEverything(): Promise<void> {
+		await Promise.all([
+			Promise.resolve(!this._compiler? null: this._compiler.stop()),
+			Promise.resolve(!this._httpApi? null: this._httpApi.stop())
+		]);	
 	}
 
 }

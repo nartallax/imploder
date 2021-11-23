@@ -35,7 +35,7 @@ export namespace Imploder {
 		readonly httpApi: HttpApi | null;
 		readonly logger: Logger;
 
-		stopEverything(): void;
+		stopEverything(): Promise<void>;
 	}
 
 	/** Обертка над компилятором tsc */
