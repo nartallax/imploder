@@ -10,6 +10,12 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 	private _watch: Tsc.Watch<Tsc.BuilderProgram> | null = null;
 	private _builderProgram: Tsc.BuilderProgram | null = null;
+	// список всех выданных filewatcher-ов
+	// зачем? чтобы иметь возможность их завершать. почему-то сами они завершаются не всегда
+	// тут возможно будет проблема, что точечное удаление из этого списка не предусмотрено
+	// т.е. он будет очищаться только при перезапуске компилятора
+	// проблема ли это в реальности? непонятно
+	private knownFileWatchers: Tsc.FileWatcher[] = [];
 	get program(): Tsc.Program {
 		if(this._watch){
 			return this._watch.getProgram().getProgram();
@@ -26,13 +32,13 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 
 	// создать экземпляр tsc.System для работы в вотчмоде
 	private createSystemForWatch(): Tsc.System {
-		const watchFile = Tsc.sys.watchFile;
-		const watchDir = Tsc.sys.watchDirectory;
+		const watchFile = !this.shouldInstallFsWatchers()? undefined: Tsc.sys.watchFile;
+		const watchDir = !this.shouldInstallFsWatchers()? undefined: Tsc.sys.watchDirectory;
 
 		return {
 			...Tsc.sys,
-			watchFile: !watchFile || !this.shouldInstallFsWatchers()? undefined:
-				(path, callback, pollingInterval, options) => watchFile.call(Tsc.sys, path, (fileName, kind) => {
+			watchFile: !watchFile? undefined: (path, callback, pollingInterval, options) => {
+				let watcher = watchFile.call(Tsc.sys, path, (fileName, kind) => {
 					let moduleName = this.context.modulePathResolver.getCanonicalModuleName(fileName);
 					if(kind === Tsc.FileWatcherEventKind.Deleted){
 						// по-хорошему, удалять содержимое модуля нужно при каждом изменении, а не только при удалении
@@ -55,16 +61,28 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 						callback(fileName, kind);
 						this.notifyFsObjectChange(fileName);
 					}
-				}, pollingInterval, options),
-			watchDirectory: !watchDir || !this.shouldInstallFsWatchers()? undefined: 
-				(path, callback, recursive, options) => watchDir.call(Tsc.sys, path, (fileName: string) => {
+				}, pollingInterval, options);
+				if(watcher){
+					// иногда watchFile/watchDirectory выдают undefined, непонятно почему
+					// поэтому проверяем
+					this.knownFileWatchers.push(watcher);
+				}
+				return watcher;
+			},
+			watchDirectory: !watchDir? undefined: (path, callback, recursive, options) => {
+				let watcher = watchDir.call(Tsc.sys, path, (fileName: string) => {
 					if(this._watch){
 						callback(fileName);
 						// не берем здесь лок, т.к. за изменением только директории не всегда следует компиляция
 						// если мы возьмем здесь лок из-за изменений файлов, то потом разлочимся неизвестно когда
 						//this.notifyFsObjectChange(fileName);
 					}
-				}, recursive, options)
+				}, recursive, options);
+				if(watcher){
+					this.knownFileWatchers.push(watcher);
+				}
+				return watcher;
+			}
 		}
 	}
 
@@ -216,12 +234,23 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		this._watch = watchProgram;
 	}
 
-	stop(): void {
-		if(!this._watch){
-			return;
+	private stopWatchingFiles(): void {
+		for(let i = 0; i < this.knownFileWatchers.length; i++){
+			try {
+				this.knownFileWatchers[i].close();
+			} catch(e){
+				// тут могут быть ошибки, если вотчер уже был закрыт
+			}
 		}
-		this._watch.close();
-		this._watch = null;
+		this.knownFileWatchers = [];
+	}
+
+	stop(): void {
+		if(this._watch){
+			this._watch.close();
+			this._watch = null;
+		}
+		this.stopWatchingFiles();
 	}
 
 	waitBuildEnd(): Promise<void>{

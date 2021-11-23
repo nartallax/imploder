@@ -8,7 +8,6 @@ import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler";
 import {TransformerControllerImpl} from "impl/transformer/transformer_controller";
 import {BundlerImpl} from "impl/bundler";
 import {ModulePathResolverImpl} from "impl/module_path_resolver";
-import {HttpApi} from "impl/http_api";
 import {ModuleStorageImpl} from "impl/module_storage";
 import {Imploder} from "imploder";
 export {updatePartialConfigWithTsconfig} from "impl/config";
@@ -77,8 +76,8 @@ export async function runFromConfig(config: Imploder.Config): Promise<Imploder.C
 		if(!context.config.lazyStart){
 			await context.compiler.run();
 		}
-		if(typeof(config.httpPort) === "number"){
-			await new HttpApi(context).start();
+		if(context.httpApi){
+			await context.httpApi.start();
 		}
 		context.logger.info("Up and running.");
 	}

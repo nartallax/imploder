@@ -1,4 +1,5 @@
 import {updateCliArgsWithTsconfig} from "impl/config";
+import {HttpApi} from "impl/http_api";
 import {Imploder} from "imploder";
 
 export class ImploderContextImpl implements Imploder.Context {
@@ -51,6 +52,23 @@ export class ImploderContextImpl implements Imploder.Context {
 	private _moduleStorage?: Imploder.ModuleStorage;
 	get moduleStorage(): Imploder.ModuleStorage {
 		return this._moduleStorage ||= this.createOrThrow(ImploderContextImpl.createModuleStorage);
+	}
+
+	private _httpApi?: Imploder.HttpApi | null;
+	get httpApi(): Imploder.HttpApi | null{
+		if(this._httpApi === undefined){
+			this._httpApi = typeof(this.config.httpPort) === "number"? new HttpApi(this): null;
+		}
+		return this._httpApi;
+	}
+
+	stopEverything(): void {
+		if(this._compiler){
+			this._compiler.stop();
+		}
+		if(this._httpApi){
+			this._httpApi.stop();
+		}
 	}
 
 }

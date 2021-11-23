@@ -3,7 +3,7 @@ import * as http from "http";
 import * as URL from "url";
 import {typescriptDiagnosticEntryToString} from "utils/tsc_diagnostics";
 
-export class HttpApi {
+export class HttpApi implements Imploder.HttpApi {
 	private readonly server: http.Server; 
 
 	constructor(private readonly context: Imploder.Context){
@@ -80,7 +80,6 @@ export class HttpApi {
 		return new Promise((ok, bad) => {
 			this.server.close(err => err? bad(err): ok());
 		});
-
 	}
 
 }

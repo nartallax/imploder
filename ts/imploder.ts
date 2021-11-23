@@ -32,7 +32,10 @@ export namespace Imploder {
 		readonly moduleStorage: ModuleStorage;
 		readonly modulePathResolver: ModulePathResolver;
 		readonly transformerController: TransformerController;
+		readonly httpApi: HttpApi | null;
 		readonly logger: Logger;
+
+		stopEverything(): void;
 	}
 
 	/** Обертка над компилятором tsc */
@@ -267,6 +270,12 @@ export namespace Imploder {
 	export interface ExternalInstance {
 		assembleBundleErrorsOnly(): Promise<void>
 		assembleBundle(): Promise<string>
+	}
+
+	/** Вебсервер тула, принимающий команды */
+	export interface HttpApi {
+		start(): Promise<void>;
+		stop(): Promise<void>;
 	}
 
 }
