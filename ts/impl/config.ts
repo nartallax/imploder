@@ -132,6 +132,12 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 		}
 	}
 
+	// зачем здесь модифицировать еще и исходный json?
+	// я не помню. возможно, это когда-то помогало мне отлаживать.
+	// в целом его как-то использовать не надо никогда
+	// например, потому, что в нем могут быть extend-ы (а они не резолвятся сами собой)
+	// т.е. config.raw всегда будет содержать ровно то, что содержит tsconfig.json
+	// хотя фактически в конфиге есть больше опций
 	let rawOptions: Record<string, unknown>;
 	if(config.raw){
 		rawOptions = config.raw.compilerOptions;
