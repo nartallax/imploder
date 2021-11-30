@@ -1,0 +1,1 @@
+[["/main","n=>{n.main=function main(){console.log(function double(n){return n+n}('Figaro'))}}"]]

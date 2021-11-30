@@ -104,14 +104,15 @@ function getTsconfigRaw(tsconfigPath: string): [tsc.ParsedCommandLine, Imploder.
 		LoggerImpl.writeDefaultAndExit(`Failed to read tsconfig path "${tsconfigPath}"`);
 	}
 	let fileContentParsed = tsc.parseJsonText(tsconfigPath, fileContentStr)
-	let rawJson = JSON.parse(fileContentStr);
+
 	let projectRoot = path.dirname(tsconfigPath);
 	let result = tsc.parseJsonSourceFileConfigFileContent(fileContentParsed, parseConfigHost, projectRoot);
 	let haveErrors = processTypescriptDiagnostics(result.errors, undefined, projectRoot);
 	if(haveErrors){
 		throw new Error("Tsconfig has errors.");
 	}
-	return [result, rawJson.imploderConfig];
+
+	return [result, result.raw.imploderConfig];
 }
 
 function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, profile: Imploder.Profile): void{
