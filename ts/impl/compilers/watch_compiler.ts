@@ -26,6 +26,10 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		}
 		throw new Error("Compiler not started yet.");
 	}
+	
+	get isStarted(): boolean {
+		return !!this._watch || !!this._builderProgram
+	}
 
 	protected shouldInstallFsWatchers(): boolean {
 		return true;

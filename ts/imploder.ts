@@ -40,6 +40,11 @@ export namespace Imploder {
 
 	/** Обертка над компилятором tsc */
 	export interface Compiler {
+		/** Запущен ли компилятор на самом деле?
+		 * В некоторых случаях (см. lazyStart) существование инстанса Compiler не гарантирует старта tsc
+		 * И это может приводить к ошибкамз
+		 * Например, если попытаться собрать бандл, не проверив, отработал ли компилятор хоть раз */
+		readonly isStarted: boolean;
 		readonly program: Tsc.Program;
 		readonly compilerHost: Tsc.CompilerHost;
 		readonly lastBuildWasSuccessful: boolean;
