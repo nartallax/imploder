@@ -55,7 +55,16 @@ export class ModuleOrderer {
 
 		let visit = (name: string) => {
 			if(nameStack.has(name)){
+				// мы уже были в этом модуле и он - часть цикла. записываем это и не обрабатываем его чилдов
 				this.unwindNameStack(nameStack, name).forEach(x => circularDependentRelatedModules.add(x));
+				return;
+			}
+			if(result.has(name) && !circularDependentRelatedModules.has(name)){
+				// мы уже были в этом модуле, второй раз можно не заходить
+				// вообще говоря, ничего совсем страшного не случится, если мы таки зайдем
+				// это просто в каких-то случаях может привести к сильной деградации производительности
+				// но зайти обязательно надо, если модуль - часть circularDependentRelatedModules
+				// потому что без этого нельзя сдетектить некоторые сложные циклы, у которых есть общие модули
 				return;
 			}
 			if(!this.storage.has(name)){
