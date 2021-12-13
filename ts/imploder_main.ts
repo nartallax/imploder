@@ -74,14 +74,14 @@ export async function runFromConfig(config: Imploder.Config): Promise<Imploder.C
 			context.logger.error("Done; bundle was not produced as build was not successful.");
 		}
 	} else {
-		context.logger.info("Starting initial build.");
 		if(!context.config.lazyStart){
+			context.logger.info("Starting initial build.");
 			await context.compiler.run();
 		}
 		if(context.httpApi){
 			await context.httpApi.start();
 		}
-		context.logger.info("Up and running.");
+		context.logger.info("Imploder started.");
 		context.stdoutNotificator.started();
 	}
 
