@@ -13,6 +13,7 @@ export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 			tsconfigPath: CLI.str({ keys: "--tsconfig", definition: "Path to tsconfig.json.", default: ""}),
 			profile: CLI.str({ keys: "--profile", definition: "Name of tool profile to use. Profiles are defined in tsconfig.json.", default: ""}),
 			verbose: CLI.bool({ keys: ["-v", "--verbose"], definition: "Adds some more bundler-debug-related trash in stderr." }),
+			plainLogs: CLI.bool({ keys: ["--plain-logs"], definition: "Makes the tool output only log text, without other stuff (like timestamps)." }),
 			help: CLI.help({ keys: ["-h", "--h", "-help", "--help"], definition: "Shows list of commands." }),
 			test: CLI.bool({ keys: ["--test"], definition: "Run autotests." }),
 			testSingle: CLI.str({ keys: ["--test-single"], definition: "Run one single autotest.", default: "" })

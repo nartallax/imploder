@@ -16,6 +16,7 @@ export namespace Imploder {
 
 	/** Распарсить конфиг, не запуская тул */
 	export const parseConfig: (tsconfigPath: string, overrides?: Partial<Config>) => Promise<Config> = async (path, overrides) => main.updatePartialConfigWithTsconfig(path, overrides);
+	export const parseConfigSync: (tsconfigPath: string, overrides?: Partial<Config>) => Config = (path, overrides) => main.updatePartialConfigWithTsconfig(path, overrides);
 
 	/** Создать интерфейс к другому инстансу тула на этой же машине (localhost) */
 	export const externalInstance: (config: Config) => ExternalInstance = config => new ExternalInstanceImpl(config)
@@ -170,6 +171,7 @@ export namespace Imploder {
 		test?: boolean;
 		testSingle?: string;
 		profile?: string;
+		plainLogs?: boolean;
 	}
 
 	/** Класс, умеющий работать с именами модулей и путями к файлам, относящимся к этим модулям */

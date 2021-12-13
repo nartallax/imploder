@@ -13,7 +13,13 @@ export class LoggerImpl implements Imploder.Logger {
 	private readonly writeLogStr: (str: string) => void;
 
 	constructor(args: Imploder.CLIArgs & {writeLogLine?: (str: string) => void}){
-		this.writeLogStr = args.writeLogLine || (str => process.stderr.write(timeStr() + "\t" + str + "\n"));
+		this.writeLogStr = args.writeLogLine || (str => {
+			let line = str + "\n";
+			if(!args.plainLogs){
+				line = timeStr() + "\t" + line
+			}
+			process.stderr.write(line)
+		});
 		this.verbosityLevel = args.verbose? 1: 0;
 	}
 
