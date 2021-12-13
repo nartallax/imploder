@@ -275,8 +275,9 @@ export namespace Imploder {
 
 	/** Инстанс тула, запущенный на этой же машине, доступный через хттп */
 	export interface ExternalInstance {
-		assembleBundleErrorsOnly(): Promise<void>
 		assembleBundle(): Promise<string>
+		assembleBundleErrorsOnly(): Promise<void>
+		assembleBundleSilent(): Promise<void>;
 	}
 
 	/** Вебсервер тула, принимающий команды */

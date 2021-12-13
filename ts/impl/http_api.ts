@@ -49,7 +49,11 @@ export class HttpApi implements Imploder.HttpApi {
 
 	private async runFunction(name: string): Promise<[number, string]>{
 		switch(name.toLowerCase().replace(/(^\/|\/$)/g, "")){
-			// добавляя методы сюда, не забывай, что сначала их нужно добавить в ExternalInterface
+			// добавляя методы сюда, не забывай, что сначала их нужно добавить в ExternalInstance
+			case "assemble_bundle_silent":{
+				let res = await this.getBundle();
+				return [res.httpCode, res.err? "There was errors": "All ok"];
+			}
 			case "assemble_bundle_errors_only":{
 				let res = await this.getBundle();
 				return [res.httpCode, res.err || ""];

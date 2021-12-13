@@ -42,6 +42,10 @@ export class ExternalInstanceImpl implements Imploder.ExternalInstance {
 		await this.callHttp("assemble_bundle_errors_only");
 	}
 
+	async assembleBundleSilent(): Promise<void>{
+		await this.callHttp("assemble_bundle_silent");
+	}
+
 	assembleBundle(): Promise<string>{
 		return this.callHttp("assemble_bundle");
 	}
