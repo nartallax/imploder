@@ -8,6 +8,7 @@ export class ImploderContextImpl implements Imploder.Context {
 	static createPathResolver?: (context: Imploder.Context) => Imploder.ModulePathResolver;
 	static createTransformerController?: (context: Imploder.Context) => Imploder.TransformerController;
 	static createLogger?: (context: Imploder.Context) => Imploder.Logger;
+	static createStdoutNotificator?: (context: Imploder.Context) => Imploder.StdoutNotificator;
 	static createModuleStorage?: (context: Imploder.Context) => Imploder.ModuleStorage;
 
 	private createOrThrow<T>(fn?: (context: Imploder.Context) => T): T {
@@ -60,6 +61,11 @@ export class ImploderContextImpl implements Imploder.Context {
 			this._httpApi = typeof(this.config.httpPort) === "number"? new HttpApi(this): null;
 		}
 		return this._httpApi;
+	}
+
+	private _stdoutNotificator?: Imploder.StdoutNotificator;
+	get stdoutNotificator(): Imploder.StdoutNotificator {
+		return this._stdoutNotificator ||= this.createOrThrow(ImploderContextImpl.createStdoutNotificator);
 	}
 
 	async stopEverything(): Promise<void> {

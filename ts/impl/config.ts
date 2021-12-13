@@ -16,7 +16,8 @@ export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 			plainLogs: CLI.bool({ keys: ["--plain-logs"], definition: "Makes the tool output only log text, without other stuff (like timestamps)." }),
 			help: CLI.help({ keys: ["-h", "--h", "-help", "--help"], definition: "Shows list of commands." }),
 			test: CLI.bool({ keys: ["--test"], definition: "Run autotests." }),
-			testSingle: CLI.str({ keys: ["--test-single"], definition: "Run one single autotest.", default: "" })
+			testSingle: CLI.str({ keys: ["--test-single"], definition: "Run one single autotest.", default: "" }),
+			stdoutNotifications: CLI.bool({ keys: ["--stdout-notifications"], definition: "Enables the tool to output some technical notifications into stdout. Useful when tool is started by another program which wants to communicate." }),
 		}
 	}).parseArgs(args);
 

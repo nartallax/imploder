@@ -35,6 +35,7 @@ export namespace Imploder {
 		readonly transformerController: TransformerController;
 		readonly httpApi: HttpApi | null;
 		readonly logger: Logger;
+		readonly stdoutNotificator: StdoutNotificator;
 
 		stopEverything(): Promise<void>;
 	}
@@ -172,6 +173,12 @@ export namespace Imploder {
 		testSingle?: string;
 		profile?: string;
 		plainLogs?: boolean;
+		stdoutNotifications?: boolean;
+	}
+
+	/** JSON-объект, который может быть выдан в stdout */
+	export interface StdoutNotification {
+		type: "started"
 	}
 
 	/** Класс, умеющий работать с именами модулей и путями к файлам, относящимся к этим модулям */
@@ -271,6 +278,11 @@ export namespace Imploder {
 		warn(msg: string): void;
 		info(msg: string): void;
 		debug(msg: string): void;
+	}
+
+	/** Объект, выдающий оповещения в stdout */
+	export interface StdoutNotificator {
+		started(): void;
 	}
 
 	/** Инстанс тула, запущенный на этой же машине, доступный через хттп */

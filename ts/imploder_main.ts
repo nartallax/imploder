@@ -10,6 +10,7 @@ import {BundlerImpl} from "impl/bundler";
 import {ModulePathResolverImpl} from "impl/module_path_resolver";
 import {ModuleStorageImpl} from "impl/module_storage";
 import {Imploder} from "imploder";
+import {StdoutNotificatorImpl} from "impl/stdout_notificator";
 export {updatePartialConfigWithTsconfig} from "impl/config";
 
 
@@ -21,6 +22,7 @@ ImploderContextImpl.createTransformerController = context => new TransformerCont
 ImploderContextImpl.createBundler = context => new BundlerImpl(context);
 ImploderContextImpl.createPathResolver = context => new ModulePathResolverImpl(context);
 ImploderContextImpl.createLogger = context => new LoggerImpl(context.config);
+ImploderContextImpl.createStdoutNotificator = context => new StdoutNotificatorImpl(context);
 ImploderContextImpl.createModuleStorage = context => new ModuleStorageImpl(context);
 
 export async function runAsCli(): Promise<void>{
@@ -80,6 +82,7 @@ export async function runFromConfig(config: Imploder.Config): Promise<Imploder.C
 			await context.httpApi.start();
 		}
 		context.logger.info("Up and running.");
+		context.stdoutNotificator.started();
 	}
 
 	return context;
