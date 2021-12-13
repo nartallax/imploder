@@ -86,7 +86,7 @@ export namespace Imploder {
 
 	export interface BundlerWrapperParameters {
 		entryPointArgCode?: string[];
-	}	
+	}
 
 	/** Описание профиля тула в tsconfig.json */
 	export interface Profile {

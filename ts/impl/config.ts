@@ -164,6 +164,8 @@ function validateFixConfig(tsconfigPath: string, config: tsc.ParsedCommandLine, 
 	if(!config.options.outDir){
 		LoggerImpl.writeDefaultAndExit("You must explicitly pass outDir within compilerOptions.");
 	}
+	// тут я мог бы резолвить outDir, но не буду
+	// tsc сам его резолвит при чтении конфига, т.е. он уже абсолютный
 
 	if(!config.options.rootDir){
 		rawOptions.rootDir = config.options.rootDir = path.dirname(tsconfigPath);
