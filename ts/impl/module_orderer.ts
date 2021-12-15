@@ -1,21 +1,21 @@
 import {SeqSet} from "utils/seq_set";
 import {Imploder} from "imploder";
+import {findAllCycledNodesInGraph} from "impl/graph_cycle_finder";
 
 /** упорядочиватель файлов-результатов компиляции. определяет порядок их размещения в бандле */
 export class ModuleOrderer {
 	constructor(private readonly storage: Imploder.ModuleStorage){}
 
 	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>}{
-		let circularDependentRelatedModules = new Set<string>();
 		if(!this.storage.has(entryPointModule)){
 			throw new Error(`Could not order modules: entry point module (${entryPointModule}) is not found.`);
 		}
-		let [modules, absentModules] = this.getSortedModules(entryPointModule, circularDependentRelatedModules);
-		//let nonModules = this.getSortedNonModules(modules);
+		let [modules, absentModules] = this.getSortedModules(entryPointModule);
 		modules.forEach(name => this.detectRecursiveRefExport(name));
-		this.updateCircularRelatedModules(circularDependentRelatedModules);
+		let circularDependentModules = new Set(this.detectCircularDependentModules(modules))
+		this.updateCircularRelatedModules(circularDependentModules);
 		
-		return { modules, absentModules, circularDependentRelatedModules }
+		return { modules, absentModules, circularDependentRelatedModules: circularDependentModules }
 	}
 
 	private unwindNameStack(nameStack: SeqSet<string>, name: string): string[]{
@@ -48,34 +48,21 @@ export class ModuleOrderer {
 		visit(entryPoint);
 	}
 
-	private getSortedModules(entryPoint: string, circularDependentRelatedModules: Set<string>): [string[], Set<string>] {
-		let nameStack = new SeqSet<string>(undefined, true);
+	/** Получить сортированные списки используемых и отсутствующих модулей */
+	private getSortedModules(entryPoint: string): [string[], Set<string>] {
 		let absentModules = new Set<string>();
 		let result = new Set<string>();
 
 		let visit = (name: string) => {
-			if(nameStack.has(name)){
-				// мы уже были в этом модуле и он - часть цикла. записываем это и не обрабатываем его чилдов
-				this.unwindNameStack(nameStack, name).forEach(x => circularDependentRelatedModules.add(x));
-				return;
-			}
-			if(result.has(name) && !circularDependentRelatedModules.has(name)){
-				// мы уже были в этом модуле, второй раз можно не заходить
-				// вообще говоря, ничего совсем страшного не случится, если мы таки зайдем
-				// это просто в каких-то случаях может привести к сильной деградации производительности
-				// но зайти обязательно надо, если модуль - часть circularDependentRelatedModules
-				// потому что без этого нельзя сдетектить некоторые сложные циклы, у которых есть общие модули
+			if(result.has(name)){
 				return;
 			}
 			if(!this.storage.has(name)){
 				absentModules.add(name);
 			} else {
-				nameStack.push(name);
 				result.add(name);
 				this.storage.get(name).dependencies.forEach(dep => visit(dep));
-				nameStack.pop();
 			}
-			
 		}
 
 		visit(entryPoint);
@@ -86,7 +73,15 @@ export class ModuleOrderer {
 		]
 	}
 
-	// тут (и в методе выше) мы определяем, у каких модулей должна быть полная информация о зависимостях
+	/** Найти среди переданных все модули, которые участвуют в циклических ссылках */
+	private detectCircularDependentModules(allModules: string[]): string[] {
+		let srcGraph: [string, string[]][] = allModules
+			.map(id => [id, this.storage.get(id).dependencies]);
+
+		return findAllCycledNodesInGraph(srcGraph);
+	}
+
+	// тут мы определяем, у каких модулей должна быть полная информация о зависимостях
 	// полная информация о зависимостях = список экспортируемых имен + список модулей, имена из которых экспортируются as is
 	// такие модули - это те, у которых есть циклическая зависимость (т.к. эта полная информация поможет нам её разрулить)
 	// а также те модули, на которые ссылаются эти зацикленные модули с помощью, например, export * (такие попадают в exportRef-ы)
@@ -97,8 +92,8 @@ export class ModuleOrderer {
 				// модуля может не быть, если это внешний модуль
 				this.storage.get(module).exportModuleReferences.forEach(add);
 			}
-			
 		}
+
 		let add = (module: string) => {
 			s.add(module);
 			addRefs(module);
