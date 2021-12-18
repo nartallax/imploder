@@ -1,11 +1,11 @@
-import {SingleBuildTestProject} from "./single_build_test_project";
-import {ArbitraryTests} from "./arbitrary_tests";
-import {Imploder} from "imploder";
-import {LoggerImpl} from "impl/logger";
+import {SingleBuildTestProject} from "./single_build_test_project"
+import {ArbitraryTests} from "./arbitrary_tests"
+import {Imploder} from "imploder"
+import {LoggerImpl} from "impl/logger"
 
 interface Tester {
-	couldRunTest(name: string): boolean;
-	runTest(name: string, cliArgsBase: Imploder.CLIArgs): boolean | Promise<boolean>;
+	couldRunTest(name: string): boolean
+	runTest(name: string, cliArgsBase: Imploder.CLIArgs): boolean | Promise<boolean>
 }
 
 const allKnownTestNames: ReadonlyArray<string> = [
@@ -19,51 +19,52 @@ const allKnownTesters: ReadonlyArray<Tester> = [
 ]
 
 export async function runAllTests(cliArgsBase: Imploder.CLIArgs): Promise<void> {
-	LoggerImpl.writeDefault("Running all tests.");
+	LoggerImpl.writeDefault("Running all tests.")
 
-	let failCount = 0;
+	let failCount = 0
 	for(let testName of allKnownTestNames){
-		let result = await runTest(testName, cliArgsBase);
-		if(!result)
-			failCount++;
+		let result = await runTest(testName, cliArgsBase)
+		if(!result){
+			failCount++
+		}
 	}
 
 	if(failCount < 1){
-		LoggerImpl.writeDefault("Done. Testing successful.");
+		LoggerImpl.writeDefault("Done. Testing successful.")
 		await new Promise(ok => setTimeout(ok, 1000))
-		process.exit(0);
+		process.exit(0)
 	} else {
-		LoggerImpl.writeDefault("Done. Testing failed (" + failCount + " / " + allKnownTestNames.length + " tests failed)");
+		LoggerImpl.writeDefault("Done. Testing failed (" + failCount + " / " + allKnownTestNames.length + " tests failed)")
 		await new Promise(ok => setTimeout(ok, 1000))
-		process.exit(1);
+		process.exit(1)
 	}
-	
+
 }
 
 export async function runSingleTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<void> {
-	let ok = await runTest(name, cliArgsBase);
+	let ok = await runTest(name, cliArgsBase)
 	if(!ok){
 		LoggerImpl.writeDefault("Done. Test failed.")
 		await new Promise(ok => setTimeout(ok, 1000))
-		process.exit(1);
+		process.exit(1)
 	} else {
 		LoggerImpl.writeDefault("Done. Testing successful.")
 		await new Promise(ok => setTimeout(ok, 1000))
-		process.exit(0);
+		process.exit(0)
 	}
 }
 
 async function runTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<boolean> {
 	for(let tester of allKnownTesters){
 		if(tester.couldRunTest(name)){
-			LoggerImpl.writeDefault("Running test: " + name);
+			LoggerImpl.writeDefault("Running test: " + name)
 			try {
-				return await Promise.resolve(tester.runTest(name, cliArgsBase));
+				return await Promise.resolve(tester.runTest(name, cliArgsBase))
 			} catch(e){
-				LoggerImpl.writeDefault(`Test "${name}" unexpectedly throws error: ${(e as Error).stack}`);
-				return false;
+				LoggerImpl.writeDefault(`Test "${name}" unexpectedly throws error: ${(e as Error).stack}`)
+				return false
 			}
 		}
 	}
-	LoggerImpl.writeDefaultAndExit("Test with name \"" + name + "\" is not known to any available tester.");
+	LoggerImpl.writeDefaultAndExit("Test with name \"" + name + "\" is not known to any available tester.")
 }

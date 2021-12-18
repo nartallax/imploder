@@ -1,10 +1,10 @@
-import {Imploder} from "imploder";
-import {ImploderWatchCompiler} from "impl/compilers/watch_compiler";
+import {Imploder} from "imploder"
+import {ImploderWatchCompiler} from "impl/compilers/watch_compiler"
 
 
 export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements Imploder.Compiler {
 	protected shouldInstallFsWatchers(): boolean {
-		return false;
+		return false
 	}
 
 	async run(): Promise<void> {
@@ -16,9 +16,9 @@ export class ImploderSingleRunCompiler extends ImploderWatchCompiler implements 
 			// т.о. в первый цикл трансформер генерирует файл и дергает за notifyFsObjectChange
 			// мы это видим по тому, что buildLock не снят
 			// и запускаем сборку по новой
-			await super.run();
-			this.stop();
-		} while(this.buildLock.isLocked());
+			await super.run()
+			this.stop()
+		} while(this.buildLock.isLocked())
 	}
 
 }

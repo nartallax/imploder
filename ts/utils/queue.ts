@@ -1,36 +1,36 @@
-export class Queue<T>{
-	private head: QueueItem<T> | null = null;
-	private tail: QueueItem<T> | null = null;
+export class Queue<T> {
+	private head: QueueItem<T> | null = null
+	private tail: QueueItem<T> | null = null
 
 	isEmpty(): boolean {
-		return this.head === null;
+		return this.head === null
 	}
 
 	enqueue(value: T): void {
 		if(!this.tail){
-			this.head = this.tail = { value, next: null }
+			this.head = this.tail = {value, next: null}
 		} else {
-			let newTail: QueueItem<T> = { value, next: null };
-			this.tail.next = newTail;
-			this.tail = newTail;
+			let newTail: QueueItem<T> = {value, next: null}
+			this.tail.next = newTail
+			this.tail = newTail
 		}
 	}
 
 	dequeue(): T {
 		if(!this.head){
-			throw new Error("Invoked dequeue() on empty queue.");
+			throw new Error("Invoked dequeue() on empty queue.")
 		}
 
-		let oldHead = this.head;
+		let oldHead = this.head
 		this.head = oldHead.next
 		if(oldHead.next === null){
-			this.tail = null;
+			this.tail = null
 		}
-		return oldHead.value;
+		return oldHead.value
 	}
 }
 
 interface QueueItem<T>{
-	value: T;
-	next: QueueItem<T> | null;
+	value: T
+	next: QueueItem<T> | null
 }

@@ -1,11 +1,11 @@
-import * as tsc from "typescript";
-import {Imploder} from "imploder";
-import {AbstractTransformer} from "./abstract_transformer";
+import * as tsc from "typescript"
+import {Imploder} from "imploder"
+import {AbstractTransformer} from "./abstract_transformer"
 
 export class BeforeJsBundlerTransformer extends AbstractTransformer {
 
 	transformSourceFile(fileNode: tsc.SourceFile): tsc.SourceFile {
-		let moduleName = this.moduleNameByNode(fileNode);
+		let moduleName = this.moduleNameByNode(fileNode)
 		this.context.logger.debug("Visiting " + this.context.modulePathResolver.getCanonicalModuleName(fileNode.fileName) + " as module " + moduleName)
 
 		let meta: Imploder.ModuleData = {
@@ -19,17 +19,17 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		}
 
 		if(fileNode.referencedFiles.length > 0){
-			this.context.logger.warn("File " + moduleName + " references some other files. They will not be included in bundle.");
+			this.context.logger.warn("File " + moduleName + " references some other files. They will not be included in bundle.")
 		}
-		
+
 		if(fileNode.moduleName){
-			meta.altName = fileNode.moduleName;
+			meta.altName = fileNode.moduleName
 		}
 
-		this.exploreSpecialExports(meta, fileNode);
-		this.context.moduleStorage.set(moduleName, meta);
+		this.exploreSpecialExports(meta, fileNode)
+		this.context.moduleStorage.set(moduleName, meta)
 
-		return fileNode;
+		return fileNode
 	}
 
 	/** проанализировать экспорты в файле, положить результаты анализа в moduleMeta
@@ -55,18 +55,18 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 		*/
 
 		let getNodeChildren = (n: tsc.Node): tsc.Node[] => {
-			let res = [] as tsc.Node[];
-			n.forEachChild(x => { 
-				res.push(x);
+			let res = [] as tsc.Node[]
+			n.forEachChild(x => {
+				res.push(x)
 				// не возвращать ничего из этой функции - важно
 				// иначе итерация forEachChild почему-то прекращается
-			});
-			return res;
+			})
+			return res
 		}
 
-		let children = getNodeChildren(fileNode);
+		let children = getNodeChildren(fileNode)
 		if(children.length === 2 && children[0].kind === tsc.SyntaxKind.SyntaxList && children[1].kind === tsc.SyntaxKind.EndOfFileToken){
-			children = getNodeChildren(children[0]);
+			children = getNodeChildren(children[0])
 		}
 
 
@@ -75,42 +75,42 @@ export class BeforeJsBundlerTransformer extends AbstractTransformer {
 				if(!node.exportClause){
 					// такое может быть только в случае export * from "..."
 					if(!node.moduleSpecifier || !tsc.isStringLiteral(node.moduleSpecifier)){
-						this.context.logger.errorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).");
+						this.context.logger.errorAndExit("Unexpected: \"export * from\" construction has no module specifier (or is not string literal).")
 					}
-					moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text);
+					moduleMeta.exportModuleReferences.push(node.moduleSpecifier.text)
 				} else {
-					let exportClause = node.exportClause;
+					let exportClause = node.exportClause
 					if(tsc.isNamedExports(exportClause)){
 						for(let exportElement of exportClause.elements){
 							// exportElement.propertyName - это имя изначально экспортируемого значения, до переименования
 							// в случае export { privateLibConst as someLibConst }; - это privateLibConst
-							moduleMeta.exports.push(exportElement.name.text);
+							moduleMeta.exports.push(exportElement.name.text)
 						}
 					} else {
 						// на самом деле, тут можно было бы обрабатывать, но я пока не уверен, что именно это такое
 						// поэтому пока не буду
-						throw new Error("Export declaration is not consists of named elements.");
+						throw new Error("Export declaration is not consists of named elements.")
 					}
 				}
-		
+
 			} else if(tsc.isExportAssignment(node)){
 				// тут есть два варианта - либо это "export = ", либо "export default"
 				// export default просто создает в экспорте значение с именем default
 				// export = в итоге станет return-statement в определении модуля
 				if(!node.isExportEquals){
-					moduleMeta.exports.push("default");
+					moduleMeta.exports.push("default")
 				} else {
 					// в такой ситуации мы ничего не можем сказать об экспортируемом множестве имен
 					// ибо они могут быть переменными, их вообще может не быть (если таким образом экспортировано просто одно число, например), и т.д.
-					moduleMeta.hasOmniousExport = true;
+					moduleMeta.hasOmniousExport = true
 				}
-		
+
 			}
 		}
-	
-		moduleMeta.exportModuleReferences = [... new Set(
+
+		moduleMeta.exportModuleReferences = [...new Set(
 			moduleMeta.exportModuleReferences.map(x => this.context.modulePathResolver.resolveModuleDesignator(x, fileNode.fileName))
-		)];
+		)]
 	}
 
 }

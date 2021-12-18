@@ -1,74 +1,74 @@
-import {SeqSet} from "utils/seq_set";
-import {Imploder} from "imploder";
-import {findAllCycledNodesInGraph} from "impl/graph_cycle_finder";
+import {SeqSet} from "utils/seq_set"
+import {Imploder} from "imploder"
+import {findAllCycledNodesInGraph} from "impl/graph_cycle_finder"
 
 /** упорядочиватель файлов-результатов компиляции. определяет порядок их размещения в бандле */
 export class ModuleOrderer {
-	constructor(private readonly storage: Imploder.ModuleStorage){}
+	constructor(private readonly storage: Imploder.ModuleStorage) {}
 
-	getModuleOrder(entryPointModule: string): { modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>}{
+	getModuleOrder(entryPointModule: string): {modules: string[], absentModules: Set<string>, circularDependentRelatedModules: Set<string>} {
 		if(!this.storage.has(entryPointModule)){
-			throw new Error(`Could not order modules: entry point module (${entryPointModule}) is not found.`);
+			throw new Error(`Could not order modules: entry point module (${entryPointModule}) is not found.`)
 		}
-		let [modules, absentModules] = this.getSortedModules(entryPointModule);
-		modules.forEach(name => this.detectRecursiveRefExport(name));
+		let [modules, absentModules] = this.getSortedModules(entryPointModule)
+		modules.forEach(name => this.detectRecursiveRefExport(name))
 		let circularDependentModules = new Set(this.detectCircularDependentModules(modules))
-		this.updateCircularRelatedModules(circularDependentModules);
-		
-		return { modules, absentModules, circularDependentRelatedModules: circularDependentModules }
+		this.updateCircularRelatedModules(circularDependentModules)
+
+		return {modules, absentModules, circularDependentRelatedModules: circularDependentModules}
 	}
 
-	private unwindNameStack(nameStack: SeqSet<string>, name: string): string[]{
-		let referenceCircle = [name];
-		let vals = nameStack.seq;
+	private unwindNameStack(nameStack: SeqSet<string>, name: string): string[] {
+		let referenceCircle = [name]
+		let vals = nameStack.seq
 		for(let i = vals.length - 1; i >= 0; i--){
-			let v = vals[i];
-			referenceCircle.push(v);
+			let v = vals[i]
+			referenceCircle.push(v)
 			if(v === name){
-				break;
+				break
 			}
 		}
-		return referenceCircle;
+		return referenceCircle
 	}
 
-	private detectRecursiveRefExport(entryPoint: string){
-		let nameStack = new SeqSet<string>(undefined, true);
+	private detectRecursiveRefExport(entryPoint: string) {
+		let nameStack = new SeqSet<string>(undefined, true)
 		let visit = (name: string) => {
 			if(nameStack.has(name)){
-				throw new Error("Recursive \"export *\" detected: " + this.unwindNameStack(nameStack, name).join(" <- "));
+				throw new Error("Recursive \"export *\" detected: " + this.unwindNameStack(nameStack, name).join(" <- "))
 			}
 
-			nameStack.push(name);
+			nameStack.push(name)
 			if(this.storage.has(name)){
-				this.storage.get(name).exportModuleReferences.forEach(dep => visit(dep));
+				this.storage.get(name).exportModuleReferences.forEach(dep => visit(dep))
 			}
-			nameStack.pop();
+			nameStack.pop()
 		}
 
-		visit(entryPoint);
+		visit(entryPoint)
 	}
 
 	/** Получить сортированные списки используемых и отсутствующих модулей */
 	private getSortedModules(entryPoint: string): [string[], Set<string>] {
-		let absentModules = new Set<string>();
-		let result = new Set<string>();
+		let absentModules = new Set<string>()
+		let result = new Set<string>()
 
 		let visit = (name: string) => {
 			if(result.has(name)){
-				return;
+				return
 			}
 			if(!this.storage.has(name)){
-				absentModules.add(name);
+				absentModules.add(name)
 			} else {
-				result.add(name);
-				this.storage.get(name).dependencies.forEach(dep => visit(dep));
+				result.add(name)
+				this.storage.get(name).dependencies.forEach(dep => visit(dep))
 			}
 		}
 
-		visit(entryPoint);
+		visit(entryPoint)
 
 		return [
-			[...result].sort((a, b) => a < b? -1: a > b? 1: 0),
+			[...result].sort((a, b) => a < b ? -1 : a > b ? 1 : 0),
 			absentModules
 		]
 	}
@@ -76,9 +76,9 @@ export class ModuleOrderer {
 	/** Найти среди переданных все модули, которые участвуют в циклических ссылках */
 	private detectCircularDependentModules(allModules: string[]): string[] {
 		let srcGraph: [string, string[]][] = allModules
-			.map(id => [id, this.storage.get(id).dependencies]);
+			.map(id => [id, this.storage.get(id).dependencies])
 
-		return findAllCycledNodesInGraph(srcGraph);
+		return findAllCycledNodesInGraph(srcGraph)
 	}
 
 	// тут мы определяем, у каких модулей должна быть полная информация о зависимостях
@@ -90,17 +90,17 @@ export class ModuleOrderer {
 		let addRefs = (module: string) => {
 			if(this.storage.has(module)){
 				// модуля может не быть, если это внешний модуль
-				this.storage.get(module).exportModuleReferences.forEach(add);
+				this.storage.get(module).exportModuleReferences.forEach(add)
 			}
 		}
 
 		let add = (module: string) => {
-			s.add(module);
-			addRefs(module);
+			s.add(module)
+			addRefs(module)
 		}
 
 		for(let module of s){
-			addRefs(module);
+			addRefs(module)
 		}
 	}
 

@@ -1,186 +1,186 @@
-import * as Path from "path";
-import * as FsSync from "fs";
-import {Imploder} from "imploder";
-import {fileExists, unlinkRecursive} from "utils/fs_utils";
-import {BundlerImpl} from "impl/bundler";
-import {testListStr} from "generated/test_list_str";
-import {testProjectDir, runTestBundle} from "./test_project_utils";
-import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler";
-import {ImploderContextImpl} from "impl/context";
-import {updateCliArgsWithTsconfig} from "impl/config";
-import {LoggerImpl} from "impl/logger";
+import * as Path from "path"
+import * as FsSync from "fs"
+import {Imploder} from "imploder"
+import {fileExists, unlinkRecursive} from "utils/fs_utils"
+import {BundlerImpl} from "impl/bundler"
+import {testListStr} from "generated/test_list_str"
+import {testProjectDir, runTestBundle} from "./test_project_utils"
+import {ImploderSingleRunCompiler} from "impl/compilers/single_run_compiler"
+import {ImploderContextImpl} from "impl/context"
+import {updateCliArgsWithTsconfig} from "impl/config"
+import {LoggerImpl} from "impl/logger"
 
 export interface SingleBuildTestProjectPathOverrides {
-	ethalonBundle?: string;
-	testBundle?: string;
+	ethalonBundle?: string
+	testBundle?: string
 }
 
 export class SingleBuildTestProject {
 
-	private readonly compileErrorText: string | null = this.fileContentOrNull("./compile_error.txt");
-	private readonly runtimeErrorText: string | null = this.fileContentOrNull("./runtime_error.txt");
-	private readonly runtimeErrorRegexp: string | null = this.fileContentOrNull("./runtime_error_regexp.txt");
-	private readonly bundleText: string | null = this.fileContentOrNull(this.pathOverrides?.ethalonBundle ?? "./bundle.js");
-	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt");
-	private readonly codePrefixText: string | null = this.fileContentOrNull("./code_prefix.js");
+	private readonly compileErrorText: string | null = this.fileContentOrNull("./compile_error.txt")
+	private readonly runtimeErrorText: string | null = this.fileContentOrNull("./runtime_error.txt")
+	private readonly runtimeErrorRegexp: string | null = this.fileContentOrNull("./runtime_error_regexp.txt")
+	private readonly bundleText: string | null = this.fileContentOrNull(this.pathOverrides?.ethalonBundle ?? "./bundle.js")
+	private readonly stdoutText: string | null = this.fileContentOrNull("./stdout.txt")
+	private readonly codePrefixText: string | null = this.fileContentOrNull("./code_prefix.js")
 
 	get testBundlePath(): string {
-		return Path.resolve(Path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"));
+		return Path.resolve(Path.join(testProjectDir(this.name), this.pathOverrides?.testBundle ?? "./js/bundle.js"))
 	}
 
-	private _producedBundleText: string | null = null;
+	private _producedBundleText: string | null = null
 	get producedBundleText(): string {
 		if(!this._producedBundleText){
-			this._producedBundleText = this.fileContentOrNull(this.testBundlePath);
+			this._producedBundleText = this.fileContentOrNull(this.testBundlePath)
 			if(this._producedBundleText === null){
-				throw new Error("Expected test project \"" + this.name + "\" to produce bundle code, but it is not.");
+				throw new Error("Expected test project \"" + this.name + "\" to produce bundle code, but it is not.")
 			}
 		}
-		return this._producedBundleText;
+		return this._producedBundleText
 	}
 
-	private _context?: Imploder.Context;
+	private _context?: Imploder.Context
 	private get context(): Imploder.Context {
 		if(!this._context){
-			let config = updateCliArgsWithTsconfig({ 
+			let config = updateCliArgsWithTsconfig({
 				...this.cliArgsBase,
-				tsconfigPath: Path.join(testProjectDir(this.name), "./tsconfig.json") 
-			});
-			config.noBuildDiagnosticMessages = true;
-			this._context = new ImploderContextImpl(config);
+				tsconfigPath: Path.join(testProjectDir(this.name), "./tsconfig.json")
+			})
+			config.noBuildDiagnosticMessages = true
+			this._context = new ImploderContextImpl(config)
 		}
-		return this._context;
+		return this._context
 	}
 
 	private _compiler: ImploderSingleRunCompiler | null = null
 	private get compiler(): ImploderSingleRunCompiler {
 		if(!this._compiler){
-			let comp = this.context.compiler;
+			let comp = this.context.compiler
 			if(!(comp instanceof ImploderSingleRunCompiler)){
-				throw new Error("Unexpected compiler class in test.");
+				throw new Error("Unexpected compiler class in test.")
 			}
-			this._compiler = comp;
+			this._compiler = comp
 		}
-		return this._compiler;
+		return this._compiler
 	}
 
-	private _bundler: BundlerImpl | null = null;
+	private _bundler: BundlerImpl | null = null
 	get bundler(): BundlerImpl {
 		if(!this._bundler){
-			this._bundler = new BundlerImpl(this.context);
+			this._bundler = new BundlerImpl(this.context)
 		}
-		return this._bundler;
+		return this._bundler
 	}
 
 	constructor(
 		readonly name: string,
 		private readonly cliArgsBase: Imploder.CLIArgs,
 		private readonly pathOverrides?: SingleBuildTestProjectPathOverrides
-	){}
+	) {}
 
 	private fileContentOrNull(subpath: string): string | null {
 		let p = Path.resolve(testProjectDir(this.name), subpath)
 		try {
-			FsSync.statSync(p);
+			FsSync.statSync(p)
 		} catch(e){
-			return null;
+			return null
 		}
-		return FsSync.readFileSync(p, "utf8").trim();
+		return FsSync.readFileSync(p, "utf8").trim()
 	}
 
 	private outputError(error: string): false {
-		LoggerImpl.writeDefault("Test " + this.name + " failed: " + error);
-		return false;
+		LoggerImpl.writeDefault("Test " + this.name + " failed: " + error)
+		return false
 	}
 
 	private checkError(err: Error | null, errType: string, errString: string | null, regexpString: string | null): boolean {
 		if(errString || regexpString){
 			if(!err){
-				return this.outputError("expected " + errType + " error to be thrown, but it was not.");
+				return this.outputError("expected " + errType + " error to be thrown, but it was not.")
 			}
-			let trimmedMessage = err.message.trim();
+			let trimmedMessage = err.message.trim()
 			if(errString && trimmedMessage !== errString){
-				return this.outputError("expected " + errType + " error text to be \"" + errString + "\", but it's \"" + trimmedMessage + "\".");
+				return this.outputError("expected " + errType + " error text to be \"" + errString + "\", but it's \"" + trimmedMessage + "\".")
 			}
 			if(regexpString){
-				let regexp = new RegExp(regexpString);
+				let regexp = new RegExp(regexpString)
 				if(!regexp.test(trimmedMessage)){
 					return this.outputError("expected " + errType + " error text to match \"" + regexpString + "\", but it's \"" + trimmedMessage + "\".")
 				}
 			}
 		} else if(err){
-			return this.outputError((err.stack || err.message || err) + "");
+			return this.outputError((err.stack || err.message || err) + "")
 		}
 
-		return true;
+		return true
 	}
 
 	private checkBundle(): boolean {
 		if(this.producedBundleText !== this.bundleText){
-			return this.outputError("bundles are different.");
+			return this.outputError("bundles are different.")
 		}
 
-		return true;
+		return true
 	}
 
 	private runBundle(): Promise<string> {
-		return runTestBundle(this.producedBundleText, this.bundler, this.testBundlePath, this.codePrefixText);
+		return runTestBundle(this.producedBundleText, this.bundler, this.testBundlePath, this.codePrefixText)
 	}
 
 	private async checkStdout(): Promise<boolean> {
-		let stdout = await this.runBundle();
+		let stdout = await this.runBundle()
 		if(stdout !== this.stdoutText){
 			return this.outputError("stdout text expected to be \"" + this.stdoutText + "\", but it's \"" + stdout + "\" instead.")
 		}
-		return true;
+		return true
 	}
 
-	private async rmBuildProducts(){
-		let outDirPath = Path.join(testProjectDir(this.name), "./js");
+	private async rmBuildProducts() {
+		let outDirPath = Path.join(testProjectDir(this.name), "./js")
 		if(await fileExists(outDirPath)){
-			await unlinkRecursive(outDirPath);
+			await unlinkRecursive(outDirPath)
 		}
 
-		let generatedFilePath = Path.join(testProjectDir(this.name), "./generated.ts");
+		let generatedFilePath = Path.join(testProjectDir(this.name), "./generated.ts")
 		if(await fileExists(generatedFilePath)){
-			await FsSync.promises.unlink(generatedFilePath);
+			await FsSync.promises.unlink(generatedFilePath)
 		}
 	}
 
 	async run(): Promise<boolean> {
-		await this.rmBuildProducts();
-		let err: Error | null = null;
+		await this.rmBuildProducts()
+		let err: Error | null = null
 
 		try {
-			await this.compiler.run();
-			await this.bundler.produceBundle();
+			await this.compiler.run()
+			await this.bundler.produceBundle()
 		} catch(e){
-			err = e as Error;
+			err = e as Error
 		}
 
 		if(!this.checkError(err, "compile-time", this.compileErrorText, null)){
-			return false;
+			return false
 		}
 		if(err){
-			return true;
+			return true
 		}
 
 		try {
 			if(!(await this.checkStdout())){
-				return false;
+				return false
 			}
 		} catch(e){
-			err = e as Error;
+			err = e as Error
 		}
-		
+
 		if(!this.checkError(err, "runtime", this.runtimeErrorText, this.runtimeErrorRegexp)){
-			return false;
+			return false
 		}
 		if(err){
-			return true;
+			return true
 		}
-		
-		return this.checkBundle();
+
+		return this.checkBundle()
 	}
 
 	static readonly excludedTestProjectDirectories = new Set([
@@ -199,11 +199,11 @@ export class SingleBuildTestProject {
 		.filter(_ => !!_ && !_.toLowerCase().match(/\.(ts|js)$/) && !SingleBuildTestProject.excludedTestProjectDirectories.has(_))
 
 	static couldRunTest(name: string): boolean {
-		return this.availableProjects.includes(name);
+		return this.availableProjects.includes(name)
 	}
-	
+
 	static runTest(name: string, cliArgsBase: Imploder.CLIArgs): Promise<boolean> {
-		return new SingleBuildTestProject(name, cliArgsBase).run();
+		return new SingleBuildTestProject(name, cliArgsBase).run()
 	}
 
 }

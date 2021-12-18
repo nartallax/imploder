@@ -1,12 +1,12 @@
-import {Imploder} from "imploder";
+import {Imploder} from "imploder"
 
 export class StdoutNotificatorImpl implements Imploder.StdoutNotificator {
 
-	constructor(private readonly context: Imploder.Context){}
+	constructor(private readonly context: Imploder.Context) {}
 
 	private notify(notification: Imploder.StdoutNotification): void {
 		if(!this.context.config.stdoutNotifications){
-			return;
+			return
 		}
 		process.stdout.write(JSON.stringify(notification) + "\n")
 	}
