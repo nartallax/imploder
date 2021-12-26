@@ -114,6 +114,10 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 	let products = {} as {[name: string]: any};
 
 	function throwCircularDependencyError(name: string): never {
+		if(currentlyDefiningProductSeq.length === 1 && 
+			currentlyDefiningProductSeq[0] === name){
+			throw new Error("Module imports itself: " + name + ". It's not clear what exactly do you want.");
+		}
 		let str = name;
 		for(let i = currentlyDefiningProductSeq.length - 1; i >= 0; i--){
 			let n = currentlyDefiningProductSeq[i];
