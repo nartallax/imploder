@@ -55,7 +55,7 @@ export class AfterJsBundlerTransformer extends AbstractTransformer {
 
 		let depArrNode = defineCallNode.arguments[defineCallNode.arguments.length - 2]
 		if(!tsc.isArrayLiteralExpression(depArrNode)){
-			throw new Error("Second-from-end argument of define() is not array literal.")
+			throw new Error("Second-from-end argument of define() is not array literal in file" + fileNode.fileName + ". Maybe it's non-module file? They are not supported. Import or export anything from the file to fix this error.")
 		}
 
 		let rawDependencies = depArrNode.elements.map(el => {

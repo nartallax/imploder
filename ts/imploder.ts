@@ -174,6 +174,7 @@ export namespace Imploder {
 		profile?: string
 		plainLogs?: boolean
 		stdoutNotifications?: boolean
+		idleTimeout?: number
 	}
 
 	/** JSON-объект, который может быть выдан в stdout */

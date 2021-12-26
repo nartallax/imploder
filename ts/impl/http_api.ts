@@ -1,7 +1,7 @@
 import {Imploder} from "imploder"
 import * as http from "http"
-import * as URL from "url"
 import {typescriptDiagnosticEntryToString} from "utils/tsc_diagnostics"
+import {ImploderWatchCompiler} from "impl/compilers/watch_compiler"
 
 export class HttpApi implements Imploder.HttpApi {
 	private readonly server: http.Server
@@ -10,12 +10,26 @@ export class HttpApi implements Imploder.HttpApi {
 		this.server = http.createServer((req, res) => this.handle(req, res))
 	}
 
+	private updateShutdownTimeout(): void {
+		let timeout = this.context.config.idleTimeout
+		if(timeout === undefined || timeout < 0){
+			return
+		}
+		let compiler = this.context.compiler
+		if(!(compiler instanceof ImploderWatchCompiler)){
+			this.context.logger.error("Cannot set shutdown timeout when compiler is not in watch mode.")
+			return
+		}
+		compiler.shutdownAfter(timeout * 1000)
+	}
+
 	private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+		this.updateShutdownTimeout()
 		try {
 			if(!req.url){
 				throw new Error("No url in HTTP request!")
 			}
-			let url = URL.parse(req.url)
+			let url = new URL(req.url, "http://localhost")
 			if(!url.pathname){
 				throw new Error("Expected HTTP request to have path; got none.")
 			}
@@ -74,6 +88,7 @@ export class HttpApi implements Imploder.HttpApi {
 			try {
 				this.server.listen(this.context.config.httpPort, "localhost", () => {
 					this.context.logger.debug("HTTP server listening at http://localhost:" + this.context.config.httpPort)
+					this.updateShutdownTimeout()
 					ok()
 				})
 			} catch(e){

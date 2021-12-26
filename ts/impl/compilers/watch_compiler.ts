@@ -198,6 +198,10 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			this._watch = null
 		}
 		this.fsWatcherController.clear()
+		if(this.shutdownTimeout){
+			clearTimeout(this.shutdownTimeout)
+			this.shutdownTimeout = null
+		}
 	}
 
 	waitBuildEnd(): Promise<void> {
@@ -210,4 +214,15 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			}, 500)
 		})
 	}
+
+	private shutdownTimeout: NodeJS.Timeout | null = null
+	shutdownAfter(timeMsec: number): void {
+		if(this.shutdownTimeout){
+			clearTimeout(this.shutdownTimeout)
+		}
+		this.shutdownTimeout = setTimeout(() => {
+			this.stop()
+		}, timeMsec)
+	}
+
 }

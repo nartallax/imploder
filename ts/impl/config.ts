@@ -17,7 +17,8 @@ export function parseToolCliArgs(args: readonly string[]): Imploder.CLIArgs {
 			help: CLI.help({keys: ["-h", "--h", "-help", "--help"], definition: "Shows list of commands."}),
 			test: CLI.bool({keys: ["--test"], definition: "Run autotests."}),
 			testSingle: CLI.str({keys: ["--test-single"], definition: "Run one single autotest.", default: ""}),
-			stdoutNotifications: CLI.bool({keys: ["--stdout-notifications"], definition: "Enables the tool to output some technical notifications into stdout. Useful when tool is started by another program which wants to communicate."})
+			stdoutNotifications: CLI.bool({keys: ["--stdout-notifications"], definition: "Enables the tool to output some technical notifications into stdout. Useful when tool is started by another program which wants to communicate."}),
+			idleTimeout: CLI.double({keys: ["--idle-timeout"], definition: "Time in seconds that needs to pass since last HTTP API call for compiler to be stopped. Effective only when compiler is started in watch mode and HTTP API is present.", default: -1})
 		}
 	}).parseArgs(args)
 
