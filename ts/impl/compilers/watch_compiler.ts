@@ -221,6 +221,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 			clearTimeout(this.shutdownTimeout)
 		}
 		this.shutdownTimeout = setTimeout(() => {
+			this.context.logger.info("Compiler idle for too long; shutting down.")
 			this.stop()
 		}, timeMsec)
 	}
