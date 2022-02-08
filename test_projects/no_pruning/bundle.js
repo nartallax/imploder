@@ -1,0 +1,1 @@
+[["/main",["/repo"],"(n,i,o)=>{n.main=function main(){console.log(o.strings.join('; '))}}"],["/prunable",["/repo"],"(a,d,e)=>{(0,e.addToRepo)('ayaya')}"],["/repo","n=>{n.strings=[],n.addToRepo=function addToRepo(o){n.strings.push(o)}}"]]

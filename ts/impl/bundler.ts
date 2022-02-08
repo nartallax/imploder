@@ -8,6 +8,8 @@ import {Imploder} from "imploder"
 
 export class BundlerImpl implements Imploder.Bundler {
 
+	private moduleOrderer: ModuleOrderer | null = null
+
 	constructor(private readonly context: Imploder.Context) {}
 
 	async produceBundle(): Promise<string> {
@@ -28,12 +30,16 @@ export class BundlerImpl implements Imploder.Bundler {
 
 		await this.loadAbsentModuleCode()
 
-		let moduleOrder = new ModuleOrderer(this.context.moduleStorage).getModuleOrder(this.getEntryModuleName())
-		this.context.logger.debug("Bundle related modules: " + JSON.stringify(moduleOrder))
+		let moduleOrderer = this.moduleOrderer ||= new ModuleOrderer(
+			this.context.moduleStorage,
+			this.context.config.moduleBlacklistRegexp || [],
+			this.context.config.moduleWhitelistRegexp || [],
+		)
+		let moduleOrder = this.context.config.preventModuleTreePruning
+			? moduleOrderer.getUnprunedModuleOrder(this.getEntryModuleName())
+			: moduleOrderer.getPrunedModuleOrder(this.getEntryModuleName())
 
-		this.checkModuleNames(moduleOrder.modules)
-
-		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.modules, moduleOrder.circularDependentRelatedModules)
+		let defArrArr = this.buildModuleDefinitionArrayArray(moduleOrder.orderedModules, moduleOrder.circularDependentRelatedModules)
 		if(this.context.config.embedTslib && moduleOrder.absentModules.has("tslib")){
 			defArrArr.push(await this.getTslibDefArr())
 		}
@@ -179,47 +185,6 @@ export class BundlerImpl implements Imploder.Bundler {
 			moduleName,
 			overrides: this.context.config.minificationOverrides
 		}, this.context)
-	}
-
-	private blacklistRegexps: RegExp[] | null = null
-	private whitelistRegexps: RegExp[] | null = null
-	private checkModuleNames(names: string[]): void {
-		let blacklistedModules = [] as string[]
-		if(this.context.config.moduleBlacklistRegexp){
-			let regexps = (this.blacklistRegexps ||= this.context.config.moduleBlacklistRegexp.map(x => new RegExp(x)))
-			names.forEach(name => {
-				for(let regexp of regexps){
-					if(regexp.test(name)){
-						blacklistedModules.push(name)
-						return
-					}
-				}
-			})
-		}
-
-		let nonWhitelistedModules = [] as string[]
-		if(this.context.config.moduleWhitelistRegexp && this.context.config.moduleWhitelistRegexp.length > 0){
-			let regexps = (this.whitelistRegexps ||= this.context.config.moduleWhitelistRegexp.map(x => new RegExp(x)))
-			names.forEach(name => {
-				for(let regexp of regexps){
-					if(regexp.test(name)){
-						return
-					}
-				}
-				nonWhitelistedModules.push(name)
-			})
-		}
-
-		if(blacklistedModules.length > 0 || nonWhitelistedModules.length > 0){
-			let message = "Bundle includes some modules that must not be included:"
-			if(blacklistedModules.length > 0){
-				message += " " + blacklistedModules.join(", ") + " (excluded by blacklist);"
-			}
-			if(nonWhitelistedModules.length > 0){
-				message += " " + nonWhitelistedModules.join(", ") + " (not included in whitelist);"
-			}
-			throw new Error(message)
-		}
 	}
 
 }

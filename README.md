@@ -187,6 +187,15 @@ If bundler detects that bundle includes module which name is matches any blackli
 If whitelist regexps are defined and non-empty, then names of all modules included in bundle must match at least one of the regexps, otherwise bundling is failed.  
 Use-case of this option is sanity checks (to prevent accidently bundling a ton of code you won't actually use), or to keep some secret server-side logic away from client-side bundle.  
 
+### Prevent module tree pruning
+
+By default, the tool won't include in bundle modules that are not referenced (directly or indirectly) from the entrypoint module.  
+To actually include all of the compiled modules (not really, see below), you can set the following option:
+
+	"preventModuleTreePruning": true
+
+Note that enabling this option won't include any blacklisted or not whitelisted modules. The only way how whitelist/blacklist check can be triggered is for module to be referenced from entrypoint.  
+
 ### Output directory deletion
 
 By default, output directory is deleted on tool start. This is done to ensure build consistency (there are bugs related to changing "target" value without purging old js files, resulting in inconsistency of ES version within single bundle).  
