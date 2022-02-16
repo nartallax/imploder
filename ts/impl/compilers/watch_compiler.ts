@@ -61,6 +61,7 @@ export class ImploderWatchCompiler extends ImploderAbstractCompiler implements I
 		// смысл в том, что обычно createProgram будет чем-то вроде createEmitAndSemanticDiagnosticsBuilderProgram
 		// но я не хочу это хардкодить. поэтому я получаю её таким вот непрямым путем
 		// в худшем случае, при изменениях тул перестанет компилиться/работать
+		// TODO: just use createProgram from actual host
 		let defaultHost = Tsc.createWatchCompilerHost(
 			this.context.config.tsconfigPath,
 			this.context.config.tscParsedCommandLine.options,

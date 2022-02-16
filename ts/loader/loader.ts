@@ -227,19 +227,15 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 		});
 	}
 
-	function discoverExternalModules(moduleName: string, result: string[] = [], visited: {[k: string]: true} = {}): string[] {
-		if(moduleName in renames){
-			moduleName = renames[moduleName];
+	function discoverExternalModules(result: {[k: string]: true} = {}): string[] {
+		for(let moduleName in defMap){
+			defMap[moduleName].dependencies.forEach(dep => {
+				if(!(dep in defMap)){
+					result[dep] = true
+				}
+			})
 		}
-		if(!(moduleName in visited)){
-			visited[moduleName] = true;
-			if(moduleName in defMap){
-				defMap[moduleName].dependencies.forEach(depName => discoverExternalModules(depName, result, visited));
-			} else {
-				result.push(moduleName);
-			}
-		}
-		return result;
+		return Object.keys(result).sort();
 	}
 
 	function afterExternalsLoaded(){
@@ -274,7 +270,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 
 	function start(){
 		if(amd){
-			let externalModuleNames = discoverExternalModules(params.entryPoint.module, ["require"]);
+			let externalModuleNames = discoverExternalModules({"require": true});
 			define(externalModuleNames, function(require: AmdRequire){
 				req = require;
 				for(let i = externalModuleNames.length; i < arguments.length; i++){
@@ -283,7 +279,7 @@ function imploderLoader(defs: ImploderModuleDefinitonArray[], params: LoaderPara
 				return afterExternalsLoaded();
 			});
 		} else {
-			let externalModuleNames = discoverExternalModules(params.entryPoint.module);
+			let externalModuleNames = discoverExternalModules();
 			requireAny(externalModuleNames, function(){
 				for(let i = 0; i < arguments.length; i++){
 					products[externalModuleNames[i]] = arguments[i];
