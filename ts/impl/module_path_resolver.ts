@@ -98,7 +98,7 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 
 }
 
-const tsFileExtensions: readonly string[] = [".ts", ".tsx", ".d.ts"]
+const tsFileExtensions: readonly string[] = [".d.ts", ".ts", ".tsx"]
 
 function stripTsExt(path: string): string {
 	let lc = path.toLowerCase()
