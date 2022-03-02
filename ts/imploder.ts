@@ -195,6 +195,9 @@ export namespace Imploder {
 
 		/** привести имя файла-модуля проекта к каноничному виду */
 		getCanonicalModuleName(localModuleNameOrPath: string): string
+
+		/** Если path ведет в node_modules - получить имя npm-пакета и каноничный путь */
+		getExternalPackageNameAndPath(path: string): {packageName: string, filePathInPackage: string} | null
 	}
 
 	/** Хранилище всякой информации о модулях */

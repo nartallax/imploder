@@ -54,26 +54,61 @@ export class ModulePathResolverImpl implements Imploder.ModulePathResolver {
 		return moduleDesignator
 	}
 
+	getExternalPackageNameAndPath(path: string): {packageName: string, filePathInPackage: string} | null {
+		let pathParts = path.split(/[/\\]/)
+		let packageName: string | null = null
+		let packageNameStartsAt: number | null = null
+		for(let i = pathParts.length - 2; i >= 0; i--){
+			if(packageName === null){
+				if(pathParts[i] === "node_modules"){
+					let part = pathParts[i + 1]!
+					if(part.startsWith("@")){
+						if(i === pathParts.length - 2){
+							throw new Error("Cannot deduce NPM package name from file path: " + path + ": last part of path is a namespace, but nothing comes after it.")
+						}
+
+						packageName = part + "/" + pathParts[i + 2]
+					} else {
+						packageName = part
+					}
+					packageNameStartsAt = i + 1
+					break
+				}
+			}
+		}
+
+		if(packageName === null || packageNameStartsAt === null){
+			return null
+		}
+
+		return {
+			packageName,
+			filePathInPackage: pathParts.slice(packageNameStartsAt).join("/")
+		}
+	}
+
 	getCanonicalModuleName(localModuleNameOrPath: string): string {
-		return "/" + getRelativeModulePath(this.moduleRoot, localModuleNameOrPath)
+		let externalPkg = this.getExternalPackageNameAndPath(localModuleNameOrPath)
+		if(!externalPkg){
+			return "/" + getRelativeModulePath(this.moduleRoot, localModuleNameOrPath)
+		} else {
+			return normalizeModulePath(externalPkg.filePathInPackage)
+		}
 	}
 
 }
 
-const tsFileExtensions: ReadonlySet<string> = new Set([".ts", ".tsx"])
-const fileExtensionRegexp = /\.[^.]+$/
-
-function isTsExt(path: string): boolean {
-	let extMatch = path.match(fileExtensionRegexp)
-	if(!extMatch){
-		return false
-	}
-	let ext = extMatch[0].toLowerCase()
-	return tsFileExtensions.has(ext)
-}
+const tsFileExtensions: readonly string[] = [".ts", ".tsx", ".d.ts"]
 
 function stripTsExt(path: string): string {
-	return isTsExt(path) ? path.replace(fileExtensionRegexp, "") : path
+	let lc = path.toLowerCase()
+	for(let ext of tsFileExtensions){
+		if(lc.endsWith(ext)){
+			path = path.substring(0, path.length - ext.length)
+			break
+		}
+	}
+	return path
 }
 
 function normalizeModulePath(p: string): string {
