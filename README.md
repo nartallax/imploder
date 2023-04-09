@@ -1,3 +1,7 @@
+# Discontinued
+
+Use anything else, like Parcel, or webpack, or whatever else you want - that will make your life much better than using this project.  
+The only value there is in this project is proper circular dependency resolution, which is kinda impossible to do performantly anyways.  
 
 # Imploder
 
